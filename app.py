@@ -15,6 +15,8 @@ print("\n--- Store Details ---")
 store_name = input("Enter Store Name: ")
 store_city = input("Enter Store Town / City: ")
 store_phone = input("Enter Store Phone Number: ")
+store_email = input("Enter Store Email ID (optional, leave blank if none): ")
+store_website = input("Enter Store Website URL (optional, leave blank if none): ")
 
 # For now we save only the logo file path/name.
 # Later, in the web/app version, we can actually upload/display the logo.
@@ -349,7 +351,11 @@ print(
     "Store Phone:",
     store_phone
 )
+if store_email:
+    print("Store Email:", store_email)
 
+if store_website:
+    print("Store Website:", store_website)
 if store_logo:
 
     print(
