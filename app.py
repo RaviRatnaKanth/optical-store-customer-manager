@@ -1,3 +1,6 @@
+import csv
+from datetime import datetime
+
 print("==================================================")
 print("          OPTICAL STORE CUSTOMER MANAGER")
 print("==================================================")
@@ -493,7 +496,44 @@ print(
     balance
 )
 
+# Save customer record to CSV
+with open("customers.csv", "a", newline="", encoding="utf-8") as file:
+    writer = csv.writer(file)
 
+    writer.writerow([
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        store_name,
+        store_city,
+        store_phone,
+        store_logo,
+        customer_name,
+        age,
+        phone,
+        address,
+        spectacle_history,
+        years_using_glasses,
+        previous_right_sph,
+        previous_right_cyl,
+        previous_right_axis,
+        previous_right_add,
+        previous_left_sph,
+        previous_left_cyl,
+        previous_left_axis,
+        previous_left_add,
+        frame_details,
+        lens_type,
+        right_sph,
+        right_cyl,
+        right_axis,
+        right_add,
+        left_sph,
+        left_cyl,
+        left_axis,
+        left_add,
+        total_amount,
+        advance_amount,
+        balance
+    ])
 print("\n==================================================")
 print("        CUSTOMER RECORD COMPLETED SUCCESSFULLY")
 print("==================================================")
