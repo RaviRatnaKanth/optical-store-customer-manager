@@ -1,29 +1,12 @@
 import csv
 from datetime import datetime
-
+from store_config import store_name, store_city, store_phone, store_email, store_website, store_logo
 print("==================================================")
 print("          OPTICAL STORE CUSTOMER MANAGER")
 print("==================================================")
 
 
-# ==================================================
-# 1. STORE DETAILS
-# ==================================================
 
-print("\n--- Store Details ---")
-
-store_name = input("Enter Store Name: ")
-store_city = input("Enter Store Town / City: ")
-store_phone = input("Enter Store Phone Number: ")
-store_email = input("Enter Store Email ID (optional, leave blank if none): ")
-store_website = input("Enter Store Website URL (optional, leave blank if none): ")
-
-# For now we save only the logo file path/name.
-# Later, in the web/app version, we can actually upload/display the logo.
-store_logo = input(
-    "Enter Store Logo File Name/Path "
-    "(leave blank if no logo): "
-)
 
 
 # ==================================================

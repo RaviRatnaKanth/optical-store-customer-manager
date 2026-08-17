@@ -1,0 +1,176 @@
+import csv
+
+
+def show_customer(row):
+    print("\n" + "=" * 60)
+    print("CUSTOMER RECORD FOUND")
+    print("=" * 60)
+
+    print("Date / Time:", row[0])
+
+    print("\n--- Store Details ---")
+    print("Store Name:", row[1])
+    print("Store City:", row[2])
+    print("Store Phone:", row[3])
+    print("Store Logo:", row[4] if row[4] else "Not Added")
+
+    print("\n--- Customer Details ---")
+    print("Customer Name:", row[5])
+    print("Age:", row[6])
+    print("Phone:", row[7])
+    print("Address:", row[8])
+    print("Spectacle History:", row[9])
+    print("Years Using Glasses:", row[10])
+
+    print("\n--- Previous Prescription ---")
+    print(
+        "Right Eye (OD):",
+        "SPH =", row[11],
+        "CYL =", row[12],
+        "AXIS =", row[13],
+        "ADD =", row[14] if row[14] else "Not Required"
+    )
+
+    print(
+        "Left Eye (OS):",
+        "SPH =", row[15],
+        "CYL =", row[16],
+        "AXIS =", row[17],
+        "ADD =", row[18] if row[18] else "Not Required"
+    )
+
+    print("\n--- Frame / Lens ---")
+    print("Frame Details:", row[19])
+    print("Lens Type:", row[20])
+
+    print("\n--- Current Prescription ---")
+    print(
+        "Right Eye (OD):",
+        "SPH =", row[21],
+        "CYL =", row[22],
+        "AXIS =", row[23],
+        "ADD =", row[24] if row[24] else "Not Required"
+    )
+
+    print(
+        "Left Eye (OS):",
+        "SPH =", row[25],
+        "CYL =", row[26],
+        "AXIS =", row[27],
+        "ADD =", row[28] if row[28] else "Not Required"
+    )
+
+    print("\n--- Payment ---")
+    print("Total Amount:", row[29])
+    print("Advance Amount:", row[30])
+    print("Balance Amount:", row[31])
+
+    print("=" * 60)
+
+
+def search_customer():
+    print("\n--- SEARCH CUSTOMER ---")
+
+    search_value = input(
+        "Enter Customer Name or Phone Number: "
+    ).strip().lower()
+
+    found = False
+
+    try:
+        with open(
+            "customers.csv",
+            "r",
+            newline="",
+            encoding="utf-8"
+        ) as file:
+
+            reader = csv.reader(file)
+
+            for row in reader:
+
+                if len(row) < 32:
+                    continue
+
+                customer_name = row[5].strip().lower()
+                phone = row[7].strip().lower()
+
+                if (
+                    search_value in customer_name
+                    or search_value in phone
+                ):
+                    show_customer(row)
+                    found = True
+
+        if not found:
+            print("\nCustomer not found.")
+
+    except FileNotFoundError:
+        print("\nNo customer records found yet.")
+
+
+def view_all_customers():
+    print("\n--- ALL CUSTOMERS ---")
+
+    found = False
+
+    try:
+        with open(
+            "customers.csv",
+            "r",
+            newline="",
+            encoding="utf-8"
+        ) as file:
+
+            reader = csv.reader(file)
+
+            for row in reader:
+
+                if len(row) < 32:
+                    continue
+
+                print(
+                    "\nName:",
+                    row[5],
+                    "| Phone:",
+                    row[7],
+                    "| Balance:",
+                    row[31]
+                )
+
+                found = True
+
+        if not found:
+            print("\nNo customer records found yet.")
+
+    except FileNotFoundError:
+        print("\nNo customer records found yet.")
+
+
+print("=" * 60)
+print("          OPTICAL STORE CUSTOMER MANAGER")
+print("=" * 60)
+
+print("\nMAIN MENU")
+print("1. Add New Customer")
+print("2. Search Customer")
+print("3. View All Customers")
+print("4. Exit")
+
+choice = input("\nEnter your choice (1-4): ").strip()
+
+if choice == "1":
+    print("\nOpening Add New Customer...")
+    import app
+
+elif choice == "2":
+    search_customer()
+
+elif choice == "3":
+    view_all_customers()
+
+elif choice == "4":
+    print("\nThank you for using Optical Store Customer Manager.")
+
+else:
+    print("\nInvalid choice. Please enter 1, 2, 3 or 4.")
