@@ -197,6 +197,149 @@ def search_customer():
 # ============================================================
 # VIEW ALL CUSTOMERS
 # ============================================================
+def print_bill():
+    print("\n--- PRINT BILL ---")
+
+    search_value = input(
+        "Enter Customer Name or Phone Number: "
+    ).strip().lower()
+
+    found = False
+
+    try:
+        with open(
+            "customers.csv",
+            "r",
+            newline="",
+            encoding="utf-8"
+        ) as file:
+
+            reader = csv.reader(file)
+
+            for row in reader:
+
+                if len(row) < 32:
+                    continue
+
+                customer_name = row[5].strip().lower()
+                phone = row[7].strip().lower()
+
+                if (
+                    search_value in customer_name
+                    or search_value in phone
+                ):
+                    print("\n" + "=" * 50)
+                    print("              CUSTOMER BILL")
+                    print("=" * 50)
+
+                    print("Store Name:", row[1])
+                    print("Store City:", row[2])
+
+                    print("\nCustomer Name:", row[5])
+                    print("Phone:", row[7])
+
+                    print("\n--- Spectacle Details ---")
+                    print("Frame Details:", row[19])
+                    print("Lens Type:", row[20])
+
+                    print("\n--- Payment Details ---")
+                    print("Total Amount:", row[29])
+                    print("Advance Amount:", row[30])
+                    print("Balance Amount:", row[31])
+
+                    print("=" * 50)
+
+                    found = True
+
+        if not found:
+            print("\nCustomer not found.")
+
+    except FileNotFoundError:
+        print("\nNo customer records found yet.")
+
+# ============================================================
+# PRINT PRESCRIPTION
+# ============================================================
+
+def print_prescription():
+    print("\n--- PRINT PRESCRIPTION ---")
+
+    search_value = input(
+        "Enter Customer Name or Phone Number: "
+    ).strip().lower()
+
+    found = False
+
+    try:
+        with open(
+            "customers.csv",
+            "r",
+            newline="",
+            encoding="utf-8"
+        ) as file:
+
+            reader = csv.reader(file)
+
+            for row in reader:
+
+                if len(row) < 32:
+                    continue
+
+                customer_name = row[5].strip().lower()
+                phone = row[7].strip().lower()
+
+                if (
+                    search_value in customer_name
+                    or search_value in phone
+                ):
+
+                    print("\n" + "=" * 60)
+                    print("              SPECTACLE PRESCRIPTION")
+                    print("=" * 60)
+
+                    print("Store Name:", row[1])
+                    print("Store City:", row[2])
+
+                    print("\nCustomer Name:", row[5])
+                    print("Phone:", row[7])
+
+                    print("\n" + "-" * 60)
+                    print("Eye        SPH        CYL        AXIS        ADD")
+                    print("-" * 60)
+
+                    print(
+                        "RIGHT      ",
+                        row[21],
+                        "     ",
+                        row[22],
+                        "     ",
+                        row[23],
+                        "     ",
+                        row[24] if row[24] else "Not Required"
+                    )
+
+                    print(
+                        "LEFT       ",
+                        row[25],
+                        "     ",
+                        row[26],
+                        "     ",
+                        row[27],
+                        "     ",
+                        row[28] if row[28] else "Not Required"
+                    )
+
+                    print("-" * 60)
+
+                    found = True
+
+            if not found:
+                print("\nCustomer not found.")
+
+    except FileNotFoundError:
+        print("\nNo customer records found yet.")
+
+
 
 def view_all_customers():
 
@@ -250,10 +393,11 @@ print("\nMAIN MENU")
 print("1. Add New Customer")
 print("2. Search Customer")
 print("3. View All Customers")
-print("4. Exit")
+print("4. Print Bill")
+print("5. Print Prescription")
+print("6. Exit")
 
-choice = input("\nEnter your choice (1-4): ").strip()
-
+choice = input("\nEnter your choice (1-6): ").strip()
 
 # ============================================================
 # MENU ACTIONS
@@ -277,6 +421,18 @@ elif choice == "3":
 
 elif choice == "4":
 
+    print("\nOpening Print Bill...")
+    print_bill()
+
+
+elif choice == "5":
+
+    print("\nOpening Print Prescription...")
+    print_prescription()
+
+
+elif choice == "6":
+
     print(
         "\nThank you for using "
         "Optical Store Customer Manager."
@@ -287,5 +443,5 @@ else:
 
     print(
         "\nInvalid choice. "
-        "Please enter 1, 2, 3 or 4."
+        "Please enter 1, 2, 3, 4, 5 or 6."
     )
