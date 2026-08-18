@@ -1,6 +1,10 @@
 import csv
 
 
+# ============================================================
+# DISPLAY FULL CUSTOMER RECORD
+# ============================================================
+
 def show_customer(row):
     print("\n" + "=" * 60)
     print("CUSTOMER RECORD FOUND")
@@ -8,11 +12,23 @@ def show_customer(row):
 
     print("Date / Time:", row[0])
 
+    # --------------------------------------------------------
+    # Store Details
+    # --------------------------------------------------------
+
     print("\n--- Store Details ---")
     print("Store Name:", row[1])
     print("Store City:", row[2])
-    print("Store Phone:", row[3])
-    print("Store Logo:", row[4] if row[4] else "Not Added")
+
+    if row[3]:
+        print("Store Phone:", row[3])
+
+    if row[4]:
+        print("Store Logo:", row[4])
+
+    # --------------------------------------------------------
+    # Customer Details
+    # --------------------------------------------------------
 
     print("\n--- Customer Details ---")
     print("Customer Name:", row[5])
@@ -20,9 +36,16 @@ def show_customer(row):
     print("Phone:", row[7])
     print("Address:", row[8])
     print("Spectacle History:", row[9])
-    print("Years Using Glasses:", row[10])
+
+    if row[10]:
+        print("Years Using Glasses:", row[10])
+
+    # --------------------------------------------------------
+    # Previous Prescription
+    # --------------------------------------------------------
 
     print("\n--- Previous Prescription ---")
+
     print(
         "Right Eye (OD):",
         "SPH =", row[11],
@@ -39,11 +62,20 @@ def show_customer(row):
         "ADD =", row[18] if row[18] else "Not Required"
     )
 
+    # --------------------------------------------------------
+    # Frame / Lens Details
+    # --------------------------------------------------------
+
     print("\n--- Frame / Lens ---")
     print("Frame Details:", row[19])
     print("Lens Type:", row[20])
 
+    # --------------------------------------------------------
+    # Current Prescription
+    # --------------------------------------------------------
+
     print("\n--- Current Prescription ---")
+
     print(
         "Right Eye (OD):",
         "SPH =", row[21],
@@ -60,6 +92,10 @@ def show_customer(row):
         "ADD =", row[28] if row[28] else "Not Required"
     )
 
+    # --------------------------------------------------------
+    # Payment Details
+    # --------------------------------------------------------
+
     print("\n--- Payment ---")
     print("Total Amount:", row[29])
     print("Advance Amount:", row[30])
@@ -68,7 +104,44 @@ def show_customer(row):
     print("=" * 60)
 
 
+# ============================================================
+# PREPARE PRESCRIPTION MESSAGE
+# ============================================================
+
+def prepare_prescription_message(row):
+
+    prescription_message = f"""
+{row[1]}
+
+Customer: {row[5]}
+
+Spectacle Prescription
+
+Right Eye (OD):
+SPH: {row[21]}
+CYL: {row[22]}
+AXIS: {row[23]}
+ADD: {row[24] if row[24] else "Not Required"}
+
+Left Eye (OS):
+SPH: {row[25]}
+CYL: {row[26]}
+AXIS: {row[27]}
+ADD: {row[28] if row[28] else "Not Required"}
+
+Please keep this prescription for your reference.
+"""
+
+    print("\n--- PRESCRIPTION MESSAGE ---")
+    print(prescription_message)
+
+
+# ============================================================
+# SEARCH CUSTOMER
+# ============================================================
+
 def search_customer():
+
     print("\n--- SEARCH CUSTOMER ---")
 
     search_value = input(
@@ -78,6 +151,7 @@ def search_customer():
     found = False
 
     try:
+
         with open(
             "customers.csv",
             "r",
@@ -89,6 +163,7 @@ def search_customer():
 
             for row in reader:
 
+                # Old/incomplete CSV rows are ignored safely
                 if len(row) < 32:
                     continue
 
@@ -99,8 +174,18 @@ def search_customer():
                     search_value in customer_name
                     or search_value in phone
                 ):
+
                     show_customer(row)
+
                     found = True
+
+                    send_choice = input(
+                        "\nPrepare prescription message "
+                        "for this customer? (yes/no): "
+                    ).strip().lower()
+
+                    if send_choice in ["yes", "y"]:
+                        prepare_prescription_message(row)
 
         if not found:
             print("\nCustomer not found.")
@@ -109,12 +194,18 @@ def search_customer():
         print("\nNo customer records found yet.")
 
 
+# ============================================================
+# VIEW ALL CUSTOMERS
+# ============================================================
+
 def view_all_customers():
+
     print("\n--- ALL CUSTOMERS ---")
 
     found = False
 
     try:
+
         with open(
             "customers.csv",
             "r",
@@ -147,6 +238,10 @@ def view_all_customers():
         print("\nNo customer records found yet.")
 
 
+# ============================================================
+# MAIN MENU
+# ============================================================
+
 print("=" * 60)
 print("          OPTICAL STORE CUSTOMER MANAGER")
 print("=" * 60)
@@ -159,18 +254,38 @@ print("4. Exit")
 
 choice = input("\nEnter your choice (1-4): ").strip()
 
+
+# ============================================================
+# MENU ACTIONS
+# ============================================================
+
 if choice == "1":
+
     print("\nOpening Add New Customer...")
     import app
 
+
 elif choice == "2":
+
     search_customer()
 
+
 elif choice == "3":
+
     view_all_customers()
 
+
 elif choice == "4":
-    print("\nThank you for using Optical Store Customer Manager.")
+
+    print(
+        "\nThank you for using "
+        "Optical Store Customer Manager."
+    )
+
 
 else:
-    print("\nInvalid choice. Please enter 1, 2, 3 or 4.")
+
+    print(
+        "\nInvalid choice. "
+        "Please enter 1, 2, 3 or 4."
+    )

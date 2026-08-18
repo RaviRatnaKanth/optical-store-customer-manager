@@ -526,3 +526,26 @@ with open("customers.csv", "a", newline="", encoding="utf-8") as file:
 print("\n==================================================")
 print("        CUSTOMER RECORD COMPLETED SUCCESSFULLY")
 print("==================================================")
+print("\n--- PRESCRIPTION MESSAGE ---")
+
+prescription_message = f"""
+{store_name}
+
+Spectacle Prescription
+
+Right Eye (OD):
+SPH: {right_sph}
+CYL: {right_cyl}
+AXIS: {right_axis}
+ADD: {right_add if right_add else "Not Required"}
+
+Left Eye (OS):
+SPH: {left_sph}
+CYL: {left_cyl}
+AXIS: {left_axis}
+ADD: {left_add if left_add else "Not Required"}
+
+Please keep this prescription for your reference.
+"""
+
+print(prescription_message)
