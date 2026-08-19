@@ -234,6 +234,19 @@ left_add = input(
     "Enter Left Eye ADD / Near Power: "
 )
 
+# ==================================================
+# VISUAL ACUITY / PINHOLE TEST (OPTIONAL)
+# ==================================================
+
+print("\n--- Visual Acuity Test (Optional) ---")
+print("Leave blank if not tested.")
+
+right_va = input("Right Eye Visual Acuity (Example: 6/6): ")
+left_va = input("Left Eye Visual Acuity (Example: 6/6): ")
+
+right_pinhole = input("Right Eye Pinhole (Example: 6/6): ")
+left_pinhole = input("Left Eye Pinhole (Example: 6/6): ")
+
 
 # ==================================================
 # 11. PAYMENT DETAILS
@@ -466,6 +479,29 @@ print(
 )
 
 
+# ---------------- VISUAL ACUITY / PINHOLE ----------------
+
+print("\n--- Visual Acuity / Pinhole Test ---")
+
+print(
+    "Right Eye Visual Acuity:",
+    right_va if right_va else "Not Tested"
+)
+
+print(
+    "Left Eye Visual Acuity:",
+    left_va if left_va else "Not Tested"
+)
+
+print(
+    "Right Eye Pinhole:",
+    right_pinhole if right_pinhole else "Not Tested"
+)
+
+print(
+    "Left Eye Pinhole:",
+    left_pinhole if left_pinhole else "Not Tested"
+)
 # ---------------- PAYMENT ----------------
 
 print("\n--- Payment ---")
@@ -519,6 +555,10 @@ with open("customers.csv", "a", newline="", encoding="utf-8") as file:
         left_cyl,
         left_axis,
         left_add,
+        right_va,
+        left_va,
+        right_pinhole,
+        left_pinhole,
         total_amount,
         advance_amount,
         balance
@@ -544,7 +584,13 @@ SPH: {left_sph}
 CYL: {left_cyl}
 AXIS: {left_axis}
 ADD: {left_add if left_add else "Not Required"}
+Visual Acuity / Pinhole Test:
 
+Right Eye Visual Acuity: {right_va if right_va else "Not Tested"}
+Left Eye Visual Acuity: {left_va if left_va else "Not Tested"}
+
+Right Eye Pinhole: {right_pinhole if right_pinhole else "Not Tested"}
+Left Eye Pinhole: {left_pinhole if left_pinhole else "Not Tested"}
 Please keep this prescription for your reference.
 """
 
