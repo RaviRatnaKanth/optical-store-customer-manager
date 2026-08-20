@@ -4,7 +4,6 @@ from store_config import store_name, store_city, store_phone, store_email, store
 record_date = datetime.now().strftime("%d-%m-%Y")
 record_time = datetime.now().strftime("%I:%M %p")
 
-show_time = False
 print("==================================================")
 print("          OPTICAL STORE CUSTOMER MANAGER")
 print("==================================================")
@@ -582,7 +581,7 @@ prescription_message = f"""
 {store_name}
 Customer Name: {customer_name}
 Date: {record_date}
-Time: {record_time if show_time else "Not Included"}
+Time: {record_time}
 Spectacle Prescription
 
 Right Eye (OD):
