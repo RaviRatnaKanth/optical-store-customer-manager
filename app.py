@@ -1,6 +1,10 @@
 import csv
 from datetime import datetime
 from store_config import store_name, store_city, store_phone, store_email, store_website, store_logo
+record_date = datetime.now().strftime("%d-%m-%Y")
+record_time = datetime.now().strftime("%I:%M %p")
+
+show_time = False
 print("==================================================")
 print("          OPTICAL STORE CUSTOMER MANAGER")
 print("==================================================")
@@ -576,7 +580,9 @@ print("\n--- PRESCRIPTION MESSAGE ---")
 
 prescription_message = f"""
 {store_name}
-
+Customer Name: {customer_name}
+Date: {record_date}
+Time: {record_time if show_time else "Not Included"}
 Spectacle Prescription
 
 Right Eye (OD):
@@ -595,6 +601,7 @@ Distance PD: {distance_pd if distance_pd else "Not Measured"}
 Near PD: {near_pd if near_pd else "Not Measured"}
 
 Visual Acuity / Pinhole Test:
+
 
 Right Eye Visual Acuity: {right_va if right_va else "Not Tested"}
 Left Eye Visual Acuity: {left_va if left_va else "Not Tested"}
