@@ -590,6 +590,10 @@ SPH: {left_sph}
 CYL: {left_cyl}
 AXIS: {left_axis}
 ADD: {left_add if left_add else "Not Required"}
+Pupillary Distance (PD):
+Distance PD: {distance_pd if distance_pd else "Not Measured"}
+Near PD: {near_pd if near_pd else "Not Measured"}
+
 Visual Acuity / Pinhole Test:
 
 Right Eye Visual Acuity: {right_va if right_va else "Not Tested"}
