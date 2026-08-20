@@ -195,21 +195,13 @@ print(
 
 print("\nRight Eye (OD)")
 
-right_sph = input(
-    "Enter Right Eye SPH: "
-)
+right_sph = input("Enter Right Eye SPH (+/-): ").strip()
 
-right_cyl = input(
-    "Enter Right Eye CYL: "
-)
+right_cyl = input("Enter Right Eye CYL (+/-): ").strip()
 
-right_axis = input(
-    "Enter Right Eye AXIS (0-180): "
-)
+right_axis = input("Enter Right Eye AXIS (0-180): ").strip()
 
-right_add = input(
-    "Enter Right Eye ADD / Near Power: "
-)
+right_add = input("Enter Right Eye ADD / Near Power (+): ").strip()
 
 
 # ==================================================
@@ -218,22 +210,26 @@ right_add = input(
 
 print("\nLeft Eye (OS)")
 
-left_sph = input(
-    "Enter Left Eye SPH: "
-)
+left_sph = input("Enter Left Eye SPH (+/-): ").strip()
 
-left_cyl = input(
-    "Enter Left Eye CYL: "
-)
+left_cyl = input("Enter Left Eye CYL (+/-): ").strip()
 
-left_axis = input(
-    "Enter Left Eye AXIS (0-180): "
-)
+left_axis = input("Enter Left Eye AXIS (0-180): ").strip()
 
-left_add = input(
-    "Enter Left Eye ADD / Near Power: "
-)
+left_add = input("Enter Left Eye ADD / Near Power (+): ").strip()
+# ==========================================================
+# 11. PUPILLARY DISTANCE (PD) - OPTIONAL
+# ==========================================================
 
+print("\n--- Pupillary Distance (PD) (Optional) ---")
+
+distance_pd = input(
+    "Enter Distance PD in mm (Example: 62): "
+).strip()
+
+near_pd = input(
+    "Enter Near PD in mm (Example: 59): "
+).strip()
 # ==================================================
 # VISUAL ACUITY / PINHOLE TEST (OPTIONAL)
 # ==================================================
@@ -477,7 +473,17 @@ print(
     if left_add
     else "Not Required"
 )
+print("\n--- Pupillary Distance (PD) ---")
 
+print(
+    "Distance PD:",
+    distance_pd if distance_pd else "Not Measured"
+)
+
+print(
+    "Near PD:",
+    near_pd if near_pd else "Not Measured"
+)
 
 # ---------------- VISUAL ACUITY / PINHOLE ----------------
 
