@@ -65,31 +65,43 @@ def show_customer(row):
     # --------------------------------------------------------
     # Frame / Lens Details
     # --------------------------------------------------------
+    print("\n--- Frame / Lens Details ---")
 
-    print("\n--- Frame / Lens ---")
     print("Frame Details:", row[19])
-    print("Lens Type:", row[20])
 
+    if row[20]:
+        print("Frame Brand:", row[20])
+
+    if row[21]:
+        print("Frame Offer:", row[21])
+
+    print("Lens Type:", row[22])
+
+    if row[23]:
+        print("Lens Brand:", row[23])
+
+    if row[24]:
+        print("Lens Offer:", row[24])
     # --------------------------------------------------------
     # Current Prescription
     # --------------------------------------------------------
 
-    print("\n--- Current Prescription ---")
+        print("\n--- Current Prescription ---")
 
     print(
         "Right Eye (OD):",
-        "SPH =", row[21],
-        "CYL =", row[22],
-        "AXIS =", row[23],
-        "ADD =", row[24] if row[24] else "Not Required"
-    )
-
-    print(
-        "Left Eye (OS):",
         "SPH =", row[25],
         "CYL =", row[26],
         "AXIS =", row[27],
         "ADD =", row[28] if row[28] else "Not Required"
+    )
+
+    print(
+        "Left Eye (OS):",
+        "SPH =", row[29],
+        "CYL =", row[30],
+        "AXIS =", row[31],
+        "ADD =", row[32] if row[32] else "Not Required"
     )
 
     # --------------------------------------------------------
@@ -97,9 +109,9 @@ def show_customer(row):
     # --------------------------------------------------------
 
     print("\n--- Payment ---")
-    print("Total Amount:", row[29])
-    print("Advance Amount:", row[30])
-    print("Balance Amount:", row[31])
+    print("Total Amount:", row[37])
+    print("Advance Amount:", row[38])
+    print("Balance Amount:", row[39])
 
     print("=" * 60)
 
@@ -118,16 +130,17 @@ Customer: {row[5]}
 Spectacle Prescription
 
 Right Eye (OD):
-SPH: {row[21]}
-CYL: {row[22]}
-AXIS: {row[23]}
-ADD: {row[24] if row[24] else "Not Required"}
-
-Left Eye (OS):
+Right Eye (OD):
 SPH: {row[25]}
 CYL: {row[26]}
 AXIS: {row[27]}
 ADD: {row[28] if row[28] else "Not Required"}
+
+Left Eye (OS):
+SPH: {row[29]}
+CYL: {row[30]}
+AXIS: {row[31]}
+ADD: {row[32] if row[32] else "Not Required"}
 
 Please keep this prescription for your reference.
 """
@@ -164,7 +177,7 @@ def search_customer():
             for row in reader:
 
                 # Old/incomplete CSV rows are ignored safely
-                if len(row) < 32:
+                if len(row) < 40:
                     continue
 
                 customer_name = row[5].strip().lower()
@@ -218,7 +231,7 @@ def print_bill():
 
             for row in reader:
 
-                if len(row) < 32:
+                if len(row) < 40:
                     continue
 
                 customer_name = row[5].strip().lower()
@@ -240,12 +253,12 @@ def print_bill():
 
                     print("\n--- Spectacle Details ---")
                     print("Frame Details:", row[19])
-                    print("Lens Type:", row[20])
+                    print("Lens Type:", row[22])
 
                     print("\n--- Payment Details ---")
-                    print("Total Amount:", row[29])
-                    print("Advance Amount:", row[30])
-                    print("Balance Amount:", row[31])
+                    print("Total Amount:", row[37])
+                    print("Advance Amount:", row[38])
+                    print("Balance Amount:", row[39])
 
                     print("=" * 50)
 
@@ -282,7 +295,8 @@ def print_prescription():
 
             for row in reader:
 
-                if len(row) < 32:
+                # Ignore old/incomplete CSV records
+                if len(row) < 40:
                     continue
 
                 customer_name = row[5].strip().lower()
@@ -293,9 +307,9 @@ def print_prescription():
                     or search_value in phone
                 ):
 
-                    print("\n" + "=" * 60)
+                    print("\n" + "=" * 65)
                     print("              SPECTACLE PRESCRIPTION")
-                    print("=" * 60)
+                    print("=" * 65)
 
                     print("Store Name:", row[1])
                     print("Store City:", row[2])
@@ -303,35 +317,50 @@ def print_prescription():
                     print("\nCustomer Name:", row[5])
                     print("Phone:", row[7])
 
-                    print("\n" + "-" * 60)
-                    print("Eye        SPH        CYL        AXIS        ADD")
-                    print("-" * 60)
+                    print("\n" + "-" * 65)
 
                     print(
-                        "RIGHT      ",
-                        row[21],
-                        "     ",
-                        row[22],
-                        "     ",
-                        row[23],
-                        "     ",
-                        row[24] if row[24] else "Not Required"
+                        f"{'Eye':<10}"
+                        f"{'SPH':<12}"
+                        f"{'CYL':<12}"
+                        f"{'AXIS':<12}"
+                        f"{'ADD':<15}"
+                    )
+
+                    print("-" * 65)
+
+                    right_add = (
+                        row[28]
+                        if row[28]
+                        else "Not Required"
+                    )
+
+                    left_add = (
+                        row[32]
+                        if row[32]
+                        else "Not Required"
                     )
 
                     print(
-                        "LEFT       ",
-                        row[25],
-                        "     ",
-                        row[26],
-                        "     ",
-                        row[27],
-                        "     ",
-                        row[28] if row[28] else "Not Required"
+                        f"{'RIGHT':<10}"
+                        f"{row[25]:<12}"
+                        f"{row[26]:<12}"
+                        f"{row[27]:<12}"
+                        f"{right_add:<15}"
                     )
 
-                    print("-" * 60)
+                    print(
+                        f"{'LEFT':<10}"
+                        f"{row[29]:<12}"
+                        f"{row[30]:<12}"
+                        f"{row[31]:<12}"
+                        f"{left_add:<15}"
+                    )
+
+                    print("-" * 65)
 
                     found = True
+                    break
 
             if not found:
                 print("\nCustomer not found.")
@@ -339,16 +368,12 @@ def print_prescription():
     except FileNotFoundError:
         print("\nNo customer records found yet.")
 
-
-
 def view_all_customers():
-
     print("\n--- ALL CUSTOMERS ---")
 
     found = False
 
     try:
-
         with open(
             "customers.csv",
             "r",
@@ -360,22 +385,25 @@ def view_all_customers():
 
             for row in reader:
 
-                if len(row) < 32:
+                # Ignore old/incomplete records
+                if len(row) < 40:
                     continue
 
-                print(
-                    "\nName:",
-                    row[5],
-                    "| Phone:",
-                    row[7],
-                    "| Balance:",
-                    row[31]
-                )
+                print("\n" + "-" * 60)
+                print("Customer Name:", row[5])
+                print("Age:", row[6])
+                print("Phone:", row[7])
+                print("Address:", row[8])
+                print("Spectacle History:", row[9])
+
+                print("Total Amount:", row[37])
+                print("Advance Amount:", row[38])
+                print("Balance Amount:", row[39])
 
                 found = True
 
         if not found:
-            print("\nNo customer records found yet.")
+            print("\nNo complete customer records found.")
 
     except FileNotFoundError:
         print("\nNo customer records found yet.")

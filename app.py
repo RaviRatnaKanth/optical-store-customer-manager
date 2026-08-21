@@ -158,9 +158,13 @@ else:
 
 print("\n--- Frame Details ---")
 
+frame_brand = input("Enter Frame Brand: ").strip()
+
 frame_details = input(
     "Enter Frame Details: "
-)
+).strip()
+
+frame_offer = input("Enter Frame Offer: ").strip()
 
 
 # ==================================================
@@ -173,6 +177,8 @@ lens_type = input(
     "Enter Lens Type "
     "(Single Vision / Bifocal / Progressive / Other): "
 )
+lens_brand = input("Enter Lens Brand: ").strip()
+lens_offer = input("Enter Lens Offer: ").strip()
 
 
 # ==================================================
@@ -440,15 +446,21 @@ else:
 
 print("\n--- Frame / Lens Details ---")
 
-print(
-    "Frame Details:",
-    frame_details
-)
+print("Frame Details:", frame_details)
 
-print(
-    "Lens Type:",
-    lens_type
-)
+if frame_brand:
+    print("Frame Brand:", frame_brand)
+
+if frame_offer:
+    print("Frame Offer:", frame_offer)
+
+print("Lens Type:", lens_type)
+
+if lens_brand:
+    print("Lens Brand:", lens_brand)
+
+if lens_offer:
+    print("Lens Offer:", lens_offer)
 
 
 # ---------------- CURRENT PRESCRIPTION ----------------
@@ -555,7 +567,11 @@ with open("customers.csv", "a", newline="", encoding="utf-8") as file:
         previous_left_axis,
         previous_left_add,
         frame_details,
+        frame_brand,
+        frame_offer,
         lens_type,
+        lens_brand,
+        lens_offer,
         right_sph,
         right_cyl,
         right_axis,
