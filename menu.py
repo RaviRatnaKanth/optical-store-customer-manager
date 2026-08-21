@@ -423,25 +423,29 @@ def view_all_customers():
                     "AXIS =", row[31],
                     "ADD =", row[32] if row[32] else "Not Required"
                 )
+                print("\n--- Pupillary Distance (PD) ---")
+                print("Distance PD:", row[33])
+                print("Near PD:", row[34])
 
                 print("\n--- Visual Acuity / Pinhole ---")
-                print("Right Eye Visual Acuity:", row[33])
-                print("Left Eye Visual Acuity:", row[34])
-                print("Right Eye Pinhole:", row[35])
-                print("Left Eye Pinhole:", row[36])
+                print("Right Eye Visual Acuity:", row[35])
+                print("Left Eye Visual Acuity:", row[36])
+                print("Right Eye Pinhole:", row[37])
+                print("Left Eye Pinhole:", row[38])
 
                 print("\n--- Payment Details ---")
-                print("Total Amount:", row[37])
-                print("Advance Amount:", row[38])
-                print("Balance Amount:", row[39])
+                print("Total Amount:", row[39])
+                print("Advance Amount:", row[40])
+                print("Balance Amount:", row[41])
+ 
 
-                found = True
+            found = True
 
         if not found:
             print("\nNo complete customer records found.")
 
     except FileNotFoundError:
-        print("\nNo customer records found yet.")
+        print("\nNo customer records found yet.")    
 
 
 # ============================================================

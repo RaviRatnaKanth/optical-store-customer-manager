@@ -580,6 +580,8 @@ with open("customers.csv", "a", newline="", encoding="utf-8") as file:
         left_cyl,
         left_axis,
         left_add,
+        distance_pd,
+        near_pd,
         right_va,
         left_va,
         right_pinhole,
