@@ -1,5 +1,6 @@
 import csv
-
+import webbrowser
+from urllib.parse import quote
 
 # ============================================================
 # DISPLAY FULL CUSTOMER RECORD
@@ -148,7 +149,25 @@ Please keep this prescription for your reference.
     print("\n--- PRESCRIPTION MESSAGE ---")
     print(prescription_message)
 
+    return prescription_message
 
+def open_whatsapp(phone, message):
+    clean_phone = phone.strip()
+
+    if clean_phone.startswith("+"):
+        clean_phone = clean_phone[1:]
+
+    if len(clean_phone) == 10:
+        clean_phone = "91" + clean_phone
+
+    encoded_message = quote(message)
+
+    whatsapp_url = (
+        f"https://wa.me/{clean_phone}"
+        f"?text={encoded_message}"
+    )
+
+    webbrowser.open(whatsapp_url)
 # ============================================================
 # SEARCH CUSTOMER
 # ============================================================
@@ -198,7 +217,8 @@ def search_customer():
                     ).strip().lower()
 
                     if send_choice in ["yes", "y"]:
-                        prepare_prescription_message(row)
+                        message = prepare_prescription_message(row)
+                        open_whatsapp(row[7], message)
 
         if not found:
             print("\nCustomer not found.")
