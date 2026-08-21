@@ -129,7 +129,7 @@ Customer: {row[5]}
 
 Spectacle Prescription
 
-Right Eye (OD):
+
 Right Eye (OD):
 SPH: {row[25]}
 CYL: {row[26]}
