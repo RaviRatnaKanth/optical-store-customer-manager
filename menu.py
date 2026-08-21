@@ -390,12 +390,47 @@ def view_all_customers():
                     continue
 
                 print("\n" + "-" * 60)
+
                 print("Customer Name:", row[5])
                 print("Age:", row[6])
                 print("Phone:", row[7])
                 print("Address:", row[8])
                 print("Spectacle History:", row[9])
+                print("Years Using Glasses:", row[10])
 
+                print("\n--- Frame / Lens Details ---")
+                print("Frame Details:", row[19])
+                print("Frame Brand:", row[20])
+                print("Frame Offer:", row[21])
+                print("Lens Type:", row[22])
+                print("Lens Brand:", row[23])
+                print("Lens Offer:", row[24])
+
+                print("\n--- Current Prescription ---")
+
+                print(
+                    "Right Eye (OD):",
+                    "SPH =", row[25],
+                    "CYL =", row[26],
+                    "AXIS =", row[27],
+                    "ADD =", row[28] if row[28] else "Not Required"
+                )
+
+                print(
+                    "Left Eye (OS):",
+                    "SPH =", row[29],
+                    "CYL =", row[30],
+                    "AXIS =", row[31],
+                    "ADD =", row[32] if row[32] else "Not Required"
+                )
+
+                print("\n--- Visual Acuity / Pinhole ---")
+                print("Right Eye Visual Acuity:", row[33])
+                print("Left Eye Visual Acuity:", row[34])
+                print("Right Eye Pinhole:", row[35])
+                print("Left Eye Pinhole:", row[36])
+
+                print("\n--- Payment Details ---")
                 print("Total Amount:", row[37])
                 print("Advance Amount:", row[38])
                 print("Balance Amount:", row[39])
