@@ -276,9 +276,9 @@ def print_bill():
                     print("Lens Type:", row[22])
 
                     print("\n--- Payment Details ---")
-                    print("Total Amount:", row[37])
-                    print("Advance Amount:", row[38])
-                    print("Balance Amount:", row[39])
+                    print("Total Amount:", row[39])
+                    print("Advance Amount:", row[40])
+                    print("Balance Amount:", row[41])
 
                     print("=" * 50)
 
