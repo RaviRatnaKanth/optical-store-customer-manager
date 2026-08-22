@@ -378,7 +378,17 @@ def print_prescription():
                     )
 
                     print("-" * 65)
+                    print("\n--- PD Details ---")
+                    print("Distance PD:", row[33])
+                    print("Near PD:", row[34])
 
+                    print("\n--- Visual Acuity ---")
+                    print("Right Eye Distance VA:", row[35])
+                    print("Left Eye Distance VA:", row[36])
+                    print("Right Eye Near VA:", row[37])
+                    print("Left Eye Near VA:", row[38])
+
+                    print("-" * 65)
                     found = True
                     break
 
