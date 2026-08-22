@@ -153,12 +153,15 @@ Please keep this prescription for your reference.
 
 def open_whatsapp(phone, message):
     clean_phone = phone.strip()
-
+    clean_phone = clean_phone.replace(" ", "").replace("-", "")
     if clean_phone.startswith("+"):
         clean_phone = clean_phone[1:]
 
-    if len(clean_phone) == 10:
-        clean_phone = "91" + clean_phone
+    if not (len(clean_phone) == 10 and clean_phone.isdigit() and clean_phone[0] in "6789"):
+     print("\nInvalid Indian mobile number. Please enter a valid 10-digit mobile number.")
+     return
+
+    clean_phone = "91" + clean_phone
 
     encoded_message = quote(message)
 
