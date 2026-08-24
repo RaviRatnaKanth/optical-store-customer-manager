@@ -230,6 +230,106 @@ def search_customer():
         print("\nNo customer records found yet.")
 
 
+
+def edit_customer():
+    print("\n--- EDIT CUSTOMER ---")
+
+    search_value = input(
+        "Enter Customer Name or Phone Number: "
+    ).strip().lower()
+
+    rows = []
+    found = False
+
+    try:
+        with open(
+            "customers.csv",
+            "r",
+            newline="",
+            encoding="utf-8"
+        ) as file:
+            reader = csv.reader(file)
+            rows = list(reader)
+
+        for i, row in enumerate(rows):
+
+            if len(row) < 40:
+                continue
+
+            customer_name = row[5].strip().lower()
+            phone = row[7].strip().lower()
+
+            if (
+                search_value in customer_name
+                or search_value in phone
+            ):
+                found = True
+
+                print("\nCustomer Found:")
+                show_customer(row)
+
+                print("\nLeave blank to keep the old value.")
+
+                new_name = input(
+                    f"Customer Name [{row[5]}]: "
+                ).strip()
+
+                new_age = input(
+                    f"Age [{row[6]}]: "
+                ).strip()
+
+                new_phone = input(
+                    f"Phone Number [{row[7]}]: "
+                ).strip()
+
+                new_address = input(
+                    f"Address [{row[8]}]: "
+                ).strip()
+                new_history = input(
+    f"Spectacle History [{row[9]}]: "
+).strip()
+
+                new_years = input(
+    f"Years Using Glasses [{row[10]}]: "
+).strip()
+
+                            
+                if new_name:
+                    row[5] = new_name
+
+                if new_age:
+                    row[6] = new_age
+
+                if new_phone:
+                    row[7] = new_phone
+
+                if new_address:
+                        row[8] = new_address
+                if new_history:
+                   row[9] = new_history
+
+                if new_years:
+                   row[10] = new_years
+                rows[i] = row
+
+                with open(
+                        "customers.csv",
+                        "w",
+                        newline="",
+                        encoding="utf-8"
+                    ) as file:
+                        writer = csv.writer(file)
+                        writer.writerows(rows)
+
+                print("\nCustomer updated successfully.")
+                break
+
+        if not found:
+            print("\nCustomer not found.")
+
+    except FileNotFoundError:
+        print("\nNo customer records found yet.")
+
 # ============================================================
 # VIEW ALL CUSTOMERS
 # ============================================================
@@ -495,9 +595,10 @@ print("2. Search Customer")
 print("3. View All Customers")
 print("4. Print Bill")
 print("5. Print Prescription")
-print("6. Exit")
+print("6. Edit Customer")
+print("7. Exit")
 
-choice = input("\nEnter your choice (1-6): ").strip()
+choice = input("\nEnter your choice (1-7): ").strip()
 
 # ============================================================
 # MENU ACTIONS
@@ -530,8 +631,11 @@ elif choice == "5":
     print("\nOpening Print Prescription...")
     print_prescription()
 
-
 elif choice == "6":
+    edit_customer()
+
+
+elif choice == "7":
 
     print(
         "\nThank you for using "
@@ -543,5 +647,5 @@ else:
 
     print(
         "\nInvalid choice. "
-        "Please enter 1, 2, 3, 4, 5 or 6."
-    )
+        "Please enter 1, 2, 3, 4, 5 , 6. or 7"
+    ) 
