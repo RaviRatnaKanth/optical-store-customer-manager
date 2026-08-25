@@ -262,7 +262,7 @@ def edit_customer():
             if (
                 search_value in customer_name
                 or search_value in phone
-            ):
+        ):
                 found = True
 
                 print("\nCustomer Found:")
@@ -272,26 +272,26 @@ def edit_customer():
 
                 new_name = input(
                     f"Customer Name [{row[5]}]: "
-                ).strip()
+            ).strip()
 
                 new_age = input(
                     f"Age [{row[6]}]: "
-                ).strip()
+            ).strip()
 
                 new_phone = input(
                     f"Phone Number [{row[7]}]: "
-                ).strip()
+            ).strip()
 
                 new_address = input(
                     f"Address [{row[8]}]: "
-                ).strip()
+            ).strip()
                 new_history = input(
-    f"Spectacle History [{row[9]}]: "
-).strip()
+                    f"Spectacle History [{row[9]}]: "
+            ).strip()
 
                 new_years = input(
-    f"Years Using Glasses [{row[10]}]: "
-).strip()
+                    f"Years Using Glasses [{row[10]}]: "
+            ).strip()
 
                             
                 if new_name:
@@ -310,29 +310,115 @@ def edit_customer():
 
                 if new_years:
                    row[10] = new_years
-                rows[i] = row
+                print("\n--- Edit Frame / Lens Details ---")
 
-                with open(
-                        "customers.csv",
-                        "w",
-                        newline="",
-                        encoding="utf-8"
-                    ) as file:
-                        writer = csv.writer(file)
-                        writer.writerows(rows)
+            new_frame_details = input(
+                f"Frame Details [{row[19]}]: "
+            ).strip()
+            if new_frame_details:
+                row[19] = new_frame_details
 
-                print("\nCustomer updated successfully.")
-                break
+            new_frame_brand = input(
+                f"Frame Brand [{row[20]}]: "
+            ).strip()
+            if new_frame_brand:
+                row[20] = new_frame_brand
 
-        if not found:
-            print("\nCustomer not found.")
+            new_frame_offer = input(
+                f"Frame Offer [{row[21]}]: "
+            ).strip()
+            if new_frame_offer:
+                row[21] = new_frame_offer
+
+            new_lens_type = input(
+                f"Lens Type [{row[22]}]: "
+            ).strip()
+            if new_lens_type:
+                row[22] = new_lens_type
+
+            new_lens_brand = input(
+                f"Lens Brand [{row[23]}]: "
+            ).strip()
+            if new_lens_brand:
+                row[23] = new_lens_brand
+
+            new_lens_offer = input(
+                f"Lens Offer [{row[24]}]: "
+            ).strip()
+            if new_lens_offer:
+                row[24] = new_lens_offer
+            print("\n--- Edit Current Prescription ---")
+
+            new_od_sph = input(
+                f"Right Eye (OD) SPH [{row[25]}]: "
+            ).strip()
+            if new_od_sph:
+                row[25] = new_od_sph
+
+            new_od_cyl = input(
+                f"Right Eye (OD) CYL [{row[26]}]: "
+            ).strip()
+            if new_od_cyl:
+                row[26] = new_od_cyl
+
+            new_od_axis = input(
+                f"Right Eye (OD) AXIS [{row[27]}]: "
+            ).strip()
+            if new_od_axis:
+                row[27] = new_od_axis
+
+            new_od_add = input(
+                f"Right Eye (OD) ADD [{row[28]}]: "
+            ).strip()
+            if new_od_add:
+                row[28] = new_od_add
+
+            new_os_sph = input(
+                f"Left Eye (OS) SPH [{row[29]}]: "
+            ).strip()
+            if new_os_sph:
+                row[29] = new_os_sph
+
+            new_os_cyl = input(
+                f"Left Eye (OS) CYL [{row[30]}]: "
+            ).strip()
+            if new_os_cyl:
+                row[30] = new_os_cyl
+
+            new_os_axis = input(
+                f"Left Eye (OS) AXIS [{row[31]}]: "
+            ).strip()
+            if new_os_axis:
+                row[31] = new_os_axis
+
+            new_os_add = input(
+                f"Left Eye (OS) ADD [{row[32]}]: "
+            ).strip()
+            if new_os_add:
+                row[32] = new_os_add
+
+            rows[i] = row
+            with open(
+                    "customers.csv",
+                    "w",
+                    newline="",
+                    encoding="utf-8"
+        ) as file:
+                    writer = csv.writer(file)
+                    writer.writerows(rows)
+
+                    print("\nCustomer updated successfully.")
+                    break
+
+                    if not found:
+                            print("\nCustomer not found.")
 
     except FileNotFoundError:
-        print("\nNo customer records found yet.")
+                        print("\nNo customer records found yet.")
 
-# ============================================================
-# VIEW ALL CUSTOMERS
-# ============================================================
+                # ============================================================
+                # VIEW ALL CUSTOMERS
+                # ============================================================
 def print_bill():
     print("\n--- PRINT BILL ---")
 
@@ -354,7 +440,7 @@ def print_bill():
 
             for row in reader:
 
-                if len(row) < 40:
+                if len(row) < 42:
                     continue
 
                 customer_name = row[5].strip().lower()
@@ -386,6 +472,7 @@ def print_bill():
                     print("=" * 50)
 
                     found = True
+                    break
 
         if not found:
             print("\nCustomer not found.")
