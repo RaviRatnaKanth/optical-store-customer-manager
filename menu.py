@@ -1,6 +1,8 @@
 import csv
+import subprocess
 import webbrowser
 from urllib.parse import quote
+
 
 # ============================================================
 # DISPLAY FULL CUSTOMER RECORD
@@ -671,68 +673,68 @@ def view_all_customers():
 # ============================================================
 # MAIN MENU
 # ============================================================
+while True:
+    print("=" * 60)
+    print("          OPTICAL STORE CUSTOMER MANAGER")
+    print("=" * 60)
 
-print("=" * 60)
-print("          OPTICAL STORE CUSTOMER MANAGER")
-print("=" * 60)
+    print("\nMAIN MENU")
+    print("1. Add New Customer")
+    print("2. Search Customer")
+    print("3. View All Customers")
+    print("4. Print Bill")
+    print("5. Print Prescription")
+    print("6. Edit Customer")
+    print("7. Exit")
 
-print("\nMAIN MENU")
-print("1. Add New Customer")
-print("2. Search Customer")
-print("3. View All Customers")
-print("4. Print Bill")
-print("5. Print Prescription")
-print("6. Edit Customer")
-print("7. Exit")
+    choice = input("\nEnter your choice (1-7): ").strip()
 
-choice = input("\nEnter your choice (1-7): ").strip()
+    # ============================================================
+    # MENU ACTIONS
+    # ============================================================
 
-# ============================================================
-# MENU ACTIONS
-# ============================================================
+    if choice == "1":
 
-if choice == "1":
-
-    print("\nOpening Add New Customer...")
-    import app
-
-
-elif choice == "2":
-
-    search_customer()
+        print("\nOpening Add New Customer...")
+        subprocess.run(["python", "app.py"])
 
 
-elif choice == "3":
+    elif choice == "2":
 
-    view_all_customers()
-
-
-elif choice == "4":
-
-    print("\nOpening Print Bill...")
-    print_bill()
+        search_customer()
 
 
-elif choice == "5":
+    elif choice == "3":
 
-    print("\nOpening Print Prescription...")
-    print_prescription()
-
-elif choice == "6":
-    edit_customer()
+        view_all_customers()
 
 
-elif choice == "7":
+    elif choice == "4":
 
-    print(
-        "\nThank you for using "
-        "Optical Store Customer Manager."
-    )
+        print("\nOpening Print Bill...")
+        print_bill()
 
 
-else:
+    elif choice == "5":
 
-    print(
-        "\nInvalid choice. "
-        "Please enter 1, 2, 3, 4, 5 , 6. or 7"
-    ) 
+        print("\nOpening Print Prescription...")
+        print_prescription()
+
+    elif choice == "6":
+        edit_customer()
+
+
+    elif choice == "7":
+
+        print(
+            "\nThank you for using "
+            "Optical Store Customer Manager."
+        )
+        break
+
+    else:
+
+        print(
+            "\nInvalid choice. "
+            "Please enter 1, 2, 3, 4, 5 , 6. or 7"
+        ) 
