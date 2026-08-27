@@ -37,31 +37,6 @@ phone = input("Enter Customer Phone Number: ")
 address = input("Enter Customer Address: ")
 
 
-# ==================================================
-# 3. SPECTACLE HISTORY
-# ==================================================
-
-print("\n--- Spectacle History ---")
-
-while True:
-
-    spectacle_history = input(
-        "Enter Spectacle History "
-        "(First-time / Existing): "
-    ).strip().lower()
-
-    if spectacle_history in ["first-time", "first time", "first"]:
-        spectacle_history = "First-time"
-        break
-
-    elif spectacle_history in ["existing", "old"]:
-        spectacle_history = "Existing"
-        break
-
-    else:
-        print(
-            "Please type First-time or Existing."
-        )
 
 
 # ==================================================
@@ -81,6 +56,137 @@ previous_left_axis = ""
 previous_left_add = ""
 
 
+
+
+
+# ==================================================
+# 6. FRAME DETAILS
+# ==================================================
+
+print("\n--- Frame Details ---")
+
+
+
+
+
+print("\n--- Order Type ---")
+print("1. Frame Only")
+print("2. Lenses Only")
+print("3. Frame + Lenses")
+
+while True:
+    order_type = input("Select Order Type (1/2/3): ").strip()
+
+    if order_type in ["1", "2", "3"]:
+        break
+    else:
+        print("Please enter 1, 2, or 3 only.")
+if order_type in ["1", "3"]:
+
+    frame_details = input(
+        "Enter Frame Details: "
+    ).strip()
+
+    print("\n--- Frame Category ---")
+    print("1. Brand")
+    print("2. Non-Brand")
+
+    while True:
+        frame_category = input(
+            "Select Frame Category (1/2): "
+        ).strip()
+
+        if frame_category in ["1", "2"]:
+            break
+        else:
+            print("Please enter 1 or 2 only.")
+
+    if frame_category == "1":
+        frame_brand = input(
+            "Enter Frame Brand: "
+        ).strip()
+    else:
+        frame_brand = "Non-Brand"
+
+    frame_offer = input(
+        "Enter Frame Offer: "
+    ).strip()
+
+else:
+    frame_details = ""
+    frame_brand = ""
+    frame_offer = ""
+# ==================================================
+# 7. LENS TYPE
+# ==================================================
+
+
+
+if order_type in ["2", "3"]:
+    print("\n--- Lens Details ---")
+
+    lens_type = input(
+        "Enter Lens Type "
+        "(Single Vision / Bifocal / Progressive / Other): "
+    ).strip()
+
+    print("\n--- Lens Category ---")
+    print("1. Brand")
+    print("2. Non-Brand")
+
+    while True:
+        lens_category = input(
+            "Select Lens Category (1/2): "
+        ).strip()
+
+        if lens_category in ["1", "2"]:
+            break
+        else:
+            print("Please enter 1 or 2 only.")
+
+    if lens_category == "1":
+        lens_brand = input(
+            "Enter Lens Brand: "
+        ).strip()
+    else:
+        lens_brand = "Non-Brand"
+
+    lens_offer = input(
+        "Enter Lens Offer: "
+    ).strip()
+
+else:
+    lens_type = ""
+    lens_brand = ""
+    lens_offer = ""
+# ==================================================
+# 3. SPECTACLE HISTORY
+# ==================================================
+
+print("\n--- Spectacle History ---")
+
+if order_type != "1":
+  while True:
+
+    spectacle_history = input(
+        "Enter Spectacle History "
+        "(First-time / Existing): "
+    ).strip().lower()
+
+    if spectacle_history in ["first-time", "first time", "first"]:
+        spectacle_history = "First-time"
+        break
+
+    elif spectacle_history in ["existing", "old"]:
+        spectacle_history = "Existing"
+        break
+
+    else:
+        print(
+            "Please type First-time or Existing."
+        )
+else:
+    spectacle_history = "Not Applicable"    
 # ==================================================
 # 5. PREVIOUS PRESCRIPTION
 #    ONLY FOR EXISTING SPECTACLE USERS
@@ -150,108 +256,96 @@ else:
         "First-time spectacle user - "
         "Previous prescription not required."
     )
-
-
-# ==================================================
-# 6. FRAME DETAILS
-# ==================================================
-
-print("\n--- Frame Details ---")
-
-frame_brand = input("Enter Frame Brand: ").strip()
-
-frame_details = input(
-    "Enter Frame Details: "
-).strip()
-
-frame_offer = input("Enter Frame Offer: ").strip()
-
-
-# ==================================================
-# 7. LENS TYPE
-# ==================================================
-
-print("\n--- Lens Details ---")
-
-lens_type = input(
-    "Enter Lens Type "
-    "(Single Vision / Bifocal / Progressive / Other): "
-)
-lens_brand = input("Enter Lens Brand: ").strip()
-lens_offer = input("Enter Lens Offer: ").strip()
-
-
 # ==================================================
 # 8. CURRENT PRESCRIPTION
 # ==================================================
 
-print("\n--- Current Prescription ---")
+if order_type in ["2", "3"]:
+    print("\n--- Current Prescription ---")
 
-print(
-    "Enter power with + or - sign "
-    "(Example: -2.00 or +1.50)"
-)
+    print(
+        "Enter power with + or - sign "
+        "(Example: -2.00 or +1.50)"
+    )
 
-print(
-    "Leave ADD blank when near/add power "
-    "is not required."
-)
-
-
-# ==================================================
-# 9. CURRENT RIGHT EYE
-# ==================================================
-
-print("\nRight Eye (OD)")
-
-right_sph = input("Enter Right Eye SPH (+/-): ").strip()
-
-right_cyl = input("Enter Right Eye CYL (+/-): ").strip()
-
-right_axis = input("Enter Right Eye AXIS (0-180): ").strip()
-
-right_add = input("Enter Right Eye ADD / Near Power (+): ").strip()
+    print(
+        "Leave ADD blank when near/add power "
+        "is not required."
+    )
 
 
-# ==================================================
-# 10. CURRENT LEFT EYE
-# ==================================================
+    # ==================================================
+    # 9. CURRENT RIGHT EYE
+    # ==================================================
 
-print("\nLeft Eye (OS)")
+    print("\nRight Eye (OD)")
 
-left_sph = input("Enter Left Eye SPH (+/-): ").strip()
+    right_sph = input("Enter Right Eye SPH (+/-): ").strip()
 
-left_cyl = input("Enter Left Eye CYL (+/-): ").strip()
+    right_cyl = input("Enter Right Eye CYL (+/-): ").strip()
 
-left_axis = input("Enter Left Eye AXIS (0-180): ").strip()
+    right_axis = input("Enter Right Eye AXIS (0-180): ").strip()
 
-left_add = input("Enter Left Eye ADD / Near Power (+): ").strip()
-# ==========================================================
-# 11. PUPILLARY DISTANCE (PD) - OPTIONAL
-# ==========================================================
+    right_add = input("Enter Right Eye ADD / Near Power (+): ").strip()
 
-print("\n--- Pupillary Distance (PD) (Optional) ---")
 
-distance_pd = input(
-    "Enter Distance PD in mm (Example: 62): "
-).strip()
+    # ==================================================
+    # 10. CURRENT LEFT EYE
+    # ==================================================
 
-near_pd = input(
-    "Enter Near PD in mm (Example: 59): "
-).strip()
-# ==================================================
-# VISUAL ACUITY / PINHOLE TEST (OPTIONAL)
-# ==================================================
+    print("\nLeft Eye (OS)")
 
-print("\n--- Visual Acuity Test (Optional) ---")
-print("Leave blank if not tested.")
+    left_sph = input("Enter Left Eye SPH (+/-): ").strip()
 
-right_va = input("Right Eye Visual Acuity (Example: 6/6): ")
-left_va = input("Left Eye Visual Acuity (Example: 6/6): ")
+    left_cyl = input("Enter Left Eye CYL (+/-): ").strip()
 
-right_pinhole = input("Right Eye Pinhole (Example: 6/6): ")
-left_pinhole = input("Left Eye Pinhole (Example: 6/6): ")
+    left_axis = input("Enter Left Eye AXIS (0-180): ").strip()
 
+    left_add = input("Enter Left Eye ADD / Near Power (+): ").strip()
+    # ==========================================================
+    # 11. PUPILLARY DISTANCE (PD) - OPTIONAL
+    # ==========================================================
+
+    print("\n--- Pupillary Distance (PD) (Optional) ---")
+
+    distance_pd = input(
+        "Enter Distance PD in mm (Example: 62): "
+    ).strip()
+
+    near_pd = input(
+        "Enter Near PD in mm (Example: 59): "
+    ).strip()
+    # ==================================================
+    # VISUAL ACUITY / PINHOLE TEST (OPTIONAL)
+    # ==================================================
+
+    print("\n--- Visual Acuity Test (Optional) ---")
+    print("Leave blank if not tested.")
+
+    right_va = input("Right Eye Visual Acuity (Example: 6/6): ")
+    left_va = input("Left Eye Visual Acuity (Example: 6/6): ")
+
+    right_pinhole = input("Right Eye Pinhole (Example: 6/6): ")
+    left_pinhole = input("Left Eye Pinhole (Example: 6/6): ")
+
+else:
+    right_sph = ""
+    right_cyl = ""
+    right_axis = ""
+    right_add = ""
+
+    left_sph = ""
+    left_cyl = ""
+    left_axis = ""
+    left_add = ""
+
+    distance_pd = ""
+    near_pd = ""
+
+    right_va = ""
+    left_va = ""
+    right_pinhole = ""
+    left_pinhole = ""
 
 # ==================================================
 # 11. PAYMENT DETAILS
