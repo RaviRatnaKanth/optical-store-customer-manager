@@ -206,16 +206,14 @@ def search_customer():
 
                 customer_name = row[5].strip().lower()
                 phone = row[7].strip().lower()
-
                 if (
                     search_value in customer_name
                     or search_value in phone
                 ):
-
-                    show_customer(row)
-
                     found = True
 
+                    print("\nCUSTOMER RECORD FOUND")
+                    show_customer(row)
                     send_choice = input(
                         "\nPrepare prescription message "
                         "for this customer? (yes/no): "
