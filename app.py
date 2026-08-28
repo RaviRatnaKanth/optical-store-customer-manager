@@ -111,11 +111,13 @@ if order_type in ["1", "3"]:
     frame_offer = input(
         "Enter Frame Offer: "
     ).strip()
+    frame_price = float(input("Enter Frame Price: "))
 
 else:
     frame_details = ""
     frame_brand = ""
     frame_offer = ""
+    frame_price = 0.0
 # ==================================================
 # 7. LENS TYPE
 # ==================================================
@@ -154,11 +156,13 @@ if order_type in ["2", "3"]:
     lens_offer = input(
         "Enter Lens Offer: "
     ).strip()
+    lens_price = float(input("Enter Lens Price: "))
 
 else:
     lens_type = ""
     lens_brand = ""
     lens_offer = ""
+    lens_price = 0.0
 # ==================================================
 # 3. SPECTACLE HISTORY
 # ==================================================
@@ -547,6 +551,7 @@ if frame_brand:
 
 if frame_offer:
     print("Frame Offer:", frame_offer)
+    print("Frame Price:", frame_price)
 
 print("Lens Type:", lens_type)
 
@@ -555,6 +560,7 @@ if lens_brand:
 
 if lens_offer:
     print("Lens Offer:", lens_offer)
+    print("Lens Price:", lens_price)
 
 
 # ---------------- CURRENT PRESCRIPTION ----------------
