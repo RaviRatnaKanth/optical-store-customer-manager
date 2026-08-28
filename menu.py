@@ -186,6 +186,7 @@ def search_customer():
     ).strip().lower()
 
     found = False
+    matches = []
 
     try:
 
@@ -213,18 +214,43 @@ def search_customer():
                     or search_value in address
                 ):
                     found = True
+                    matches.append(row)
+                    
+                    #print("\nCUSTOMER RECORD FOUND")
+                    #show_customer(row)
+                    #send_choice = input(
+                        #"\nPrepare prescription message "
+                        #"for this customer? (yes/no): "
+                    #).strip().lower()
 
-                    print("\nCUSTOMER RECORD FOUND")
-                    show_customer(row)
-                    send_choice = input(
-                        "\nPrepare prescription message "
-                        "for this customer? (yes/no): "
-                    ).strip().lower()
+                    #if send_choice in ["yes", "y"]:
+                    #    message = prepare_prescription_message(row)
+                    #   open_whatsapp(row[7], message)
+        if len(matches) > 1:
+            print("\nMultiple customers found:")
+            for number, customer in enumerate(matches, start=1):
+                print(
+                    f"{number}. Name: {customer[5]} | "
+                    f"Phone: {customer[7]} | "
+                    f"Address: {customer[8]}"
+                )
+        choice = input("\nSelect customer number: ").strip()
 
-                    if send_choice in ["yes", "y"]:
-                        message = prepare_prescription_message(row)
-                        open_whatsapp(row[7], message)
+        if choice.isdigit():
+            choice = int(choice)
 
+            if 1 <= choice <= len(matches):
+                selected_customer = matches[choice - 1]
+
+                print("\nSELECTED CUSTOMER")
+                show_customer(selected_customer)
+                send_choice = input(
+    "\nPrepare prescription message for this customer? (yes/no): "
+).strip().lower()
+
+        if send_choice in ["yes", "y"]:
+            message = prepare_prescription_message(selected_customer)
+            open_whatsapp(selected_customer[7], message)
         if not found:
             print("\nCustomer not found.")
 
