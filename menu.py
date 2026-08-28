@@ -182,7 +182,7 @@ def search_customer():
     print("\n--- SEARCH CUSTOMER ---")
 
     search_value = input(
-        "Enter Customer Name or Phone Number: "
+        "Enter Customer Name, Phone Number or Address: "
     ).strip().lower()
 
     found = False
@@ -206,9 +206,11 @@ def search_customer():
 
                 customer_name = row[5].strip().lower()
                 phone = row[7].strip().lower()
+                address = row[8].strip().lower()
                 if (
                     search_value in customer_name
                     or search_value in phone
+                    or search_value in address
                 ):
                     found = True
 
