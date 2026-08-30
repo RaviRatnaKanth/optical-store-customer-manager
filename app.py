@@ -24,7 +24,21 @@ customer_type = input("Select Customer Type (1/2): ").strip()
 print("\n--- Customer Details ---")
 
 customer_name = input("Enter Customer Name: ")
+print("\n--- Gender ---")
+print("1. Male")
+print("2. Female")
 
+while True:
+    gender_choice = input("Select Gender (1/2): ").strip()
+
+    if gender_choice == "1":
+        gender = "Male"
+        break
+    elif gender_choice == "2":
+        gender = "Female"
+        break
+    else:
+        print("Please select 1 for Male or 2 for Female.")
 # Age validation
 while True:
     try:
@@ -462,6 +476,10 @@ print(
     "Customer Name:",
     customer_name
 )
+print(
+    "Gender:",
+    gender
+)
 
 print(
     "Patient Age:",
@@ -640,6 +658,7 @@ with open("customers.csv", "a", newline="", encoding="utf-8") as file:
     "Store Phone",
     "Store Logo",
     "Customer Name",
+    "Gender",
     "Age",
     "Phone",
     "Address",
@@ -687,6 +706,7 @@ with open("customers.csv", "a", newline="", encoding="utf-8") as file:
     store_phone,
     store_logo,
     customer_name,
+    gender,
     age,
     phone,
     address,
