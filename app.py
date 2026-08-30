@@ -1,4 +1,5 @@
 import csv
+import os
 from datetime import datetime
 from store_config import store_name, store_city, store_phone, store_email, store_website, store_logo
 record_date = datetime.now().strftime("%d-%m-%Y")
@@ -15,7 +16,11 @@ print("==================================================")
 # ==================================================
 # 2. CUSTOMER / PATIENT DETAILS
 # ==================================================
+print("\n--- Customer Type ---")
+print("1. New Customer")
+print("2. Existing Customer")
 
+customer_type = input("Select Customer Type (1/2): ").strip()
 print("\n--- Customer Details ---")
 
 customer_name = input("Enter Customer Name: ")
@@ -359,28 +364,8 @@ print("\n--- Payment Details ---")
 
 
 # Total Amount Validation
-while True:
-
-    try:
-
-        total_amount = float(
-            input("Enter Total Amount: ")
-        )
-
-        if total_amount >= 0:
-            break
-
-        else:
-            print(
-                "Total amount cannot be negative."
-            )
-
-    except ValueError:
-
-        print(
-            "Please enter amount using numbers only."
-        )
-
+total_amount = frame_price + lens_price
+print(f"Total Amount: ₹{total_amount:.2f}")
 
 # Advance Amount Validation
 while True:
@@ -642,54 +627,105 @@ print(
     balance
 )
 
+csv_file_exists = os.path.exists("customers.csv")
 # Save customer record to CSV
 with open("customers.csv", "a", newline="", encoding="utf-8") as file:
     writer = csv.writer(file)
 
-    writer.writerow([
-        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        store_name,
-        store_city,
-        store_phone,
-        store_logo,
-        customer_name,
-        age,
-        phone,
-        address,
-        spectacle_history,
-        years_using_glasses,
-        previous_right_sph,
-        previous_right_cyl,
-        previous_right_axis,
-        previous_right_add,
-        previous_left_sph,
-        previous_left_cyl,
-        previous_left_axis,
-        previous_left_add,
-        frame_details,
-        frame_brand,
-        frame_offer,
-        lens_type,
-        lens_brand,
-        lens_offer,
-        right_sph,
-        right_cyl,
-        right_axis,
-        right_add,
-        left_sph,
-        left_cyl,
-        left_axis,
-        left_add,
-        distance_pd,
-        near_pd,
-        right_va,
-        left_va,
-        right_pinhole,
-        left_pinhole,
-        total_amount,
-        advance_amount,
-        balance
-    ])
+    if not csv_file_exists:
+       writer.writerow([
+    "Date/Time",
+    "Store Name",
+    "Store City",
+    "Store Phone",
+    "Store Logo",
+    "Customer Name",
+    "Age",
+    "Phone",
+    "Address",
+    "Spectacle History",
+    "Years Using Glasses",
+    "Previous Right SPH",
+    "Previous Right CYL",
+    "Previous Right AXIS",
+    "Previous Right ADD",
+    "Previous Left SPH",
+    "Previous Left CYL",
+    "Previous Left AXIS",
+    "Previous Left ADD",
+    "Frame Details",
+    "Frame Brand",
+    "Frame Offer",
+    "Frame Price",
+    "Lens Type",
+    "Lens Brand",
+    "Lens Offer",
+    "Lens Price",
+    "Right SPH",
+    "Right CYL",
+    "Right AXIS",
+    "Right ADD",
+    "Left SPH",
+    "Left CYL",
+    "Left AXIS",
+    "Left ADD",
+    "Distance PD",
+    "Near PD",
+    "Right VA",
+    "Left VA",
+    "Right Pinhole",
+    "Left Pinhole",
+    "Total Amount",
+    "Advance Amount",
+    "Balance"
+ ])   
+    writer.writerow([  
+            
+    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    store_name,
+    store_city,
+    store_phone,
+    store_logo,
+    customer_name,
+    age,
+    phone,
+    address,
+    spectacle_history,
+    years_using_glasses,
+    previous_right_sph,
+    previous_right_cyl,
+    previous_right_axis,
+    previous_right_add,
+    previous_left_sph,
+    previous_left_cyl,
+    previous_left_axis,
+    previous_left_add,
+    frame_details,
+    frame_brand,
+    frame_offer,
+    frame_price,
+    lens_type,
+    lens_brand,
+    lens_offer,
+    lens_price,
+    right_sph,
+    right_cyl,
+    right_axis,
+    right_add,
+    left_sph,
+    left_cyl,
+    left_axis,
+    left_add,
+    distance_pd,
+    near_pd,
+    right_va,
+    left_va,
+    right_pinhole,
+    left_pinhole,
+    total_amount,
+    advance_amount,
+    balance
+])
 print("\n==================================================")
 print("        CUSTOMER RECORD COMPLETED SUCCESSFULLY")
 print("==================================================")
@@ -729,3 +765,16 @@ Please keep this prescription for your reference.
 """
 
 print(prescription_message)
+send_whatsapp = input("\nSend prescription on WhatsApp? (y/n): ").strip().lower()
+
+if send_whatsapp == "y":
+    import urllib.parse
+    import webbrowser
+
+    whatsapp_message = urllib.parse.quote(prescription_message)
+    whatsapp_url = f"https://wa.me/91{phone}?text={whatsapp_message}"
+
+    webbrowser.open(whatsapp_url)
+    print("Opening WhatsApp...")
+else:
+    print("Prescription not sent on WhatsApp.")
