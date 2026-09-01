@@ -247,17 +247,36 @@ if customer_type == "2" and order_type == "4":
 # ==================================================
 
 if customer_type == "2" and order_type == "5":
-    print("\n--- Old Order History ---")
-    print("Order Date / Time:", selected_customer[0])
-    print("Previous Frame Details:", selected_customer[20])
-    print("Previous Frame Brand:", selected_customer[21])
-    print("Previous Frame Offer:", selected_customer[22])
-    print("Previous Frame Price:", selected_customer[23])
+    customer_orders = [
+        customer
+        for customer in matching_customers
+        if customer[5].strip().lower() == selected_customer[5].strip().lower()
+        and customer[8].strip() == selected_customer[8].strip()
+        and customer[9].strip().lower() == selected_customer[9].strip().lower()
+    ]
 
-    print("Previous Lens Type:", selected_customer[24])
-    print("Previous Lens Brand:", selected_customer[25])
-    print("Previous Lens Offer:", selected_customer[26])
-    print("Previous Lens Price:", selected_customer[27])
+    print("\n--- Old Order History ---")
+    print("Matching Orders Found:", len(customer_orders))
+
+    for number, order in enumerate(customer_orders, start=1):
+        print(
+            f"{number}. Order Date / Time: {order[0]} | "
+            f"Frame: {order[20]} | "
+            f"Lens: {order[24]}"
+        )
+    order_choice = int(input("Select Order Number: "))
+    selected_order = customer_orders[order_choice - 1]
+    print("Order Date / Time:", selected_order[0])
+
+    print("Previous Frame Details:", selected_order[20])
+    print("Previous Frame Brand:", selected_order[21])
+    print("Previous Frame Offer:", selected_order[22])
+    print("Previous Frame Price:", selected_order[23])
+
+    print("Previous Lens Type:", selected_order[24])
+    print("Previous Lens Brand:", selected_order[25])
+    print("Previous Lens Offer:", selected_order[26])
+    print("Previous Lens Price:", selected_order[27])
 
     raise SystemExit
 
