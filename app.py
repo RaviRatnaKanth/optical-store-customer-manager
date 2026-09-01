@@ -66,10 +66,11 @@ if customer_type == "2":
             matching_customers,
             start=1
         ):
-            print(
-                f"{number}. Name: {customer[5]} | "
-                f"Phone: {customer[8]}"
-            )
+          print(
+    f"{number}. Name: {customer[5]} | "
+    f"Phone: {customer[8]} | "
+    f"Address: {customer[9]}"
+)
 
         choice = input(
             "Select Customer Number: "
