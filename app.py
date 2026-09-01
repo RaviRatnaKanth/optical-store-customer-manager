@@ -21,40 +21,143 @@ print("1. New Customer")
 print("2. Existing Customer")
 
 customer_type = input("Select Customer Type (1/2): ").strip()
-print("\n--- Customer Details ---")
 
-customer_name = input("Enter Customer Name: ")
-print("\n--- Gender ---")
-print("1. Male")
-print("2. Female")
+if customer_type == "2":
+    search_value = input(
+        "Enter Existing Customer Name or Phone: "
+    ).strip().lower()
 
-while True:
-    gender_choice = input("Select Gender (1/2): ").strip()
+    matching_customers = []
 
-    if gender_choice == "1":
-        gender = "Male"
-        break
-    elif gender_choice == "2":
-        gender = "Female"
-        break
+    with open("customers.csv", "r", encoding="utf-8") as file:
+        reader = csv.reader(file)
+        next(reader, None)
+
+        for row in reader:
+            if len(row) > 8 and (
+                row[5].strip().lower() == search_value
+                or row[8].strip().lower() == search_value
+            ):
+                matching_customers.append(row)
+
+    if len(matching_customers) == 1:
+        selected_customer = matching_customers[0]
+        customer_name = selected_customer[5]
+        phone = selected_customer[8]
+
+        print("\nSelected Customer:")
+        print(f"Name: {customer_name} | Phone: {phone}")
+
+        confirm = input(
+            "Is this the correct customer? (y/n): "
+        ).strip().lower()
+
+        if confirm == "y":
+            print("Customer confirmed.")
+            print("Customer selection successful.")
+        else:
+            print("Customer not confirmed.")
+            raise SystemExit
+
+    elif len(matching_customers) > 1:
+        print("\nMultiple customers found:")
+
+        for number, customer in enumerate(
+            matching_customers,
+            start=1
+        ):
+            print(
+                f"{number}. Name: {customer[5]} | "
+                f"Phone: {customer[8]}"
+            )
+
+        choice = input(
+            "Select Customer Number: "
+        ).strip()
+
+        if choice.isdigit():
+            choice = int(choice)
+
+            if 1 <= choice <= len(matching_customers):
+                selected_customer = matching_customers[
+                    choice - 1
+                ]
+
+                customer_name = selected_customer[5]
+                phone = selected_customer[8]
+
+                print("\nSelected Customer:")
+                print(
+                    f"Name: {customer_name} | "
+                    f"Phone: {phone}"
+                )
+
+                confirm = input(
+                    "Is this the correct customer? (y/n): "
+                ).strip().lower()
+
+                if confirm == "y":
+                    print("Customer confirmed.")
+                    print(
+                        "Customer selection successful."
+                    )
+                else:
+                    print("Customer not confirmed.")
+                    raise SystemExit
+
+            else:
+                print("Invalid customer number.")
+                raise SystemExit
+        else:
+            print("Please enter a valid customer number.")
+            raise SystemExit
+
     else:
-        print("Please select 1 for Male or 2 for Female.")
-# Age validation
-while True:
-    try:
-        age = int(input("Enter Patient Age: "))
+        print("Customer not found.")
+        raise SystemExit
+print("\n--- Customer Details ---")
+if customer_type == "1":
+    customer_name = input("Enter Customer Name: ")
+else:
+    customer_name = selected_customer[5]
+if customer_type == "1":
+    print("\n--- Gender ---")
+    print("1. Male")
+    print("2. Female")
 
-        if age > 0:
+    while True:
+        gender_choice = input("Select Gender (1/2): ").strip()
+
+        if gender_choice == "1":
+            gender = "Male"
+            break
+        elif gender_choice == "2":
+            gender = "Female"
             break
         else:
-            print("Please enter a valid age.")
+            print("Please select 1 for Male or 2 for Female.")
+else:
+    gender = selected_customer[6]
+# Age / Phone / Address
+if customer_type == "1":
+    while True:
+        try:
+            age = int(input("Enter Patient Age: "))
 
-    except ValueError:
-        print("Please enter age using numbers only.")
+            if age > 0:
+                break
+            else:
+                print("Please enter a valid age.")
 
-phone = input("Enter Customer Phone Number: ")
-address = input("Enter Customer Address: ")
+        except ValueError:
+            print("Please enter age using numbers only.")
 
+    phone = input("Enter Customer Phone Number: ")
+    address = input("Enter Customer Address: ")
+else:
+    age = selected_customer[7]
+    phone = selected_customer[8]
+    address = selected_customer[9]
 
 
 
@@ -76,7 +179,7 @@ previous_left_add = ""
 
 
 
-
+                                
 
 # ==================================================
 # 6. FRAME DETAILS
@@ -84,24 +187,85 @@ previous_left_add = ""
 
 print("\n--- Frame Details ---")
 
-
-
-
-
 print("\n--- Order Type ---")
 print("1. Frame Only")
 print("2. Lenses Only")
 print("3. Frame + Lenses")
 
+if customer_type == "2":
+    print("4. Previous Prescription")
+    print("5. Old Order History")
+
+
 while True:
-    order_type = input("Select Order Type (1/2/3): ").strip()
-
-    if order_type in ["1", "2", "3"]:
-        break
+    if customer_type == "2":
+        order_type = input(
+            "Select Order Type (1/2/3/4/5): "
+        ).strip()
+        valid_options = ["1", "2", "3", "4", "5"]
     else:
-        print("Please enter 1, 2, or 3 only.")
-if order_type in ["1", "3"]:
+        order_type = input(
+            "Select Order Type (1/2/3): "
+        ).strip()
+        valid_options = ["1", "2", "3"]
 
+    if order_type in valid_options:
+        break
+
+    print("Please select a valid Order Type.")
+
+
+# ==================================================
+# PREVIOUS PRESCRIPTION
+# ==================================================
+
+if customer_type == "2" and order_type == "4":
+    print("\n--- Previous Prescription ---")
+
+    print("OD:")
+    print(
+        f"SPH: {selected_customer[28]} | "
+        f"CYL: {selected_customer[29]} | "
+        f"AXIS: {selected_customer[30]} | "
+        f"ADD: {selected_customer[31]}"
+    )
+
+    print("OS:")
+    print(
+        f"SPH: {selected_customer[32]} | "
+        f"CYL: {selected_customer[33]} | "
+        f"AXIS: {selected_customer[34]} | "
+        f"ADD: {selected_customer[35]}"
+    )
+
+    raise SystemExit
+
+
+# ==================================================
+# OLD ORDER HISTORY
+# ==================================================
+
+if customer_type == "2" and order_type == "5":
+    print("\n--- Old Order History ---")
+
+    print("Previous Frame Details:", selected_customer[20])
+    print("Previous Frame Brand:", selected_customer[21])
+    print("Previous Frame Offer:", selected_customer[22])
+    print("Previous Frame Price:", selected_customer[23])
+
+    print("Previous Lens Type:", selected_customer[24])
+    print("Previous Lens Brand:", selected_customer[25])
+    print("Previous Lens Offer:", selected_customer[26])
+    print("Previous Lens Price:", selected_customer[27])
+
+    raise SystemExit
+
+
+# ==================================================
+# FRAME ENTRY
+# ==================================================
+
+if order_type in ["1", "3"]:
     frame_details = input(
         "Enter Frame Details: "
     ).strip()
@@ -117,8 +281,8 @@ if order_type in ["1", "3"]:
 
         if frame_category in ["1", "2"]:
             break
-        else:
-            print("Please enter 1 or 2 only.")
+
+        print("Please enter 1 or 2 only.")
 
     if frame_category == "1":
         frame_brand = input(
@@ -130,13 +294,18 @@ if order_type in ["1", "3"]:
     frame_offer = input(
         "Enter Frame Offer: "
     ).strip()
-    frame_price = float(input("Enter Frame Price: "))
+
+    frame_price = float(
+        input("Enter Frame Price: ")
+    )
 
 else:
     frame_details = ""
+    frame_category = ""
     frame_brand = ""
     frame_offer = ""
     frame_price = 0.0
+
 # ==================================================
 # 7. LENS TYPE
 # ==================================================
@@ -188,97 +357,127 @@ else:
 
 print("\n--- Spectacle History ---")
 
-if order_type != "1":
-  while True:
+if customer_type == "2":
+    spectacle_history = "Existing"
 
-    spectacle_history = input(
-        "Enter Spectacle History "
-        "(First-time / Existing): "
-    ).strip().lower()
+    years_using_glasses = selected_customer[11]
 
-    if spectacle_history in ["first-time", "first time", "first"]:
-        spectacle_history = "First-time"
-        break
+    previous_right_sph = selected_customer[28]
+    previous_right_cyl = selected_customer[29]
+    previous_right_axis = selected_customer[30]
+    previous_right_add = selected_customer[31]
 
-    elif spectacle_history in ["existing", "old"]:
-        spectacle_history = "Existing"
-        break
+    previous_left_sph = selected_customer[32]
+    previous_left_cyl = selected_customer[33]
+    previous_left_axis = selected_customer[34]
+    previous_left_add = selected_customer[35]
 
-    else:
-        print(
-            "Please type First-time or Existing."
-        )
-else:
-    spectacle_history = "Not Applicable"    
-# ==================================================
-# 5. PREVIOUS PRESCRIPTION
-#    ONLY FOR EXISTING SPECTACLE USERS
-# ==================================================
-
-if spectacle_history == "Existing":
-
-    years_using_glasses = input(
-        "How long have you been using glasses?: "
+    print(
+        "Existing customer - "
+        "previous prescription loaded automatically."
     )
 
     print("\n--- Previous Prescription ---")
+
+    print("OD:")
     print(
-        "Enter power with + or - sign."
+        f"SPH: {previous_right_sph} | "
+        f"CYL: {previous_right_cyl} | "
+        f"AXIS: {previous_right_axis} | "
+        f"ADD: {previous_right_add}"
     )
+
+    print("OS:")
     print(
-        "Example: -1.00, +2.00"
-    )
-    print(
-        "Leave ADD blank if not required."
-    )
-
-    # ---------------- RIGHT EYE ----------------
-
-    print("\nPrevious Right Eye (OD)")
-
-    previous_right_sph = input(
-        "Previous Right Eye SPH: "
+        f"SPH: {previous_left_sph} | "
+        f"CYL: {previous_left_cyl} | "
+        f"AXIS: {previous_left_axis} | "
+        f"ADD: {previous_left_add}"
     )
 
-    previous_right_cyl = input(
-        "Previous Right Eye CYL: "
-    )
+elif order_type in ["2", "3"]:
 
-    previous_right_axis = input(
-        "Previous Right Eye AXIS (0-180): "
-    )
+    while True:
+        spectacle_history = input(
+            "Enter Spectacle History "
+            "(First-time / Existing): "
+        ).strip().lower()
 
-    previous_right_add = input(
-        "Previous Right Eye ADD / Near Power: "
-    )
+        if spectacle_history in [
+            "first-time",
+            "first time",
+            "first"
+        ]:
+            spectacle_history = "First-time"
+            break
 
+        elif spectacle_history in [
+            "existing",
+            "old"
+        ]:
+            spectacle_history = "Existing"
+            break
 
-    # ---------------- LEFT EYE ----------------
+        else:
+            print(
+                "Please type First-time or Existing."
+            )
 
-    print("\nPrevious Left Eye (OS)")
+    if spectacle_history == "Existing":
 
-    previous_left_sph = input(
-        "Previous Left Eye SPH: "
-    )
+        years_using_glasses = input(
+            "How long have you been using glasses?: "
+        )
 
-    previous_left_cyl = input(
-        "Previous Left Eye CYL: "
-    )
+        print("\n--- Previous Prescription ---")
+        print("Enter power with + or - sign.")
+        print("Example: -1.00, +2.00")
+        print("Leave ADD blank if not required.")
 
-    previous_left_axis = input(
-        "Previous Left Eye AXIS (0-180): "
-    )
+        print("\nPrevious Right Eye (OD)")
 
-    previous_left_add = input(
-        "Previous Left Eye ADD / Near Power: "
-    )
+        previous_right_sph = input(
+            "Previous Right Eye SPH: "
+        )
+
+        previous_right_cyl = input(
+            "Previous Right Eye CYL: "
+        )
+
+        previous_right_axis = input(
+            "Previous Right Eye AXIS (0-180): "
+        )
+
+        previous_right_add = input(
+            "Previous Right Eye ADD / Near Power: "
+        )
+
+        print("\nPrevious Left Eye (OS)")
+
+        previous_left_sph = input(
+            "Previous Left Eye SPH: "
+        )
+
+        previous_left_cyl = input(
+            "Previous Left Eye CYL: "
+        )
+
+        previous_left_axis = input(
+            "Previous Left Eye AXIS (0-180): "
+        )
+
+        previous_left_add = input(
+            "Previous Left Eye ADD / Near Power: "
+        )
+
+    else:
+        print(
+            "First-time spectacle user - "
+            "Previous prescription not required."
+        )
 
 else:
-
-    print(
-        "First-time spectacle user - "
-        "Previous prescription not required."
-    )
+    spectacle_history = "Not Applicable"
 # ==================================================
 # 8. CURRENT PRESCRIPTION
 # ==================================================
