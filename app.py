@@ -248,7 +248,7 @@ if customer_type == "2" and order_type == "4":
 
 if customer_type == "2" and order_type == "5":
     print("\n--- Old Order History ---")
-
+    print("Order Date / Time:", selected_customer[0])
     print("Previous Frame Details:", selected_customer[20])
     print("Previous Frame Brand:", selected_customer[21])
     print("Previous Frame Offer:", selected_customer[22])
