@@ -258,27 +258,51 @@ if customer_type == "2" and order_type == "5":
     print("\n--- Old Order History ---")
     print("Matching Orders Found:", len(customer_orders))
 
-    for number, order in enumerate(customer_orders, start=1):
-        print(
-            f"{number}. Order Date / Time: {order[0]} | "
-            f"Frame: {order[20]} | "
-            f"Lens: {order[24]}"
-        )
-    order_choice = int(input("Select Order Number: "))
-    selected_order = customer_orders[order_choice - 1]
-    print("Order Date / Time:", selected_order[0])
+for number, order in enumerate(customer_orders, start=1):
+    print(
+        f"{number}. Order Date / Time: {order[0]} | "
+        f"Frame: {order[20]} | "
+        f"Lens: {order[24]}"
+    )
 
-    print("Previous Frame Details:", selected_order[20])
-    print("Previous Frame Brand:", selected_order[21])
-    print("Previous Frame Offer:", selected_order[22])
-    print("Previous Frame Price:", selected_order[23])
+order_choice_input = input("Select Order Number: ")
 
-    print("Previous Lens Type:", selected_order[24])
-    print("Previous Lens Brand:", selected_order[25])
-    print("Previous Lens Offer:", selected_order[26])
-    print("Previous Lens Price:", selected_order[27])
-
+if not order_choice_input.isdigit():
+    print("Invalid input. Please enter an order number.")
     raise SystemExit
+
+order_choice = int(order_choice_input)
+
+if order_choice < 1 or order_choice > len(customer_orders):
+    print("Invalid order number. Please select from the list.")
+    raise SystemExit
+
+selected_order = customer_orders[order_choice - 1]
+
+print("\n==================================================")
+print("              OLD ORDER DETAILS")
+print("==================================================")
+print("Order Date / Time :", selected_order[0])
+print()
+if selected_order[20].strip():
+    print("--- Frame Details ---")
+    print("Frame      :", selected_order[20])
+    if selected_order[21].strip():
+        print("Brand      :", selected_order[21])
+    if selected_order[22].strip() and selected_order[22].strip() not in ["0", "0.0"]:
+        print("Offer      :", selected_order[22])
+    if selected_order[23].strip() and selected_order[23].strip() not in ["0", "0.0"]:
+        print("Price      : ₹", selected_order[23])
+if selected_order[24].strip():
+    print("--- Lens Details ---")
+    print("Lens Type  :", selected_order[24])
+if selected_order[25].strip():
+    print("Brand      :", selected_order[25])
+if selected_order[26].strip() and selected_order[26].strip() not in ["0", "0.0"]:
+    print("Offer      :", selected_order[26]) 
+if selected_order[27].strip() and selected_order[27].strip() not in ["0", "0.0"]:
+    print("Price      : ₹", selected_order[27])  
+raise SystemExit
 
 
 # ==================================================
