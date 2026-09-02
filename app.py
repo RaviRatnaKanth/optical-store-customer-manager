@@ -153,7 +153,7 @@ if customer_type == "1":
         except ValueError:
             print("Please enter age using numbers only.")
 
-    phone = input("Enter Customer Phone Number: ")
+    phone = input("Enter Customer Phone Number (Optional - press Enter if unavailable): ").strip()
     address = input("Enter Customer Address: ")
 else:
     age = selected_customer[7]
@@ -258,51 +258,51 @@ if customer_type == "2" and order_type == "5":
     print("\n--- Old Order History ---")
     print("Matching Orders Found:", len(customer_orders))
 
-for number, order in enumerate(customer_orders, start=1):
-    print(
-        f"{number}. Order Date / Time: {order[0]} | "
-        f"Frame: {order[20]} | "
-        f"Lens: {order[24]}"
-    )
+    for number, order in enumerate(customer_orders, start=1):
+        print(
+            f"{number}. Order Date / Time: {order[0]} | "
+            f"Frame: {order[20]} | "
+            f"Lens: {order[24]}"
+        )
 
-order_choice_input = input("Select Order Number: ")
+    order_choice_input = input("Select Order Number: ")
 
-if not order_choice_input.isdigit():
-    print("Invalid input. Please enter an order number.")
+    if not order_choice_input.isdigit():
+        print("Invalid input. Please enter an order number.")
+        raise SystemExit
+
+    order_choice = int(order_choice_input)
+
+    if order_choice < 1 or order_choice > len(customer_orders):
+        print("Invalid order number. Please select from the list.")
+        raise SystemExit
+
+    selected_order = customer_orders[order_choice - 1]
+
+    print("\n==================================================")
+    print("              OLD ORDER DETAILS")
+    print("==================================================")
+    print("Order Date / Time :", selected_order[0])
+    print()
+    if selected_order[20].strip():
+        print("--- Frame Details ---")
+        print("Frame      :", selected_order[20])
+        if selected_order[21].strip():
+            print("Brand      :", selected_order[21])
+        if selected_order[22].strip() and selected_order[22].strip() not in ["0", "0.0"]:
+            print("Offer      :", selected_order[22])
+        if selected_order[23].strip() and selected_order[23].strip() not in ["0", "0.0"]:
+            print("Price      : ₹", selected_order[23])
+    if selected_order[24].strip():
+        print("--- Lens Details ---")
+        print("Lens Type  :", selected_order[24])
+    if selected_order[25].strip():
+        print("Brand      :", selected_order[25])
+    if selected_order[26].strip() and selected_order[26].strip() not in ["0", "0.0"]:
+        print("Offer      :", selected_order[26]) 
+    if selected_order[27].strip() and selected_order[27].strip() not in ["0", "0.0"]:
+        print("Price      : ₹", selected_order[27])  
     raise SystemExit
-
-order_choice = int(order_choice_input)
-
-if order_choice < 1 or order_choice > len(customer_orders):
-    print("Invalid order number. Please select from the list.")
-    raise SystemExit
-
-selected_order = customer_orders[order_choice - 1]
-
-print("\n==================================================")
-print("              OLD ORDER DETAILS")
-print("==================================================")
-print("Order Date / Time :", selected_order[0])
-print()
-if selected_order[20].strip():
-    print("--- Frame Details ---")
-    print("Frame      :", selected_order[20])
-    if selected_order[21].strip():
-        print("Brand      :", selected_order[21])
-    if selected_order[22].strip() and selected_order[22].strip() not in ["0", "0.0"]:
-        print("Offer      :", selected_order[22])
-    if selected_order[23].strip() and selected_order[23].strip() not in ["0", "0.0"]:
-        print("Price      : ₹", selected_order[23])
-if selected_order[24].strip():
-    print("--- Lens Details ---")
-    print("Lens Type  :", selected_order[24])
-if selected_order[25].strip():
-    print("Brand      :", selected_order[25])
-if selected_order[26].strip() and selected_order[26].strip() not in ["0", "0.0"]:
-    print("Offer      :", selected_order[26]) 
-if selected_order[27].strip() and selected_order[27].strip() not in ["0", "0.0"]:
-    print("Price      : ₹", selected_order[27])  
-raise SystemExit
 
 
 # ==================================================
@@ -834,41 +834,34 @@ print(
     if left_add
     else "Not Required"
 )
-print("\n--- Pupillary Distance (PD) ---")
+if distance_pd or near_pd:
 
-print(
-    "Distance PD:",
-    distance_pd if distance_pd else "Not Measured"
+    print(
+        "Distance PD:",
+        distance_pd if distance_pd else "Not Measured"
 )
 
-print(
-    "Near PD:",
-    near_pd if near_pd else "Not Measured"
+    print(
+        "Near PD:",
+        near_pd if near_pd else "Not Measured"
 )
 
 # ---------------- VISUAL ACUITY / PINHOLE ----------------
 
-print("\n--- Visual Acuity / Pinhole Test ---")
+if right_va or left_va or right_pinhole or left_pinhole:
 
-print(
-    "Right Eye Visual Acuity:",
-    right_va if right_va else "Not Tested"
-)
+    if right_va:
+        print("Right Eye Visual Acuity :", right_va)
 
-print(
-    "Left Eye Visual Acuity:",
-    left_va if left_va else "Not Tested"
-)
+    if left_va:
+        print("Left Eye Visual Acuity  :", left_va)
 
-print(
-    "Right Eye Pinhole:",
-    right_pinhole if right_pinhole else "Not Tested"
-)
+    if right_pinhole:
+        print("Right Eye Pinhole       :", right_pinhole)
 
-print(
-    "Left Eye Pinhole:",
-    left_pinhole if left_pinhole else "Not Tested"
-)
+    if left_pinhole:
+        print("Left Eye Pinhole        :", left_pinhole)
+
 # ---------------- PAYMENT ----------------
 
 print("\n--- Payment ---")
@@ -1012,18 +1005,9 @@ SPH: {left_sph}
 CYL: {left_cyl}
 AXIS: {left_axis}
 ADD: {left_add if left_add else "Not Required"}
-Pupillary Distance (PD):
-Distance PD: {distance_pd if distance_pd else "Not Measured"}
-Near PD: {near_pd if near_pd else "Not Measured"}
+{f"Pupillary Distance (PD):\nDistance PD: {distance_pd}\nNear PD: {near_pd}\n" if distance_pd or near_pd else ""}
 
-Visual Acuity / Pinhole Test:
-
-
-Right Eye Visual Acuity: {right_va if right_va else "Not Tested"}
-Left Eye Visual Acuity: {left_va if left_va else "Not Tested"}
-
-Right Eye Pinhole: {right_pinhole if right_pinhole else "Not Tested"}
-Left Eye Pinhole: {left_pinhole if left_pinhole else "Not Tested"}
+{f"Visual Acuity / Pinhole Test:\nRight Eye Visual Acuity: {right_va}\nLeft Eye Visual Acuity: {left_va}\nRight Eye Pinhole: {right_pinhole}\nLeft Eye Pinhole: {left_pinhole}\n" if right_va or left_va or right_pinhole or left_pinhole else ""}
 Please keep this prescription for your reference.
 """
 
