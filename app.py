@@ -118,7 +118,7 @@ if customer_type == "2":
         raise SystemExit
 print("\n--- Customer Details ---")
 if customer_type == "1":
-    customer_name = input("Enter Customer Name: ")
+    customer_name = input("Enter Customer Name: ").strip().title()
 else:
     customer_name = selected_customer[5]
 if customer_type == "1":
@@ -154,7 +154,7 @@ if customer_type == "1":
             print("Please enter age using numbers only.")
 
     phone = input("Enter Customer Phone Number (Optional - press Enter if unavailable): ").strip()
-    address = input("Enter Customer Address: ")
+    address = input("Enter Customer Address: ").strip().title()
 else:
     age = selected_customer[7]
     phone = selected_customer[8]
@@ -362,29 +362,9 @@ if order_type in ["2", "3"]:
     lens_type = input(
         "Enter Lens Type "
         "(Single Vision / Bifocal / Progressive / Other): "
-    ).strip()
-
-    print("\n--- Lens Category ---")
-    print("1. Brand")
-    print("2. Non-Brand")
-
-    while True:
-        lens_category = input(
-            "Select Lens Category (1/2): "
-        ).strip()
-
-        if lens_category in ["1", "2"]:
-            break
-        else:
-            print("Please enter 1 or 2 only.")
-
-    if lens_category == "1":
-        lens_brand = input(
-            "Enter Lens Brand: "
-        ).strip()
-    else:
-        lens_brand = "Non-Brand"
-
+    ).strip().title()
+    lens_features = input("Enter Lens Features / Coating (Optional): ").strip().title()
+    lens_brand = input("Enter Lens Brand (Optional): ").strip().title()
     lens_offer = input(
         "Enter Lens Offer: "
     ).strip()
@@ -546,14 +526,92 @@ if order_type in ["2", "3"]:
 
     print("\nRight Eye (OD)")
 
-    right_sph = input("Enter Right Eye SPH (+/-): ").strip()
+    while True:
+        right_sph = input("Enter Right Eye SPH (+/-): ").strip()
 
-    right_cyl = input("Enter Right Eye CYL (+/-): ").strip()
+        if right_sph.lower() == "plano":
+            right_sph = "Plano"
+            break
 
-    right_axis = input("Enter Right Eye AXIS (0-180): ").strip()
+        if right_sph == "0":
+            break
 
-    right_add = input("Enter Right Eye ADD / Near Power (+): ").strip()
+        if right_sph.startswith(("+", "-")):
+            number_part = right_sph[1:]
+            parts = number_part.split(".")
 
+            if (
+                len(parts) == 2
+                and parts[0].isdigit()
+                and len(parts[1]) == 2
+                and parts[1] in ["00", "25", "50", "75"]
+                and float(number_part) <= 30
+            ):
+                break
+
+        print("Invalid SPH. Enter like -1.00, +1.25, 0 or Plano.")
+
+    while True:
+        right_cyl = input("Enter Right Eye CYL (+/-): ").strip()
+
+        if right_cyl == "":
+            break
+
+        if right_cyl == "0":
+            break
+
+        if right_cyl.startswith(("+", "-")):
+            number_part = right_cyl[1:]
+            parts = number_part.split(".")
+
+            if (
+                len(parts) == 2
+                and parts[0].isdigit()
+                and len(parts[1]) == 2
+                and parts[1] in ["00", "25", "50", "75"]
+                and float(number_part) <= 10
+            ):
+                break
+
+        print("Invalid CYL. Enter like -0.50, +1.25, 0 or leave blank.")
+
+    while True:
+        right_axis = input("Enter Right Eye AXIS (0-180): ").strip()
+
+        if right_axis == "":
+            break
+
+        if right_axis.isdigit():
+            axis_value = int(right_axis)
+
+            if 0 <= axis_value <= 180:
+                break
+
+        print("Invalid AXIS. Enter a number from 0 to 180 or leave blank.")
+
+    while True:
+        right_add = input("Enter Right Eye ADD / Near Power (+): ").strip()
+
+        if right_add == "":
+            break
+
+        if right_add == "0":
+            break
+
+        if right_add.startswith("+"):
+            number_part = right_add[1:]
+            parts = number_part.split(".")
+
+            if (
+                len(parts) == 2
+                and parts[0].isdigit()
+                and len(parts[1]) == 2
+                and parts[1] in ["00", "25", "50", "75"]
+                and float(number_part) <= 5
+            ):
+                break
+
+        print("Invalid ADD. Enter like +1.00, +1.25, +2.00, 0 or leave blank.")
 
     # ==================================================
     # 10. CURRENT LEFT EYE
@@ -561,39 +619,94 @@ if order_type in ["2", "3"]:
 
     print("\nLeft Eye (OS)")
 
-    left_sph = input("Enter Left Eye SPH (+/-): ").strip()
+    while True:
+        left_sph = input("Enter Left Eye SPH (+/-): ").strip()
 
-    left_cyl = input("Enter Left Eye CYL (+/-): ").strip()
+        if left_sph.lower() == "plano":
+            left_sph = "Plano"
+            break
 
-    left_axis = input("Enter Left Eye AXIS (0-180): ").strip()
+        if left_sph == "0":
+            break
 
-    left_add = input("Enter Left Eye ADD / Near Power (+): ").strip()
-    # ==========================================================
-    # 11. PUPILLARY DISTANCE (PD) - OPTIONAL
-    # ==========================================================
+        if left_sph.startswith(("+", "-")):
+            number_part = left_sph[1:]
+            parts = number_part.split(".")
 
-    print("\n--- Pupillary Distance (PD) (Optional) ---")
+            if (
+                len(parts) == 2
+                and parts[0].isdigit()
+                and len(parts[1]) == 2
+                and parts[1] in ["00", "25", "50", "75"]
+                and float(number_part) <= 30
+            ):
+                break
 
-    distance_pd = input(
-        "Enter Distance PD in mm (Example: 62): "
-    ).strip()
+        print("Invalid SPH. Enter like -1.00, +1.25, 0 or Plano.")
 
-    near_pd = input(
-        "Enter Near PD in mm (Example: 59): "
-    ).strip()
-    # ==================================================
-    # VISUAL ACUITY / PINHOLE TEST (OPTIONAL)
-    # ==================================================
+    while True:
+        left_cyl = input("Enter Left Eye CYL (+/-): ").strip()
 
-    print("\n--- Visual Acuity Test (Optional) ---")
-    print("Leave blank if not tested.")
+        if left_cyl == "":
+            break
 
-    right_va = input("Right Eye Visual Acuity (Example: 6/6): ")
-    left_va = input("Left Eye Visual Acuity (Example: 6/6): ")
+        if left_cyl == "0":
+            break
 
-    right_pinhole = input("Right Eye Pinhole (Example: 6/6): ")
-    left_pinhole = input("Left Eye Pinhole (Example: 6/6): ")
+        if left_cyl.startswith(("+", "-")):
+            number_part = left_cyl[1:]
+            parts = number_part.split(".")
 
+            if (
+                len(parts) == 2
+                and parts[0].isdigit()
+                and len(parts[1]) == 2
+                and parts[1] in ["00", "25", "50", "75"]
+                and float(number_part) <= 10
+            ):
+                break
+
+        print("Invalid CYL. Enter like -1.00, +0.50, 0 or leave blank.")
+
+    while True:
+        left_axis = input("Enter Left Eye AXIS (0-180): ").strip()
+
+        if left_axis == "":
+            break
+
+        if left_axis.isdigit():
+            axis_value = int(left_axis)
+
+            if 0 <= axis_value <= 180:
+                break
+
+        print("Invalid AXIS. Enter a number from 0 to 180 or leave blank.")
+
+    while True:
+        left_add = input("Enter Left Eye ADD / Near Power (+): ").strip()
+
+        if left_add == "":
+            break
+
+        if left_add == "0":
+            break
+
+        if left_add.startswith("+"):
+            number_part = left_add[1:]
+            parts = number_part.split(".")
+
+            if (
+                len(parts) == 2
+                and parts[0].isdigit()
+                and len(parts[1]) == 2
+                and parts[1] in ["00", "25", "50", "75"]
+                and float(number_part) <= 5
+            ):
+                break
+
+        print("Invalid ADD. Enter like +1.00, +1.25, +2.00, 0 or leave blank.")
+
+ 
 else:
     right_sph = ""
     right_cyl = ""
@@ -613,11 +726,21 @@ else:
     right_pinhole = ""
     left_pinhole = ""
 
+if order_type in ["2", "3"]:
+    print("\n--- Pupillary Distance (PD) (Optional) ---")
+    distance_pd = input("Enter Distance PD in mm (Example: 62): ").strip()
+    near_pd = input("Enter Near PD in mm (Example: 59): ").strip()
+    print("\n--- Visual Acuity Test (Optional) ---")
+    right_va = input("Right Eye Visual Acuity (Example: 6/6): ").strip()
+    left_va = input("Left Eye Visual Acuity (Example: 6/6): ").strip()
+    right_pinhole = input("Right Eye Pinhole (Example: 6/6): ").strip()
+    left_pinhole = input("Left Eye Pinhole (Example: 6/6): ").strip()
+    
 # ==================================================
 # 11. PAYMENT DETAILS
 # ==================================================
 
-print("\n--- Payment Details ---")
+    print("\n--- Payment Details ---")
 
 
 # Total Amount Validation
@@ -800,7 +923,8 @@ if frame_offer:
     print("Frame Price:", frame_price)
 
 print("Lens Type:", lens_type)
-
+if lens_features:
+    print("Lens Features / Coating:", lens_features)
 if lens_brand:
     print("Lens Brand:", lens_brand)
 
@@ -932,7 +1056,8 @@ with open("customers.csv", "a", newline="", encoding="utf-8") as file:
     "Left Pinhole",
     "Total Amount",
     "Advance Amount",
-    "Balance"
+    "Balance",
+    "Lens Features / Coating"
  ])   
     writer.writerow([  
             
@@ -980,7 +1105,8 @@ with open("customers.csv", "a", newline="", encoding="utf-8") as file:
     left_pinhole,
     total_amount,
     advance_amount,
-    balance
+    balance,
+    lens_features
 ])
 print("\n==================================================")
 print("        CUSTOMER RECORD COMPLETED SUCCESSFULLY")
