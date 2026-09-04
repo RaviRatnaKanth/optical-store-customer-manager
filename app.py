@@ -302,6 +302,8 @@ if customer_type == "2" and order_type == "5":
         print("Offer      :", selected_order[26]) 
     if selected_order[27].strip() and selected_order[27].strip() not in ["0", "0.0"]:
         print("Price      : ₹", selected_order[27])  
+    if len(selected_order) > 44 and selected_order[-1].strip():
+       print("Features   :", selected_order[-1])
     raise SystemExit
 
 
@@ -1038,6 +1040,7 @@ with open("customers.csv", "a", newline="", encoding="utf-8") as file:
     "Frame Price",
     "Lens Type",
     "Lens Brand",
+    "Lens Features / Coating",
     "Lens Offer",
     "Lens Price",
     "Right SPH",
@@ -1087,6 +1090,7 @@ with open("customers.csv", "a", newline="", encoding="utf-8") as file:
     frame_price,
     lens_type,
     lens_brand,
+    
     lens_offer,
     lens_price,
     right_sph,
@@ -1106,7 +1110,7 @@ with open("customers.csv", "a", newline="", encoding="utf-8") as file:
     total_amount,
     advance_amount,
     balance,
-    lens_features
+    lens_features,
 ])
 print("\n==================================================")
 print("        CUSTOMER RECORD COMPLETED SUCCESSFULLY")
