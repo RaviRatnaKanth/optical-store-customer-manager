@@ -118,7 +118,24 @@ if customer_type == "2":
         raise SystemExit
 print("\n--- Customer Details ---")
 if customer_type == "1":
-    customer_name = input("Enter Customer Name: ").strip().title()
+    while True:
+        customer_name = input("Enter Customer Name: ").strip().title()
+
+        if (
+            customer_name
+            and any(char.isalpha() for char in customer_name)
+            and all(
+                char.isalpha()
+                or char.isspace()
+                or char in [".", "'", "-"]
+                for char in customer_name
+            )
+        ):
+            break
+
+        print(
+            "Invalid customer name. Please enter a valid name using letters."
+        )
 else:
     customer_name = selected_customer[5]
 if customer_type == "1":
@@ -153,8 +170,72 @@ if customer_type == "1":
         except ValueError:
             print("Please enter age using numbers only.")
 
-    phone = input("Enter Customer Phone Number (Optional - press Enter if unavailable): ").strip()
-    address = input("Enter Customer Address: ").strip().title()
+    while True:
+        raw_phone = input(
+            "Enter Customer Phone Number (Optional - press Enter if unavailable): "
+        ).strip()
+
+        # Phone number is optional
+        if raw_phone == "":
+            phone = ""
+            break
+
+        # Remove common formatting
+        clean_phone = (
+            raw_phone
+            .replace(" ", "")
+            .replace("-", "")
+            .replace("(", "")
+            .replace(")", "")
+        )
+
+        # Accept Indian country code formats
+        if clean_phone.startswith("+91"):
+            clean_phone = clean_phone[3:]
+
+        elif clean_phone.startswith("0091"):
+            clean_phone = clean_phone[4:]
+
+        elif clean_phone.startswith("91") and len(clean_phone) == 12:
+            clean_phone = clean_phone[2:]
+
+        # Validate Indian 10-digit mobile number
+        if (
+            clean_phone.isdigit()
+            and len(clean_phone) == 10
+            and clean_phone[0] in ["6", "7", "8", "9"]
+        ):
+            phone = clean_phone
+            break
+
+        print(
+            "Invalid phone number. Enter a valid Indian 10-digit mobile "
+            "number, optionally with +91, or leave blank."
+        )
+    while True:
+        address = input(
+            "Enter Town / Village (Required): "
+        ).strip().title()
+
+        if (
+            address
+            and any(char.isalpha() for char in address)
+            and all(
+                char.isalpha()
+                or char.isspace()
+                or char in [".", ",", "-", "'"]
+                for char in address
+            )
+        ):
+            break
+
+        print(
+            "Town / Village is required. Please enter a valid place name."
+        )
+    full_address = input(
+        "Enter Full Address (Optional - press Enter to skip): "
+    ).strip().title()
+
 else:
     age = selected_customer[7]
     phone = selected_customer[8]
@@ -356,24 +437,202 @@ else:
 # 7. LENS TYPE
 # ==================================================
 
-
-
 if order_type in ["2", "3"]:
     print("\n--- Lens Details ---")
 
-    lens_type = input(
-        "Enter Lens Type "
-        "(Single Vision / Bifocal / Progressive / Other): "
+    print("\n--- Lens Type ---")
+    print("1. Single Vision")
+    print("2. Bifocal")
+
+    add_requirement = ""
+
+    while True:
+        lens_type_choice = input("Select Lens Type (1/2): ").strip()
+
+        if lens_type_choice == "1":
+            lens_type = "Single Vision"
+            break
+
+        elif lens_type_choice == "2":
+            print("\n--- Bifocal Type ---")
+            print("1. Kryptok Bifocal")
+            print("2. D Bifocal")
+            print("3. Progressive Bifocal")
+            print("4. Other")
+
+            while True:
+                bifocal_choice = input(
+                    "Select Bifocal Type (1/2/3/4): "
+                ).strip()
+
+                if bifocal_choice == "1":
+                    lens_type = "Kryptok Bifocal"
+                    break
+
+                elif bifocal_choice == "2":
+                    lens_type = "D Bifocal"
+                    break
+
+                elif bifocal_choice == "3":
+                    lens_type = "Progressive Bifocal"
+                    break
+
+                elif bifocal_choice == "4":
+                    lens_type = "Other"
+                    break
+
+                else:
+                    print(
+                        "Invalid option. Please select 1, 2, 3 or 4."
+                    )
+
+            print("\n--- ADD Requirement ---")
+            print("1. Both Eyes")
+            print("2. Right Eye (OD) Only")
+            print("3. Left Eye (OS) Only")
+
+            while True:
+                add_requirement = input(
+                    "Select ADD Requirement (1/2/3): "
+                ).strip()
+
+                if add_requirement in ["1", "2", "3"]:
+                    break
+
+                print(
+                    "Invalid option. Please select 1, 2 or 3."
+                )
+
+            break
+
+        else:
+            print(
+                "Invalid option. Please select 1 or 2."
+            )
+
+    # ==================================================
+    # LENS FEATURES / COATING VALIDATION
+    # ==================================================
+
+    while True:
+        lens_features = input(
+            "Enter Lens Features / Coating (Optional): "
+        ).strip().title()
+
+        normalized_features = (
+            lens_features.lower()
+            .replace(".", " ")
+            .replace("-", " ")
+            .replace("/", " ")
+            .replace(",", " ")
+            .replace("_", " ")
+        )
+
+        feature_words = normalized_features.split()
+
+        has_kt = (
+            "kt" in feature_words
+            or "kryptok" in feature_words
+        )
+
+        has_progressive = (
+            "progressive" in feature_words
+        )
+
+        has_d_bifocal = (
+            "d bifocal" in normalized_features
+            or "dbifocal" in normalized_features
+        )
+
+        # Single Vision cannot contain Bifocal design names
+        if lens_type == "Single Vision":
+            if has_kt:
+                print(
+                    "KT / Kryptok is a Bifocal type and "
+                    "cannot be used with Single Vision."
+                )
+                continue
+
+            if has_progressive:
+                print(
+                    "Progressive cannot be used with "
+                    "Single Vision."
+                )
+                continue
+
+            if has_d_bifocal:
+                print(
+                    "D Bifocal cannot be used with "
+                    "Single Vision."
+                )
+                continue
+
+        # Kryptok cannot conflict with other Bifocal designs
+        elif lens_type == "Kryptok Bifocal":
+            if has_progressive:
+                print(
+                    "Progressive cannot be used with "
+                    "Kryptok Bifocal."
+                )
+                continue
+
+            if has_d_bifocal:
+                print(
+                    "D Bifocal cannot be used with "
+                    "Kryptok Bifocal."
+                )
+                continue
+
+        # D Bifocal cannot conflict with Kryptok or Progressive
+        elif lens_type == "D Bifocal":
+            if has_kt:
+                print(
+                    "KT / Kryptok cannot be used with "
+                    "D Bifocal."
+                )
+                continue
+
+            if has_progressive:
+                print(
+                    "Progressive cannot be used with "
+                    "D Bifocal."
+                )
+                continue
+
+        # Progressive cannot contain Kryptok or D Bifocal
+        elif lens_type == "Progressive Bifocal":
+            if has_kt:
+                print(
+                    "KT / Kryptok cannot be used with "
+                    "Progressive Bifocal."
+                )
+                continue
+
+            if has_d_bifocal:
+                print(
+                    "D Bifocal cannot be used with "
+                    "Progressive Bifocal."
+                )
+                continue
+
+        break
+
+    lens_brand = input(
+        "Enter Lens Brand (Optional): "
     ).strip().title()
-    lens_features = input("Enter Lens Features / Coating (Optional): ").strip().title()
-    lens_brand = input("Enter Lens Brand (Optional): ").strip().title()
+
     lens_offer = input(
         "Enter Lens Offer: "
     ).strip()
-    lens_price = float(input("Enter Lens Price: "))
+
+    lens_price = float(
+        input("Enter Lens Price: ")
+    )
 
 else:
     lens_type = ""
+    add_requirement = ""
+    lens_features = ""
     lens_brand = ""
     lens_offer = ""
     lens_price = 0.0
@@ -591,30 +850,34 @@ if order_type in ["2", "3"]:
 
         print("Invalid AXIS. Enter a number from 0 to 180 or leave blank.")
 
-    while True:
-        right_add = input("Enter Right Eye ADD / Near Power (+): ").strip()
+    if lens_type_choice == "1" or add_requirement == "3":
+        right_add = ""
+    else:
+        while True:
+            right_add = input(
+                "Enter Right Eye ADD / Near Power (+): "
+            ).strip()
 
-        if right_add == "":
-            break
+            if right_add in ["", "0"]:
+                print("ADD is required for Right Eye.")
+                continue
 
-        if right_add == "0":
-            break
+            if right_add.startswith("+"):
+                number_part = right_add[1:]
+                parts = number_part.split(".")
 
-        if right_add.startswith("+"):
-            number_part = right_add[1:]
-            parts = number_part.split(".")
+                if (
+                    len(parts) == 2
+                    and parts[0].isdigit()
+                    and len(parts[1]) == 2
+                    and parts[1] in ["00", "25", "50", "75"]
+                    and float(number_part) <= 5
+                ):
+                    break
 
-            if (
-                len(parts) == 2
-                and parts[0].isdigit()
-                and len(parts[1]) == 2
-                and parts[1] in ["00", "25", "50", "75"]
-                and float(number_part) <= 5
-            ):
-                break
-
-        print("Invalid ADD. Enter like +1.00, +1.25, +2.00, 0 or leave blank.")
-
+            print(
+                "Invalid ADD. Enter like +1.00, +1.25, +1.50 or +2.00."
+            )
     # ==================================================
     # 10. CURRENT LEFT EYE
     # ==================================================
@@ -684,31 +947,36 @@ if order_type in ["2", "3"]:
 
         print("Invalid AXIS. Enter a number from 0 to 180 or leave blank.")
 
-    while True:
-        left_add = input("Enter Left Eye ADD / Near Power (+): ").strip()
+    # Left Eye ADD Logic
+    if lens_type_choice == "1" or add_requirement == "2":
+        left_add = ""
+    else:
+        while True:
+            left_add = input(
+                "Enter Left Eye ADD / Near Power (+): "
+            ).strip()
 
-        if left_add == "":
-            break
+            if left_add in ["", "0"]:
+                print("ADD is required for Left Eye.")
+                continue
 
-        if left_add == "0":
-            break
+            if left_add.startswith("+"):
+                number_part = left_add[1:]
+                parts = number_part.split(".")
 
-        if left_add.startswith("+"):
-            number_part = left_add[1:]
-            parts = number_part.split(".")
+                if (
+                    len(parts) == 2
+                    and parts[0].isdigit()
+                    and len(parts[1]) == 2
+                    and parts[1] in ["00", "25", "50", "75"]
+                    and float(number_part) <= 5
+                ):
+                    break
 
-            if (
-                len(parts) == 2
-                and parts[0].isdigit()
-                and len(parts[1]) == 2
-                and parts[1] in ["00", "25", "50", "75"]
-                and float(number_part) <= 5
-            ):
-                break
+            print(
+                "Invalid ADD. Enter like +1.00, +1.25, +1.50 or +2.00."
+            )
 
-        print("Invalid ADD. Enter like +1.00, +1.25, +2.00, 0 or leave blank.")
-
- 
 else:
     right_sph = ""
     right_cyl = ""
@@ -730,14 +998,31 @@ else:
 
 if order_type in ["2", "3"]:
     print("\n--- Pupillary Distance (PD) (Optional) ---")
-    distance_pd = input("Enter Distance PD in mm (Example: 62): ").strip()
-    near_pd = input("Enter Near PD in mm (Example: 59): ").strip()
+    distance_pd = input(
+        "Enter Distance PD in mm (Example: 62): "
+    ).strip()
+
+    near_pd = input(
+        "Enter Near PD in mm (Example: 59): "
+    ).strip()
+
     print("\n--- Visual Acuity Test (Optional) ---")
-    right_va = input("Right Eye Visual Acuity (Example: 6/6): ").strip()
-    left_va = input("Left Eye Visual Acuity (Example: 6/6): ").strip()
-    right_pinhole = input("Right Eye Pinhole (Example: 6/6): ").strip()
-    left_pinhole = input("Left Eye Pinhole (Example: 6/6): ").strip()
-    
+
+    right_va = input(
+        "Right Eye Visual Acuity (Example: 6/6): "
+    ).strip()
+
+    left_va = input(
+        "Left Eye Visual Acuity (Example: 6/6): "
+    ).strip()
+
+    right_pinhole = input(
+        "Right Eye Pinhole (Example: 6/6): "
+    ).strip()
+
+    left_pinhole = input(
+        "Left Eye Pinhole (Example: 6/6): "
+    ).strip()
 # ==================================================
 # 11. PAYMENT DETAILS
 # ==================================================
@@ -1142,16 +1427,96 @@ Please keep this prescription for your reference.
 """
 
 print(prescription_message)
-send_whatsapp = input("\nSend prescription on WhatsApp? (y/n): ").strip().lower()
+print("\n--- Send Message ---")
+print("1. Normal SMS")
+print("2. WhatsApp Prescription")
+print("3. WhatsApp Payment Receipt")
+print("4. WhatsApp Balance Reminder")
+print("5. WhatsApp Prescription + Payment")
+print("6. Skip")
 
-if send_whatsapp == "y":
-    import urllib.parse
-    import webbrowser
+message_choice = input("Select Message Option (1/2/3/4/5/6): ").strip()
+if message_choice == "2":
+    if not phone:
+        print("WhatsApp Prescription cannot be sent - Customer phone number is not available.")
+    else:
+        import urllib.parse
+        import webbrowser
 
-    whatsapp_message = urllib.parse.quote(prescription_message)
-    whatsapp_url = f"https://wa.me/91{phone}?text={whatsapp_message}"
+        whatsapp_message = urllib.parse.quote(prescription_message)
+        whatsapp_url = f"https://wa.me/91{phone}?text={whatsapp_message}"
 
-    webbrowser.open(whatsapp_url)
-    print("Opening WhatsApp...")
-else:
-    print("Prescription not sent on WhatsApp.")
+        webbrowser.open(whatsapp_url)
+        print("Opening WhatsApp Prescription...")
+if message_choice == "3":
+    if not phone:
+        print("WhatsApp Payment Receipt cannot be sent - Customer phone number is not available.")
+    else:
+        import urllib.parse
+        import webbrowser
+
+        payment_message = f"""{store_name}
+Customer Name: {customer_name}
+
+Payment Receipt
+
+Total Amount: ₹{total_amount}
+Advance Amount: ₹{advance_amount}
+Balance Amount: ₹{balance}
+
+Thank you for choosing {store_name}.
+"""
+
+        whatsapp_message = urllib.parse.quote(payment_message)
+        whatsapp_url = f"https://wa.me/91{phone}?text={whatsapp_message}"
+
+        webbrowser.open(whatsapp_url)
+        print("Opening WhatsApp Payment Receipt...")
+if message_choice == "4":
+    if not phone:
+        print("WhatsApp Balance Reminder cannot be sent - Customer phone number is not available.")
+    else:
+        import urllib.parse
+        import webbrowser
+
+        balance_message = f"""{store_name}
+Customer Name: {customer_name}
+
+Balance Payment Reminder
+
+Your pending balance amount is ₹{balance}.
+
+Please make the balance payment at your convenience.
+
+Thank you,
+{store_name}
+"""
+
+        whatsapp_message = urllib.parse.quote(balance_message)
+        whatsapp_url = f"https://wa.me/91{phone}?text={whatsapp_message}"
+
+        webbrowser.open(whatsapp_url)
+        print("Opening WhatsApp Balance Reminder...")
+if message_choice == "5":
+    if not phone:
+        print("WhatsApp Prescription + Payment cannot be sent - Customer phone number is not available.")
+    else:
+        import urllib.parse
+        import webbrowser
+
+        combined_message = f"""{prescription_message}
+
+Payment Details
+
+Total Amount: ₹{total_amount}
+Advance Amount: ₹{advance_amount}
+Balance Amount: ₹{balance}
+
+Thank you for choosing {store_name}.
+"""
+
+        whatsapp_message = urllib.parse.quote(combined_message)
+        whatsapp_url = f"https://wa.me/91{phone}?text={whatsapp_message}"
+
+        webbrowser.open(whatsapp_url)
+        print("Opening WhatsApp Prescription + Payment...")
