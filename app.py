@@ -1247,13 +1247,14 @@ if frame_offer:
 print("Lens Type:", lens_type)
 if lens_features:
     print("Lens Features / Coating:", lens_features)
+
 if lens_brand:
     print("Lens Brand:", lens_brand)
 
 if lens_offer:
     print("Lens Offer:", lens_offer)
-    print("Lens Price:", lens_price)
 
+print("Lens Price:", lens_price)
 
 # ---------------- CURRENT PRESCRIPTION ----------------
 
