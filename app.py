@@ -240,6 +240,7 @@ else:
     age = selected_customer[7]
     phone = selected_customer[8]
     address = selected_customer[9]
+    full_address = selected_customer[46] if len(selected_customer) > 46 else ""
 
 
 
@@ -1149,6 +1150,8 @@ print(
     address
 )
 
+if full_address:
+    print("Full Address:", full_address)
 print(
     "Spectacle History:",
     spectacle_history
@@ -1345,7 +1348,8 @@ with open("customers.csv", "a", newline="", encoding="utf-8") as file:
     "Total Amount",
     "Advance Amount",
     "Balance",
-    "Lens Features / Coating"
+    "Lens Features / Coating",
+    "Full Address"
  ])   
     writer.writerow([  
             
@@ -1396,7 +1400,9 @@ with open("customers.csv", "a", newline="", encoding="utf-8") as file:
     advance_amount,
     balance,
     lens_features,
-])
+    full_address,
+ ])
+
 print("\n==================================================")
 print("        CUSTOMER RECORD COMPLETED SUCCESSFULLY")
 print("==================================================")
