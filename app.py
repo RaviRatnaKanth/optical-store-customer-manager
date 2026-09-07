@@ -26,7 +26,23 @@ if customer_type == "2":
     search_value = input(
         "Enter Existing Customer Name or Phone: "
     ).strip().lower()
+    clean_search = (
+        search_value
+        .replace(" ", "")
+        .replace("-", "")
+        .replace("(", "")
+        .replace(")", "")
+    )
 
+    if clean_search.startswith("+91"):
+        clean_search = clean_search[3:]
+    elif clean_search.startswith("0091"):
+        clean_search = clean_search[4:]
+    elif clean_search.startswith("91") and len(clean_search) == 12:
+        clean_search = clean_search[2:]
+
+    if clean_search.isdigit():
+        search_value = clean_search
     matching_customers = []
 
     with open("customers.csv", "r", encoding="utf-8") as file:
