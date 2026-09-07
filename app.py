@@ -39,7 +39,23 @@ if customer_type == "2":
                 or row[8].strip().lower() == search_value
             ):
                 matching_customers.append(row)
+    unique_customers = {}
 
+    for customer in matching_customers:
+        if customer[8].strip():
+            customer_key = (
+                customer[5].strip().lower(),
+                customer[8].strip()
+            )
+        else:
+            customer_key = (
+                customer[5].strip().lower(),
+                customer[9].strip().lower()
+            )
+
+        unique_customers[customer_key] = customer
+
+    matching_customers = list(unique_customers.values())
     if len(matching_customers) == 1:
         selected_customer = matching_customers[0]
         customer_name = selected_customer[5]
