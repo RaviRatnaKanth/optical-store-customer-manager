@@ -1235,79 +1235,80 @@ else:
 
 print("\n--- Frame / Lens Details ---")
 
-print("Frame Details:", frame_details)
+if order_type in ["1", "3"]:
+    print("Frame Details:", frame_details)
 
-if frame_brand:
-    print("Frame Brand:", frame_brand)
+    if frame_brand:
+        print("Frame Brand:", frame_brand)
 
-if frame_offer:
-    print("Frame Offer:", frame_offer)
+    if frame_offer:
+        print("Frame Offer:", frame_offer)
+
     print("Frame Price:", frame_price)
 
-print("Lens Type:", lens_type)
-if lens_features:
-    print("Lens Features / Coating:", lens_features)
+if order_type in ["2", "3"]:
+    print("Lens Type:", lens_type)
 
-if lens_brand:
-    print("Lens Brand:", lens_brand)
+    if lens_features:
+        print("Lens Features / Coating:", lens_features)
 
-if lens_offer:
-    print("Lens Offer:", lens_offer)
+    if lens_brand:
+        print("Lens Brand:", lens_brand)
 
-print("Lens Price:", lens_price)
+    if lens_offer:
+        print("Lens Offer:", lens_offer)
 
+    print("Lens Price:", lens_price)
 # ---------------- CURRENT PRESCRIPTION ----------------
 
-print("\n--- Current Prescription ---")
+if order_type in ["2", "3"]:
 
-print(
-    "Right Eye (OD):",
-    "SPH =", right_sph,
-    "CYL =", right_cyl,
-    "AXIS =", right_axis,
-    "ADD =",
-    right_add
-    if right_add
-    else "Not Required"
-)
-
-print(
-    "Left Eye (OS):",
-    "SPH =", left_sph,
-    "CYL =", left_cyl,
-    "AXIS =", left_axis,
-    "ADD =",
-    left_add
-    if left_add
-    else "Not Required"
-)
-if distance_pd or near_pd:
+    print("\n--- Current Prescription ---")
 
     print(
-        "Distance PD:",
-        distance_pd if distance_pd else "Not Measured"
-)
+        "Right Eye (OD):",
+        "SPH =", right_sph,
+        "CYL =", right_cyl,
+        "AXIS =", right_axis,
+        "ADD =",
+        right_add if right_add else "Not Required"
+    )
 
     print(
-        "Near PD:",
-        near_pd if near_pd else "Not Measured"
-)
+        "Left Eye (OS):",
+        "SPH =", left_sph,
+        "CYL =", left_cyl,
+        "AXIS =", left_axis,
+        "ADD =",
+        left_add if left_add else "Not Required"
+    )
 
-# ---------------- VISUAL ACUITY / PINHOLE ----------------
+    if distance_pd or near_pd:
+        print(
+            "Distance PD:",
+            distance_pd if distance_pd else "Not Measured"
+        )
 
-if right_va or left_va or right_pinhole or left_pinhole:
+        print(
+            "Near PD:",
+            near_pd if near_pd else "Not Measured"
+        )
 
-    if right_va:
-        print("Right Eye Visual Acuity :", right_va)
+    # ---------------- VISUAL ACUITY / PINHOLE ----------------
 
-    if left_va:
-        print("Left Eye Visual Acuity  :", left_va)
+    if right_va or left_va or right_pinhole or left_pinhole:
 
-    if right_pinhole:
-        print("Right Eye Pinhole       :", right_pinhole)
+        if right_va:
+            print("Right Eye Visual Acuity :", right_va)
 
-    if left_pinhole:
-        print("Left Eye Pinhole        :", left_pinhole)
+        if left_va:
+            print("Left Eye Visual Acuity  :", left_va)
+
+        if right_pinhole:
+            print("Right Eye Pinhole       :", right_pinhole)
+
+        if left_pinhole:
+            print("Left Eye Pinhole        :", left_pinhole)
 
 # ---------------- PAYMENT ----------------
 
@@ -1441,7 +1442,25 @@ print("        CUSTOMER RECORD COMPLETED SUCCESSFULLY")
 print("==================================================")
 print("\n--- PRESCRIPTION MESSAGE ---")
 
-prescription_message = f"""
+if order_type == "1":
+    prescription_message = f"""
+{store_name}
+Customer Name: {customer_name}
+Date: {record_date}
+Time: {record_time}
+
+Frame Order
+
+Frame Details: {frame_details}
+Frame Brand: {frame_brand}
+Frame Offer: {frame_offer}
+Frame Price: ₹{frame_price}
+
+Thank you for choosing {store_name}.
+"""
+
+else:
+    prescription_message = f"""
 {store_name}
 Customer Name: {customer_name}
 Date: {record_date}
@@ -1464,7 +1483,6 @@ ADD: {left_add if left_add else "Not Required"}
 {f"Visual Acuity / Pinhole Test:\nRight Eye Visual Acuity: {right_va}\nLeft Eye Visual Acuity: {left_va}\nRight Eye Pinhole: {right_pinhole}\nLeft Eye Pinhole: {left_pinhole}\n" if right_va or left_va or right_pinhole or left_pinhole else ""}
 Please keep this prescription for your reference.
 """
-
 print(prescription_message)
 print("\n--- Send Message ---")
 print("1. Normal SMS")
@@ -1475,6 +1493,14 @@ print("5. WhatsApp Prescription + Payment")
 print("6. Skip")
 
 message_choice = input("Select Message Option (1/2/3/4/5/6): ").strip()
+if message_choice == "1":
+    if not phone:
+        print("Normal SMS cannot be prepared - Customer phone number is not available.")
+    else:
+        sms_message = prescription_message
+
+        print("\n--- NORMAL SMS TEXT ---")
+        print(sms_message)
 if message_choice == "2":
     if not phone:
         print("WhatsApp Prescription cannot be sent - Customer phone number is not available.")
