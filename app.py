@@ -16,269 +16,609 @@ print("==================================================")
 # ==================================================
 # 2. CUSTOMER / PATIENT DETAILS
 # ==================================================
+
 print("\n--- Customer Type ---")
 print("1. New Customer")
 print("2. Existing Customer")
 
 while True:
-    customer_type = input("Select Customer Type (1/2): ").strip()
+    customer_type = input(
+        "Select Customer Type (1/2): "
+    ).strip()
 
     if customer_type in ["1", "2"]:
         break
 
-    print("Please select 1 for New Customer or 2 for Existing Customer.")
-if customer_type == "2":
-    search_value = input(
-        "Enter Existing Customer Name or Phone: "
-    ).strip().lower()
-    clean_search = (
-        search_value
+    print(
+        "Please select 1 for New Customer or 2 for Existing Customer."
+    )
+
+
+# --------------------------------------------------
+# PHONE NORMALIZATION HELPER
+# --------------------------------------------------
+
+def normalize_indian_phone(value):
+    clean_phone = (
+        value.strip()
         .replace(" ", "")
         .replace("-", "")
         .replace("(", "")
         .replace(")", "")
     )
 
-    if clean_search.startswith("+91"):
-        clean_search = clean_search[3:]
-    elif clean_search.startswith("0091"):
-        clean_search = clean_search[4:]
-    elif clean_search.startswith("91") and len(clean_search) == 12:
-        clean_search = clean_search[2:]
+    if clean_phone.startswith("+91"):
+        clean_phone = clean_phone[3:]
 
-    if clean_search.isdigit():
-        search_value = clean_search
+    elif clean_phone.startswith("0091"):
+        clean_phone = clean_phone[4:]
+
+    elif (
+        clean_phone.startswith("91")
+        and len(clean_phone) == 12
+    ):
+        clean_phone = clean_phone[2:]
+
+    return clean_phone
+
+
+# --------------------------------------------------
+# EXISTING CUSTOMER SEARCH
+# --------------------------------------------------
+
+if customer_type == "2":
+
+    search_value = input(
+        "Enter Existing Customer Name or Phone: "
+    ).strip()
+
+    search_name = search_value.lower()
+
+    search_phone = normalize_indian_phone(
+        search_value
+    )
+
+    searching_by_phone = (
+        search_phone.isdigit()
+        and len(search_phone) == 10
+    )
+
     matching_customers = []
 
-    with open("customers.csv", "r", encoding="utf-8") as file:
+    with open(
+        "customers.csv",
+        "r",
+        encoding="utf-8"
+    ) as file:
+
         reader = csv.reader(file)
+
         next(reader, None)
 
         for row in reader:
-            if len(row) > 8 and (
-                row[5].strip().lower() == search_value
-                or row[8].strip().lower() == search_value
-            ):
-                matching_customers.append(row)
+
+            if len(row) <= 9:
+                continue
+
+            row_name = row[5].strip().lower()
+
+            row_phone = normalize_indian_phone(
+                row[8]
+            )
+
+            if searching_by_phone:
+
+                if row_phone == search_phone:
+                    matching_customers.append(
+                        row
+                    )
+
+            else:
+
+                if row_name == search_name:
+                    matching_customers.append(
+                        row
+                    )
+
+
+    # ----------------------------------------------
+    # REMOVE DUPLICATE CUSTOMER RESULTS
+    # ----------------------------------------------
+
     unique_customers = {}
 
     for customer in matching_customers:
-        if customer[8].strip():
-            customer_key = (
-                customer[5].strip().lower(),
-                customer[8].strip()
+
+        customer_name_key = (
+            customer[5]
+            .strip()
+            .lower()
+        )
+
+        customer_phone_key = (
+            normalize_indian_phone(
+                customer[8]
             )
+        )
+
+        if customer_phone_key:
+
+            customer_key = (
+                customer_name_key,
+                customer_phone_key
+            )
+
         else:
-            customer_key = (
-                customer[5].strip().lower(),
-                customer[9].strip().lower()
+
+            customer_address_key = (
+                customer[9]
+                .strip()
+                .lower()
             )
 
-        unique_customers[customer_key] = customer
+            customer_key = (
+                customer_name_key,
+                customer_address_key
+            )
 
-    matching_customers = list(unique_customers.values())
+        # Keeps latest matching record
+        unique_customers[
+            customer_key
+        ] = customer
+
+
+    matching_customers = list(
+        unique_customers.values()
+    )
+
+
+    # ----------------------------------------------
+    # ONE CUSTOMER FOUND
+    # ----------------------------------------------
+
     if len(matching_customers) == 1:
-        selected_customer = matching_customers[0]
-        customer_name = selected_customer[5]
-        phone = selected_customer[8]
+
+        selected_customer = (
+            matching_customers[0]
+        )
+
+        customer_name = (
+            selected_customer[5]
+        )
+
+        phone = (
+            selected_customer[8]
+        )
 
         print("\nSelected Customer:")
-        print(f"Name: {customer_name} | Phone: {phone}")
 
-        confirm = input(
-            "Is this the correct customer? (y/n): "
-        ).strip().lower()
+        print(
+            f"Name: {customer_name} | "
+            f"Phone: {phone}"
+        )
 
-        if confirm == "y":
-            print("Customer confirmed.")
-            print("Customer selection successful.")
-        else:
-            print("Customer not confirmed.")
-            raise SystemExit
+        while True:
+
+            confirm = input(
+                "Is this the correct customer? (y/n): "
+            ).strip().lower()
+
+            if confirm == "y":
+
+                print(
+                    "Customer confirmed."
+                )
+
+                print(
+                    "Customer selection successful."
+                )
+
+                break
+
+            elif confirm == "n":
+
+                print(
+                    "Customer not confirmed."
+                )
+
+                raise SystemExit
+
+            else:
+
+                print(
+                    "Please enter y for Yes or n for No."
+                )
+
+
+    # ----------------------------------------------
+    # MULTIPLE CUSTOMERS FOUND
+    # ----------------------------------------------
 
     elif len(matching_customers) > 1:
-        print("\nMultiple customers found:")
+
+        print(
+            "\nMultiple customers found:"
+        )
 
         for number, customer in enumerate(
             matching_customers,
             start=1
         ):
-          print(
-    f"{number}. Name: {customer[5]} | "
-    f"Phone: {customer[8]} | "
-    f"Address: {customer[9]}"
-)
 
-        choice = input(
-            "Select Customer Number: "
-        ).strip()
+            print(
+                f"{number}. "
+                f"Name: {customer[5]} | "
+                f"Phone: {customer[8]} | "
+                f"Address: {customer[9]}"
+            )
 
-        if choice.isdigit():
+
+        while True:
+
+            choice = input(
+                "Select Customer Number: "
+            ).strip()
+
+
+            # Customer number must contain digits
+            if not choice.isdigit():
+
+                print(
+                    "Please enter a valid customer number."
+                )
+
+                continue
+
+
             choice = int(choice)
 
-            if 1 <= choice <= len(matching_customers):
-                selected_customer = matching_customers[
+
+            # Customer number must be in displayed range
+            if not (
+                1
+                <= choice
+                <= len(matching_customers)
+            ):
+
+                print(
+                    "Invalid customer number. Please try again."
+                )
+
+                continue
+
+
+            selected_customer = (
+                matching_customers[
                     choice - 1
                 ]
+            )
 
-                customer_name = selected_customer[5]
-                phone = selected_customer[8]
+            customer_name = (
+                selected_customer[5]
+            )
 
-                print("\nSelected Customer:")
-                print(
-                    f"Name: {customer_name} | "
-                    f"Phone: {phone}"
-                )
+            phone = (
+                selected_customer[8]
+            )
+
+
+            print(
+                "\nSelected Customer:"
+            )
+
+            print(
+                f"Name: {customer_name} | "
+                f"Phone: {phone}"
+            )
+
+
+            # --------------------------------------
+            # CUSTOMER CONFIRMATION
+            # --------------------------------------
+
+            while True:
 
                 confirm = input(
                     "Is this the correct customer? (y/n): "
                 ).strip().lower()
 
                 if confirm == "y":
-                    print("Customer confirmed.")
+
+                    print(
+                        "Customer confirmed."
+                    )
+
                     print(
                         "Customer selection successful."
                     )
-                else:
-                    print("Customer not confirmed.")
+
+                    break
+
+                elif confirm == "n":
+
+                    print(
+                        "Customer not confirmed."
+                    )
+
                     raise SystemExit
 
-            else:
-                print("Invalid customer number.")
-                raise SystemExit
-        else:
-            print("Please enter a valid customer number.")
-            raise SystemExit
+                else:
+
+                    print(
+                        "Please enter y for Yes or n for No."
+                    )
+
+
+            # Leave customer-number selection loop
+            break
+
+
+    # ----------------------------------------------
+    # NO CUSTOMER FOUND
+    # ----------------------------------------------
 
     else:
-        print("Customer not found.")
+
+        print(
+            "Customer not found."
+        )
+
         raise SystemExit
-print("\n--- Customer Details ---")
+
+
+# ==================================================
+# CUSTOMER DETAILS
+# ==================================================
+
+print(
+    "\n--- Customer Details ---"
+)
+
+
+# --------------------------------------------------
+# CUSTOMER NAME
+# --------------------------------------------------
+
 if customer_type == "1":
+
     while True:
-        customer_name = input("Enter Customer Name: ").strip().title()
+
+        customer_name = input(
+            "Enter Customer Name: "
+        ).strip().title()
 
         if (
             customer_name
-            and any(char.isalpha() for char in customer_name)
+            and any(
+                char.isalpha()
+                for char in customer_name
+            )
             and all(
                 char.isalpha()
                 or char.isspace()
-                or char in [".", "'", "-"]
+                or char in [
+                    ".",
+                    "'",
+                    "-"
+                ]
                 for char in customer_name
             )
         ):
+
             break
 
         print(
-            "Invalid customer name. Please enter a valid name using letters."
+            "Invalid customer name. "
+            "Please enter a valid name using letters."
         )
+
 else:
-    customer_name = selected_customer[5]
+
+    customer_name = (
+        selected_customer[5]
+    )
+
+
+# --------------------------------------------------
+# GENDER
+# --------------------------------------------------
+
 if customer_type == "1":
-    print("\n--- Gender ---")
-    print("1. Male")
-    print("2. Female")
+
+    print(
+        "\n--- Gender ---"
+    )
+
+    print(
+        "1. Male"
+    )
+
+    print(
+        "2. Female"
+    )
+
 
     while True:
-        gender_choice = input("Select Gender (1/2): ").strip()
 
-        if gender_choice == "1":
-            gender = "Male"
-            break
-        elif gender_choice == "2":
-            gender = "Female"
-            break
-        else:
-            print("Please select 1 for Male or 2 for Female.")
-else:
-    gender = selected_customer[6]
-# Age / Phone / Address
-if customer_type == "1":
-    while True:
-        try:
-            age = int(input("Enter Patient Age: "))
-
-            if age > 0:
-                break
-            else:
-                print("Please enter a valid age.")
-
-        except ValueError:
-            print("Please enter age using numbers only.")
-
-    while True:
-        raw_phone = input(
-            "Enter Customer Phone Number (Optional - press Enter if unavailable): "
+        gender_choice = input(
+            "Select Gender (1/2): "
         ).strip()
 
-        # Phone number is optional
+        if gender_choice == "1":
+
+            gender = "Male"
+            break
+
+        elif gender_choice == "2":
+
+            gender = "Female"
+            break
+
+        else:
+
+            print(
+                "Please select 1 for Male or 2 for Female."
+            )
+
+else:
+
+    gender = (
+        selected_customer[6]
+    )
+
+
+# --------------------------------------------------
+# AGE
+# --------------------------------------------------
+
+if customer_type == "1":
+
+    while True:
+
+        try:
+
+            age = int(
+                input(
+                    "Enter Patient Age: "
+                )
+            )
+
+            if age > 0:
+
+                break
+
+            print(
+                "Please enter a valid age."
+            )
+
+        except ValueError:
+
+            print(
+                "Please enter age using numbers only."
+            )
+
+else:
+
+    age = (
+        selected_customer[7]
+    )
+
+
+# --------------------------------------------------
+# PHONE NUMBER
+# --------------------------------------------------
+
+if customer_type == "1":
+
+    while True:
+
+        raw_phone = input(
+            "Enter Customer Phone Number "
+            "(Optional - press Enter if unavailable): "
+        ).strip()
+
+
+        # Phone is optional
         if raw_phone == "":
+
             phone = ""
             break
 
-        # Remove common formatting
+
         clean_phone = (
-            raw_phone
-            .replace(" ", "")
-            .replace("-", "")
-            .replace("(", "")
-            .replace(")", "")
+            normalize_indian_phone(
+                raw_phone
+            )
         )
 
-        # Accept Indian country code formats
-        if clean_phone.startswith("+91"):
-            clean_phone = clean_phone[3:]
 
-        elif clean_phone.startswith("0091"):
-            clean_phone = clean_phone[4:]
-
-        elif clean_phone.startswith("91") and len(clean_phone) == 12:
-            clean_phone = clean_phone[2:]
-
-        # Validate Indian 10-digit mobile number
         if (
             clean_phone.isdigit()
             and len(clean_phone) == 10
-            and clean_phone[0] in ["6", "7", "8", "9"]
+            and clean_phone[0]
+            in ["6", "7", "8", "9"]
         ):
+
             phone = clean_phone
             break
 
+
         print(
-            "Invalid phone number. Enter a valid Indian 10-digit mobile "
-            "number, optionally with +91, or leave blank."
+            "Invalid phone number. "
+            "Enter a valid Indian 10-digit mobile "
+            "number, optionally with +91, "
+            "or leave blank."
         )
+
+else:
+
+    phone = (
+        selected_customer[8]
+    )
+
+
+# --------------------------------------------------
+# TOWN / VILLAGE
+# --------------------------------------------------
+
+if customer_type == "1":
+
     while True:
+
         address = input(
             "Enter Town / Village (Required): "
         ).strip().title()
 
+
         if (
             address
-            and any(char.isalpha() for char in address)
+            and any(
+                char.isalpha()
+                for char in address
+            )
             and all(
                 char.isalpha()
                 or char.isspace()
-                or char in [".", ",", "-", "'"]
+                or char in [
+                    ".",
+                    ",",
+                    "-",
+                    "'"
+                ]
                 for char in address
             )
         ):
+
             break
 
+
         print(
-            "Town / Village is required. Please enter a valid place name."
+            "Town / Village is required. "
+            "Please enter a valid place name."
         )
+
+
+    # ----------------------------------------------
+    # FULL ADDRESS - OPTIONAL
+    # ----------------------------------------------
+
     full_address = input(
-        "Enter Full Address (Optional - press Enter to skip): "
+        "Enter Full Address "
+        "(Optional - press Enter to skip): "
     ).strip().title()
 
-else:
-    age = selected_customer[7]
-    phone = selected_customer[8]
-    address = selected_customer[9]
-    full_address = selected_customer[46] if len(selected_customer) > 46 else ""
 
+else:
+
+    address = (
+        selected_customer[9]
+    )
+
+    full_address = (
+        selected_customer[46]
+        if len(selected_customer) > 46
+        else ""
+    )
 
 
 # ==================================================
@@ -421,8 +761,8 @@ if customer_type == "2" and order_type == "5":
         print("Offer      :", selected_order[26]) 
     if selected_order[27].strip() and selected_order[27].strip() not in ["0", "0.0"]:
         print("Price      : ₹", selected_order[27])  
-    if len(selected_order) > 44 and selected_order[-1].strip():
-       print("Features   :", selected_order[-1])
+    if len(selected_order) > 45 and selected_order[45].strip():
+        print("Features   :", selected_order[45])
     raise SystemExit
 
 
