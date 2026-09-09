@@ -1836,7 +1836,15 @@ print("4. WhatsApp Balance Reminder")
 print("5. WhatsApp Prescription + Payment")
 print("6. Skip")
 
-message_choice = input("Select Message Option (1/2/3/4/5/6): ").strip()
+while True:
+    message_choice = input(
+        "Select Message Option (1/2/3/4/5/6): "
+    ).strip()
+
+    if message_choice in ["1", "2", "3", "4", "5", "6"]:
+        break
+
+    print("Please select a valid Message Option (1-6).")
 if message_choice == "1":
     if not phone:
         print("Normal SMS cannot be prepared - Customer phone number is not available.")
