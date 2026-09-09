@@ -1707,7 +1707,6 @@ with open("customers.csv", "a", newline="", encoding="utf-8") as file:
     "Frame Price",
     "Lens Type",
     "Lens Brand",
-    "Lens Features / Coating",
     "Lens Offer",
     "Lens Price",
     "Right SPH",
