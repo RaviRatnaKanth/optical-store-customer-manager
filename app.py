@@ -20,8 +20,13 @@ print("\n--- Customer Type ---")
 print("1. New Customer")
 print("2. Existing Customer")
 
-customer_type = input("Select Customer Type (1/2): ").strip()
+while True:
+    customer_type = input("Select Customer Type (1/2): ").strip()
 
+    if customer_type in ["1", "2"]:
+        break
+
+    print("Please select 1 for New Customer or 2 for Existing Customer.")
 if customer_type == "2":
     search_value = input(
         "Enter Existing Customer Name or Phone: "
