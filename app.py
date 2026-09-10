@@ -120,6 +120,7 @@ if customer_type == "2":
                         row
                     )
 
+    customer_history_rows = matching_customers.copy()
 
     # ----------------------------------------------
     # REMOVE DUPLICATE CUSTOMER RESULTS
@@ -364,6 +365,63 @@ if customer_type == "2":
         )
 
         raise SystemExit
+        # ----------------------------------------------
+    # LOAD LATEST AVAILABLE PRESCRIPTION
+    # ----------------------------------------------
+
+    selected_customer = selected_customer.copy()
+
+    selected_name = selected_customer[5].strip().lower()
+    selected_phone = normalize_indian_phone(
+        selected_customer[8]
+    )
+    selected_address = selected_customer[9].strip().lower()
+
+    for history_row in reversed(customer_history_rows):
+
+        if len(history_row) < 36:
+            continue
+
+        same_name = (
+            history_row[5].strip().lower()
+            == selected_name
+        )
+
+        history_phone = normalize_indian_phone(
+            history_row[8]
+        )
+
+        history_address = (
+            history_row[9].strip().lower()
+        )
+
+        if selected_phone:
+            same_customer = (
+                same_name
+                and history_phone == selected_phone
+            )
+        else:
+            same_customer = (
+                same_name
+                and history_address == selected_address
+            )
+
+        if not same_customer:
+            continue
+
+        if any(
+            value.strip()
+            for value in history_row[28:36]
+        ):
+            selected_customer[12:20] = history_row[28:36]
+            break
+
+        if any(
+            value.strip()
+            for value in history_row[12:20]
+        ):
+            selected_customer[12:20] = history_row[12:20]
+            break
 
 
 # ==================================================
@@ -684,22 +742,21 @@ if customer_type == "2" and order_type == "4":
 
     print("OD:")
     print(
-        f"SPH: {selected_customer[28]} | "
-        f"CYL: {selected_customer[29]} | "
-        f"AXIS: {selected_customer[30]} | "
-        f"ADD: {selected_customer[31]}"
+        f"SPH: {selected_customer[12]} | "
+        f"CYL: {selected_customer[13]} | "
+        f"AXIS: {selected_customer[14]} | "
+        f"ADD: {selected_customer[15]}"
     )
 
     print("OS:")
     print(
-        f"SPH: {selected_customer[32]} | "
-        f"CYL: {selected_customer[33]} | "
-        f"AXIS: {selected_customer[34]} | "
-        f"ADD: {selected_customer[35]}"
+        f"SPH: {selected_customer[16]} | "
+        f"CYL: {selected_customer[17]} | "
+        f"AXIS: {selected_customer[18]} | "
+        f"ADD: {selected_customer[19]}"
     )
 
     raise SystemExit
-
 
 # ==================================================
 # OLD ORDER HISTORY
@@ -1025,15 +1082,15 @@ if customer_type == "2":
 
     years_using_glasses = selected_customer[11]
 
-    previous_right_sph = selected_customer[28]
-    previous_right_cyl = selected_customer[29]
-    previous_right_axis = selected_customer[30]
-    previous_right_add = selected_customer[31]
+    previous_right_sph = selected_customer[12]
+    previous_right_cyl = selected_customer[13]
+    previous_right_axis = selected_customer[14]
+    previous_right_add = selected_customer[15]
 
-    previous_left_sph = selected_customer[32]
-    previous_left_cyl = selected_customer[33]
-    previous_left_axis = selected_customer[34]
-    previous_left_add = selected_customer[35]
+    previous_left_sph = selected_customer[16]
+    previous_left_cyl = selected_customer[17]
+    previous_left_axis = selected_customer[18]
+    previous_left_add = selected_customer[19]
 
     print(
         "Existing customer - "
