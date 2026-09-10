@@ -1841,8 +1841,10 @@ with open("customers.csv", "a", newline="", encoding="utf-8") as file:
 print("\n==================================================")
 print("        CUSTOMER RECORD COMPLETED SUCCESSFULLY")
 print("==================================================")
-print("\n--- PRESCRIPTION MESSAGE ---")
-
+if order_type == "1":
+    print("\n--- ORDER MESSAGE ---")
+else:
+    print("\n--- PRESCRIPTION MESSAGE ---")
 if order_type == "1":
     prescription_message = f"""
 {store_name}
@@ -1854,7 +1856,7 @@ Frame Order
 
 Frame Details: {frame_details}
 Frame Brand: {frame_brand}
-Frame Offer: {frame_offer}
+{f"Frame Offer: {frame_offer}" if frame_offer else ""}
 Frame Price: ₹{frame_price}
 
 Thank you for choosing {store_name}.
