@@ -1167,14 +1167,52 @@ if customer_type == "2" and order_type == "4":
 # ==================================================
 
 if customer_type == "2" and order_type == "5":
-    customer_orders = [
-        customer
-        for customer in matching_customers
-        if customer[5].strip().lower() == selected_customer[5].strip().lower()
-        and customer[8].strip() == selected_customer[8].strip()
-        and customer[9].strip().lower() == selected_customer[9].strip().lower()
-    ]
+    customer_orders = []
 
+    selected_name_key = selected_customer[5].strip().lower()
+    selected_phone_key = normalize_indian_phone(
+        selected_customer[8]
+    )
+    selected_address_key = selected_customer[9].strip().lower()
+
+    with open(
+        "customers.csv",
+        "r",
+        encoding="utf-8"
+    ) as customer_file:
+
+        customer_reader = csv.reader(customer_file)
+        next(customer_reader, None)
+
+        for customer in customer_reader:
+
+            if len(customer) < 28:
+                continue
+
+            customer_name_key = customer[5].strip().lower()
+            customer_phone_key = normalize_indian_phone(
+                customer[8]
+            )
+            customer_address_key = customer[9].strip().lower()
+
+            if selected_phone_key:
+                same_customer = (
+                    customer_name_key == selected_name_key
+                    and customer_phone_key == selected_phone_key
+                )
+            else:
+                same_customer = (
+                    customer_name_key == selected_name_key
+                    and customer_address_key == selected_address_key
+                )
+
+            if same_customer:
+                customer_orders.append(customer)
+
+    customer_orders.sort(
+        key=lambda row: row[0],
+        reverse=True
+    )
     print("\n--- Old Order History ---")
     print("Matching Orders Found:", len(customer_orders))
 
