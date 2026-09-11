@@ -178,6 +178,13 @@ if customer_type == "3":
             f"   Delivery: {payment_row[12]}"
         )
 
+        if (
+            len(payment_row) > 13
+            and payment_row[13].strip()
+        ):
+            print(
+                f"   Delivered On: {payment_row[13]}"
+            )
     while True:
         pending_choice_input = input(
             "\nSelect Pending Order Number: "
@@ -359,9 +366,18 @@ if customer_type == "3":
             new_balance,
             payment_type,
             payment_status,
-            delivery_status
-        ])
-
+delivery_status,
+(
+    selected_pending_order[13]
+    if len(selected_pending_order) > 13
+    and selected_pending_order[13].strip()
+    else (
+        payment_datetime
+        if delivery_status == "Delivered"
+        else ""
+    )
+)
+])
     print("\n--- Payment Update Completed ---")
     print(
         f"Previous Paid: ₹{previous_paid:.2f}"
@@ -1383,6 +1399,13 @@ if customer_type == "2" and order_type == "6":
             f"Delivery: {payment_row[12]}"
         )
 
+        if (
+            len(payment_row) > 13
+            and payment_row[13].strip()
+        ):
+            print(
+                f"   Delivered On: {payment_row[13]}"
+            )
     while True:
 
         payment_choice = input(
@@ -1562,9 +1585,18 @@ if customer_type == "2" and order_type == "6":
             new_balance,
             payment_type,
             payment_status,
-            delivery_status
-        ])
-
+delivery_status,
+(
+    selected_payment[13]
+    if len(selected_payment) > 13
+    and selected_payment[13].strip()
+    else (
+        payment_datetime
+        if delivery_status == "Delivered"
+        else ""
+    )
+)
+])
     print("\n--- Payment Update Completed ---")
 
     print(
@@ -2403,8 +2435,9 @@ if order_type in ["1", "2", "3"]:
             balance,
             payment_type,
             payment_status,
-            "Pending"
-        ])
+            "Pending",
+            ""
+            ])
 
 
 # ==================================================

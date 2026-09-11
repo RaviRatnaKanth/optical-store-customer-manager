@@ -2,3 +2,4 @@ __pycache__/
 customers.csv
 customers_*.csv
 payments.csv
+payments_*.csv
