@@ -422,6 +422,17 @@ delivery_status,
             else:
                 update_title = "Delivery Update"
 
+            delivery_date_for_message = (
+                selected_pending_order[13]
+                if len(selected_pending_order) > 13
+                and selected_pending_order[13].strip()
+                else (
+                    payment_datetime
+                    if delivery_status == "Delivered"
+                    else ""
+                )
+            )
+
             payment_update_message = f"""
 {store_name}
 Customer Name: {selected_pending_order[1]}
@@ -438,10 +449,10 @@ Remaining Balance: ₹{new_balance:.2f}
 
 Payment Status: {payment_status}
 Delivery Status: {delivery_status}
+{f"Delivered On: {delivery_date_for_message}" if delivery_date_for_message else ""}
 
 Thank you for choosing {store_name}.
 """
-
             whatsapp_message = urllib.parse.quote(
                 payment_update_message
             )
@@ -1752,6 +1763,17 @@ if customer_type == "2" and order_type == "6":
             else:
                 update_title = "Delivery Update"
 
+            delivery_date_for_message = (
+                selected_payment[13]
+                if len(selected_payment) > 13
+                and selected_payment[13].strip()
+                else (
+                    payment_datetime
+                    if delivery_status == "Delivered"
+                    else ""
+                )
+            )
+
             payment_update_message = f"""
 {store_name}
 Customer Name: {selected_customer[5]}
@@ -1768,10 +1790,10 @@ Remaining Balance: ₹{new_balance:.2f}
 
 Payment Status: {payment_status}
 Delivery Status: {delivery_status}
+{f"Delivered On: {delivery_date_for_message}" if delivery_date_for_message else ""}
 
 Thank you for choosing {store_name}.
 """
-
             whatsapp_message = urllib.parse.quote(
                 payment_update_message
             )
