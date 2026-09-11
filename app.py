@@ -2787,12 +2787,21 @@ Please keep this prescription for your reference.
 print(prescription_message)
 print("\n--- Send Message ---")
 print("1. Normal SMS")
-print("2. WhatsApp Prescription")
+
+if order_type == "1":
+    print("2. WhatsApp Order")
+else:
+    print("2. WhatsApp Prescription")
+
 print("3. WhatsApp Payment Receipt")
 print("4. WhatsApp Balance Reminder")
-print("5. WhatsApp Prescription + Payment")
-print("6. Skip")
 
+if order_type == "1":
+    print("5. WhatsApp Order + Payment")
+else:
+    print("5. WhatsApp Prescription + Payment")
+
+print("6. Skip")
 while True:
     message_choice = input(
         "Select Message Option (1/2/3/4/5/6): "
@@ -2821,7 +2830,10 @@ if message_choice == "2":
         whatsapp_url = f"https://wa.me/91{phone}?text={whatsapp_message}"
 
         webbrowser.open(whatsapp_url)
-        print("Opening WhatsApp Prescription...")
+if order_type == "1":
+    print("Opening WhatsApp Order...")
+else:
+    print("Opening WhatsApp Prescription...")
 if message_choice == "3":
     if not phone:
         print("WhatsApp Payment Receipt cannot be sent - Customer phone number is not available.")
