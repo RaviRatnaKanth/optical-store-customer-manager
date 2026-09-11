@@ -1142,26 +1142,85 @@ while True:
 # ==================================================
 
 if customer_type == "2" and order_type == "4":
+    latest_prescription = None
+
+    selected_name_key = selected_customer[5].strip().lower()
+    selected_phone_key = normalize_indian_phone(
+        selected_customer[8]
+    )
+    selected_address_key = selected_customer[9].strip().lower()
+
+    with open(
+        "customers.csv",
+        "r",
+        encoding="utf-8"
+    ) as customer_file:
+
+        customer_reader = csv.reader(customer_file)
+        next(customer_reader, None)
+
+        for customer in customer_reader:
+
+            if len(customer) < 36:
+                continue
+
+            customer_name_key = customer[5].strip().lower()
+            customer_phone_key = normalize_indian_phone(
+                customer[8]
+            )
+            customer_address_key = customer[9].strip().lower()
+
+            if selected_phone_key:
+                same_customer = (
+                    customer_name_key == selected_name_key
+                    and customer_phone_key == selected_phone_key
+                )
+            else:
+                same_customer = (
+                    customer_name_key == selected_name_key
+                    and customer_address_key == selected_address_key
+                )
+
+            has_prescription = any(
+                value.strip()
+                for value in customer[28:36]
+            )
+
+            if same_customer and has_prescription:
+                if (
+                    latest_prescription is None
+                    or customer[0] > latest_prescription[0]
+                ):
+                    latest_prescription = customer
+
     print("\n--- Previous Prescription ---")
 
-    print("OD:")
-    print(
-        f"SPH: {selected_customer[12]} | "
-        f"CYL: {selected_customer[13]} | "
-        f"AXIS: {selected_customer[14]} | "
-        f"ADD: {selected_customer[15]}"
-    )
+    if latest_prescription is not None:
+        print(
+            "Prescription Date / Time:",
+            latest_prescription[0]
+        )
 
-    print("OS:")
-    print(
-        f"SPH: {selected_customer[16]} | "
-        f"CYL: {selected_customer[17]} | "
-        f"AXIS: {selected_customer[18]} | "
-        f"ADD: {selected_customer[19]}"
-    )
+        print("OD:")
+        print(
+            f"SPH: {latest_prescription[28]} | "
+            f"CYL: {latest_prescription[29]} | "
+            f"AXIS: {latest_prescription[30]} | "
+            f"ADD: {latest_prescription[31]}"
+        )
+
+        print("OS:")
+        print(
+            f"SPH: {latest_prescription[32]} | "
+            f"CYL: {latest_prescription[33]} | "
+            f"AXIS: {latest_prescription[34]} | "
+            f"ADD: {latest_prescription[35]}"
+        )
+
+    else:
+        print("No previous prescription found.")
 
     raise SystemExit
-
 # ==================================================
 # OLD ORDER HISTORY
 # ==================================================
