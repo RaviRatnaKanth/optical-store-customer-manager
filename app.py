@@ -1,5 +1,7 @@
 import csv
 import os
+import webbrowser
+import urllib.parse
 from datetime import datetime
 from store_config import store_name, store_city, store_phone, store_email, store_website, store_logo
 record_date = datetime.now().strftime("%d-%m-%Y")
@@ -20,19 +22,21 @@ print("==================================================")
 print("\n--- Customer Type ---")
 print("1. New Customer")
 print("2. Existing Customer")
+print("3. Pending Balance Customers")
 
 while True:
     customer_type = input(
-        "Select Customer Type (1/2): "
+        "Select Customer Type (1/2/3): "
     ).strip()
 
-    if customer_type in ["1", "2"]:
+    if customer_type in ["1", "2", "3"]:
         break
 
     print(
-        "Please select 1 for New Customer or 2 for Existing Customer."
+        "Please select 1 for New Customer, "
+        "2 for Existing Customer, "
+        "or 3 for Pending Balance Customers."
     )
-
 
 # --------------------------------------------------
 # PHONE NORMALIZATION HELPER
@@ -60,8 +64,392 @@ def normalize_indian_phone(value):
         clean_phone = clean_phone[2:]
 
     return clean_phone
+# ==================================================
+# PENDING BALANCE CUSTOMERS
+# ==================================================
 
+if customer_type == "3":
 
+    print("\n--- Pending Balance Customers ---")
+
+    latest_payment_orders = {}
+
+    with open(
+        "payments.csv",
+        "r",
+        encoding="utf-8"
+    ) as payment_file:
+
+        payment_reader = csv.reader(
+            payment_file
+        )
+
+        next(payment_reader, None)
+
+        for payment_row in payment_reader:
+
+            if len(payment_row) < 13:
+                continue
+
+            order_key = (
+                payment_row[1].strip().lower(),
+                normalize_indian_phone(payment_row[2]),
+                payment_row[3].strip().lower(),
+                payment_row[4],
+                payment_row[5],
+                payment_row[6]
+            )
+
+            latest_payment_orders[
+                order_key
+            ] = payment_row
+
+    pending_balance_orders = []
+
+    for payment_row in latest_payment_orders.values():
+
+        try:
+            remaining_balance = float(
+                payment_row[9]
+            )
+        except ValueError:
+            continue
+
+        if remaining_balance > 0:
+            pending_balance_orders.append(
+                payment_row
+            )
+
+    if not pending_balance_orders:
+
+        print(
+            "No pending balance customers found."
+        )
+
+        raise SystemExit
+
+    pending_balance_orders.sort(
+        key=lambda row: row[4],
+        reverse=True
+    )
+
+    for number, payment_row in enumerate(
+        pending_balance_orders,
+        start=1
+    ):
+
+        total_amount_value = float(
+            payment_row[6]
+        )
+
+        remaining_balance = float(
+            payment_row[9]
+        )
+
+        paid_amount = (
+            total_amount_value
+            - remaining_balance
+        )
+
+        phone_display = (
+            payment_row[2]
+            if payment_row[2].strip()
+            else "No Phone"
+        )
+
+        print(
+            f"\n{number}. "
+            f"{payment_row[1]} | "
+            f"{phone_display}"
+        )
+
+        print(
+            f"   Order: {payment_row[5]} | "
+            f"Date: {payment_row[4]}"
+        )
+
+        print(
+            f"   Total: ₹{total_amount_value:.2f} | "
+            f"Paid: ₹{paid_amount:.2f} | "
+            f"Balance: ₹{remaining_balance:.2f}"
+        )
+
+        print(
+            f"   Delivery: {payment_row[12]}"
+        )
+
+    while True:
+        pending_choice_input = input(
+            "\nSelect Pending Order Number: "
+        ).strip()
+
+        if not pending_choice_input.isdigit():
+            print(
+                "Please enter a valid order number."
+            )
+            continue
+
+        pending_choice = int(
+            pending_choice_input
+        )
+
+        if (
+            1
+            <= pending_choice
+            <= len(pending_balance_orders)
+        ):
+            break
+
+        print(
+            "Please select an order number "
+            "from the list."
+        )
+
+    selected_pending_order = (
+        pending_balance_orders[
+            pending_choice - 1
+        ]
+    )
+
+    print(
+        "\n--- Selected Pending Order ---"
+    )
+
+    print(
+        "Customer:",
+        selected_pending_order[1]
+    )
+
+    print(
+        "Phone:",
+        selected_pending_order[2]
+        if selected_pending_order[2].strip()
+        else "No Phone"
+    )
+
+    print(
+        "Order:",
+        selected_pending_order[5]
+    )
+
+    print(
+        "Order Date / Time:",
+        selected_pending_order[4]
+    )
+
+    print(
+        "Balance Due: ₹"
+        f"{float(selected_pending_order[9]):.2f}"
+    )
+
+    total_amount_value = float(
+        selected_pending_order[6]
+    )
+
+    current_balance = float(
+        selected_pending_order[9]
+    )
+
+    previous_paid = (
+        total_amount_value
+        - current_balance
+    )
+
+    print("\n--- Current Payment Status ---")
+    print(
+        f"Total Amount: ₹{total_amount_value:.2f}"
+    )
+    print(
+        f"Already Paid: ₹{previous_paid:.2f}"
+    )
+    print(
+        f"Balance Due: ₹{current_balance:.2f}"
+    )
+
+    while True:
+        try:
+            amount_paid_now = float(
+                input(
+                    "Enter Amount Paid Now "
+                    "(0 if no payment): "
+                )
+            )
+
+            if amount_paid_now < 0:
+                print(
+                    "Payment amount cannot be negative."
+                )
+                continue
+
+            if amount_paid_now > current_balance:
+                print(
+                    "Payment cannot be greater "
+                    "than the Balance Due."
+                )
+                continue
+
+            break
+
+        except ValueError:
+            print(
+                "Please enter amount using numbers only."
+            )
+
+    new_balance = round(
+        current_balance - amount_paid_now,
+        2
+    )
+
+    print("\n--- Delivery Status ---")
+    print("1. Pending")
+    print("2. Delivered")
+
+    while True:
+        delivery_choice = input(
+            "Select Delivery Status (1/2): "
+        ).strip()
+
+        if delivery_choice == "1":
+            delivery_status = "Pending"
+            break
+
+        if delivery_choice == "2":
+            delivery_status = "Delivered"
+            break
+
+        print("Please select 1 or 2.")
+
+    if new_balance == 0:
+        payment_status = "Paid"
+    else:
+        payment_status = "Pending"
+
+    if amount_paid_now == 0:
+        payment_type = "Delivery Update"
+    elif new_balance == 0:
+        payment_type = "Balance Payment"
+    else:
+        payment_type = "Part Payment"
+
+    payment_datetime = datetime.now().strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
+
+    with open(
+        "payments.csv",
+        "a",
+        newline="",
+        encoding="utf-8"
+    ) as payment_file:
+
+        payment_writer = csv.writer(
+            payment_file
+        )
+
+        payment_writer.writerow([
+            payment_datetime,
+            selected_pending_order[1],
+            selected_pending_order[2],
+            selected_pending_order[3],
+            selected_pending_order[4],
+            selected_pending_order[5],
+            total_amount_value,
+            previous_paid,
+            amount_paid_now,
+            new_balance,
+            payment_type,
+            payment_status,
+            delivery_status
+        ])
+
+    print("\n--- Payment Update Completed ---")
+    print(
+        f"Previous Paid: ₹{previous_paid:.2f}"
+    )
+    print(
+        f"Paid Now: ₹{amount_paid_now:.2f}"
+    )
+    print(
+        f"Remaining Balance: ₹{new_balance:.2f}"
+    )
+    print(
+        f"Payment Status: {payment_status}"
+    )
+    print(
+        f"Delivery Status: {delivery_status}"
+    )
+
+    pending_phone = normalize_indian_phone(
+        selected_pending_order[2]
+    )
+
+    if pending_phone:
+
+        while True:
+            send_payment_update = input(
+                "Send Payment Update on WhatsApp? (y/n): "
+            ).strip().lower()
+
+            if send_payment_update in ["y", "n"]:
+                break
+
+            print(
+                "Please enter y for Yes or n for No."
+            )
+
+        if send_payment_update == "y":
+
+            if amount_paid_now > 0 and new_balance == 0:
+                update_title = "Final Payment Update"
+            elif amount_paid_now > 0:
+                update_title = "Payment Update"
+            else:
+                update_title = "Delivery Update"
+
+            payment_update_message = f"""
+{store_name}
+Customer Name: {selected_pending_order[1]}
+
+{update_title}
+
+Order Type: {selected_pending_order[5]}
+Order Date / Time: {selected_pending_order[4]}
+
+Total Amount: ₹{total_amount_value:.2f}
+Previously Paid: ₹{previous_paid:.2f}
+Paid Now: ₹{amount_paid_now:.2f}
+Remaining Balance: ₹{new_balance:.2f}
+
+Payment Status: {payment_status}
+Delivery Status: {delivery_status}
+
+Thank you for choosing {store_name}.
+"""
+
+            whatsapp_message = urllib.parse.quote(
+                payment_update_message
+            )
+
+            whatsapp_url = (
+                f"https://wa.me/91{pending_phone}"
+                f"?text={whatsapp_message}"
+            )
+
+            webbrowser.open(
+                whatsapp_url
+            )
+
+            print(
+                "Opening WhatsApp Payment Update..."
+            )
+
+    else:
+        print(
+            "WhatsApp Payment Update cannot be sent - "
+            "Customer phone number is not available."
+        )
+
+    raise SystemExit
 # --------------------------------------------------
 # EXISTING CUSTOMER SEARCH
 # --------------------------------------------------
@@ -713,20 +1101,20 @@ print("3. Frame + Lenses")
 if customer_type == "2":
     print("4. Previous Prescription")
     print("5. Old Order History")
+    print("6. Payment / Delivery Update")
 
 
 while True:
     if customer_type == "2":
         order_type = input(
-            "Select Order Type (1/2/3/4/5): "
+            "Select Order Type (1/2/3/4/5/6): "
         ).strip()
-        valid_options = ["1", "2", "3", "4", "5"]
+        valid_options = ["1", "2", "3", "4", "5", "6"]
     else:
         order_type = input(
             "Select Order Type (1/2/3): "
         ).strip()
         valid_options = ["1", "2", "3"]
-
     if order_type in valid_options:
         break
 
@@ -821,8 +1209,464 @@ if customer_type == "2" and order_type == "5":
     if len(selected_order) > 45 and selected_order[45].strip():
         print("Features   :", selected_order[45])
     raise SystemExit
+# ==================================================
+# PAYMENT / DELIVERY UPDATE
+# ==================================================
 
+if customer_type == "2" and order_type == "6":
 
+    print("\n--- Payment / Delivery Update ---")
+
+    selected_name_key = (
+        selected_customer[5]
+        .strip()
+        .lower()
+    )
+
+    selected_phone_key = normalize_indian_phone(
+        selected_customer[8]
+    )
+
+    selected_address_key = (
+        selected_customer[9]
+        .strip()
+        .lower()
+    )
+
+    payment_rows = []
+
+    with open(
+        "payments.csv",
+        "r",
+        encoding="utf-8"
+    ) as payment_file:
+
+        payment_reader = csv.reader(
+            payment_file
+        )
+
+        next(payment_reader, None)
+
+        for payment_row in payment_reader:
+
+            if len(payment_row) < 13:
+                continue
+
+            payment_name_key = (
+                payment_row[1]
+                .strip()
+                .lower()
+            )
+
+            payment_phone_key = normalize_indian_phone(
+                payment_row[2]
+            )
+
+            payment_address_key = (
+                payment_row[3]
+                .strip()
+                .lower()
+            )
+
+            if selected_phone_key:
+
+                same_customer = (
+                    payment_name_key
+                    == selected_name_key
+                    and payment_phone_key
+                    == selected_phone_key
+                )
+
+            else:
+
+                same_customer = (
+                    payment_name_key
+                    == selected_name_key
+                    and payment_address_key
+                    == selected_address_key
+                )
+
+            if same_customer:
+                payment_rows.append(
+                    payment_row
+                )
+
+    if not payment_rows:
+
+        print(
+            "No payment records found "
+            "for this customer."
+        )
+
+        raise SystemExit
+
+    latest_orders = {}
+
+    for payment_row in payment_rows:
+
+        order_key = (
+            payment_row[4],
+            payment_row[5],
+            payment_row[6]
+        )
+
+        latest_orders[
+            order_key
+        ] = payment_row
+
+    active_orders = []
+
+    for payment_row in latest_orders.values():
+
+        try:
+            remaining_balance = float(
+                payment_row[9]
+            )
+        except ValueError:
+            continue
+
+        delivery_status = (
+            payment_row[12]
+            .strip()
+            .lower()
+        )
+
+        if (
+            remaining_balance > 0
+            or delivery_status != "delivered"
+        ):
+            active_orders.append(
+                payment_row
+            )
+
+    if not active_orders:
+
+        print(
+            "No pending payment or "
+            "delivery updates found."
+        )
+
+        raise SystemExit
+
+    active_orders.sort(
+        key=lambda row: row[4],
+        reverse=True
+    )
+
+    print("\nPending Orders:")
+
+    for number, payment_row in enumerate(
+        active_orders,
+        start=1
+    ):
+
+        total_value = float(
+            payment_row[6]
+        )
+
+        balance_value = float(
+            payment_row[9]
+        )
+
+        paid_value = (
+            total_value
+            - balance_value
+        )
+
+        print(
+            f"{number}. "
+            f"{payment_row[4]} | "
+            f"{payment_row[5]} | "
+            f"Total: ₹{total_value:.2f} | "
+            f"Paid: ₹{paid_value:.2f} | "
+            f"Balance: ₹{balance_value:.2f} | "
+            f"Delivery: {payment_row[12]}"
+        )
+
+    while True:
+
+        payment_choice = input(
+            "Select Order Number: "
+        ).strip()
+
+        if not payment_choice.isdigit():
+
+            print(
+                "Please enter a valid "
+                "order number."
+            )
+
+            continue
+
+        payment_choice = int(
+            payment_choice
+        )
+
+        if not (
+            1
+            <= payment_choice
+            <= len(active_orders)
+        ):
+
+            print(
+                "Invalid order number. "
+                "Please try again."
+            )
+
+            continue
+
+        break
+
+    selected_payment = active_orders[
+        payment_choice - 1
+    ]
+
+    order_datetime = selected_payment[4]
+    order_type_name = selected_payment[5]
+
+    total_amount_value = float(
+        selected_payment[6]
+    )
+
+    current_balance = float(
+        selected_payment[9]
+    )
+
+    previous_paid = (
+        total_amount_value
+        - current_balance
+    )
+
+    print("\n--- Current Payment Status ---")
+
+    print(
+        f"Total Amount: "
+        f"₹{total_amount_value:.2f}"
+    )
+
+    print(
+        f"Already Paid: "
+        f"₹{previous_paid:.2f}"
+    )
+
+    print(
+        f"Balance Due: "
+        f"₹{current_balance:.2f}"
+    )
+
+    while True:
+
+        try:
+
+            amount_paid_now = float(
+                input(
+                    "Enter Amount Paid Now "
+                    "(0 if no payment): "
+                )
+            )
+
+            if amount_paid_now < 0:
+
+                print(
+                    "Payment amount cannot "
+                    "be negative."
+                )
+
+                continue
+
+            if amount_paid_now > current_balance:
+
+                print(
+                    "Payment cannot be greater "
+                    "than the Balance Due."
+                )
+
+                continue
+
+            break
+
+        except ValueError:
+
+            print(
+                "Please enter amount using "
+                "numbers only."
+            )
+
+    new_balance = round(
+        current_balance
+        - amount_paid_now,
+        2
+    )
+
+    print("\n--- Delivery Status ---")
+    print("1. Pending")
+    print("2. Delivered")
+
+    while True:
+
+        delivery_choice = input(
+            "Select Delivery Status (1/2): "
+        ).strip()
+
+        if delivery_choice == "1":
+            delivery_status = "Pending"
+            break
+
+        if delivery_choice == "2":
+            delivery_status = "Delivered"
+            break
+
+        print(
+            "Please select 1 or 2."
+        )
+
+    if new_balance == 0:
+        payment_status = "Paid"
+    else:
+        payment_status = "Pending"
+
+    if amount_paid_now == 0:
+        payment_type = "Delivery Update"
+    elif new_balance == 0:
+        payment_type = "Balance Payment"
+    else:
+        payment_type = "Part Payment"
+
+    from datetime import datetime
+
+    payment_datetime = datetime.now().strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
+
+    with open(
+        "payments.csv",
+        "a",
+        newline="",
+        encoding="utf-8"
+    ) as payment_file:
+
+        payment_writer = csv.writer(
+            payment_file
+        )
+
+        payment_writer.writerow([
+            payment_datetime,
+            selected_customer[5],
+            selected_customer[8],
+            selected_customer[9],
+            order_datetime,
+            order_type_name,
+            total_amount_value,
+            previous_paid,
+            amount_paid_now,
+            new_balance,
+            payment_type,
+            payment_status,
+            delivery_status
+        ])
+
+    print("\n--- Payment Update Completed ---")
+
+    print(
+        f"Previous Paid: "
+        f"₹{previous_paid:.2f}"
+    )
+
+    print(
+        f"Paid Now: "
+        f"₹{amount_paid_now:.2f}"
+    )
+
+    print(
+        f"Remaining Balance: "
+        f"₹{new_balance:.2f}"
+    )
+
+    print(
+        f"Payment Status: "
+        f"{payment_status}"
+    )
+
+    print(
+        f"Delivery Status: "
+        f"{delivery_status}"
+    )
+
+# ----------------------------------------------
+# WHATSAPP PAYMENT / DELIVERY UPDATE
+# ----------------------------------------------
+
+if customer_type == "2" and order_type == "6":
+
+    if phone:
+
+        while True:
+            send_payment_update = input(
+                "Send Payment Update on WhatsApp? (y/n): "
+            ).strip().lower()
+
+            if send_payment_update in ["y", "n"]:
+                break
+
+            print(
+                "Please enter y for Yes or n for No."
+            )
+
+        if send_payment_update == "y":
+
+            if amount_paid_now > 0 and new_balance == 0:
+                update_title = "Final Payment Update"
+
+            elif amount_paid_now > 0:
+                update_title = "Payment Update"
+
+            else:
+                update_title = "Delivery Update"
+
+            payment_update_message = f"""
+{store_name}
+Customer Name: {selected_customer[5]}
+
+{update_title}
+
+Order Type: {order_type_name}
+Order Date / Time: {order_datetime}
+
+Total Amount: ₹{total_amount_value:.2f}
+Previously Paid: ₹{previous_paid:.2f}
+Paid Now: ₹{amount_paid_now:.2f}
+Remaining Balance: ₹{new_balance:.2f}
+
+Payment Status: {payment_status}
+Delivery Status: {delivery_status}
+
+Thank you for choosing {store_name}.
+"""
+
+            whatsapp_message = urllib.parse.quote(
+                payment_update_message
+            )
+
+            whatsapp_url = (
+                f"https://wa.me/91{phone}"
+                f"?text={whatsapp_message}"
+            )
+
+            webbrowser.open(
+                whatsapp_url
+            )
+
+            print(
+                "Opening WhatsApp Payment Update..."
+            )
+
+    else:
+        print(
+            "WhatsApp Payment Update cannot be sent - "
+            "Customer phone number is not available."
+        )
+
+    raise SystemExit
 # ==================================================
 # FRAME ENTRY
 # ==================================================
@@ -1507,6 +2351,60 @@ while True:
 # ==================================================
 
 balance = total_amount - advance_amount
+# ----------------------------------------------
+# SAVE INITIAL PAYMENT RECORD
+# ----------------------------------------------
+
+if order_type in ["1", "2", "3"]:
+
+    from datetime import datetime
+
+    payment_datetime = datetime.now().strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
+
+    order_type_name = {
+        "1": "Frame Only",
+        "2": "Lenses Only",
+        "3": "Frame + Lenses"
+    }[order_type]
+
+    if balance == 0:
+        payment_type = "Full Payment"
+        payment_status = "Paid"
+    elif advance_amount > 0:
+        payment_type = "Advance"
+        payment_status = "Pending"
+    else:
+        payment_type = "No Advance"
+        payment_status = "Pending"
+
+    with open(
+        "payments.csv",
+        "a",
+        newline="",
+        encoding="utf-8"
+    ) as payment_file:
+
+        payment_writer = csv.writer(
+            payment_file
+        )
+
+        payment_writer.writerow([
+            payment_datetime,
+            customer_name,
+            phone,
+            address,
+            payment_datetime,
+            order_type_name,
+            total_amount,
+            0,
+            advance_amount,
+            balance,
+            payment_type,
+            payment_status,
+            "Pending"
+        ])
 
 
 # ==================================================
