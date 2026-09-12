@@ -2069,20 +2069,20 @@ if order_type in ["2", "3"]:
         "Enter Lens Offer: "
     ).strip()
 
-while True:
-    lens_price_input = input("Enter Lens Price: ").strip()
+    while True:
+        lens_price_input = input("Enter Lens Price: ").strip()
 
-    try:
-        lens_price = float(lens_price_input)
+        try:
+            lens_price = float(lens_price_input)
 
-        if lens_price < 0:
-            print("Lens Price cannot be negative.")
-            continue
+            if lens_price < 0:
+                print("Lens Price cannot be negative.")
+                continue
 
-        break
+            break
 
-    except ValueError:
-        print("Please enter Lens Price using numbers only.")
+        except ValueError:
+            print("Please enter Lens Price using numbers only.")
 else:
     lens_type = ""
     add_requirement = ""
@@ -2514,47 +2514,74 @@ if order_type in ["2", "3"]:
     print("\n--- Payment Details ---")
 
 
-# Total Amount Validation
-total_amount = frame_price + lens_price
-print(f"Total Amount: ₹{total_amount:.2f}")
+# Order Total
+order_total = frame_price + lens_price
+print(f"Order Total: ₹{order_total:.2f}")
+
+# Less Amount Validation
+while True:
+    less_amount_input = input(
+        "Enter Less Amount "
+        "(Optional - press Enter for 0): "
+    ).strip()
+
+    if less_amount_input == "":
+        less_amount = 0.0
+        break
+
+    try:
+        less_amount = float(less_amount_input)
+
+        if less_amount < 0:
+            print("Less Amount cannot be negative.")
+
+        elif less_amount > order_total:
+            print(
+                "Less Amount cannot be greater "
+                "than Order Total."
+            )
+
+        else:
+            break
+
+    except ValueError:
+        print(
+            "Please enter Less Amount "
+            "using numbers only."
+        )
+
+# Final Total After Less Amount
+total_amount = order_total - less_amount
+print(f"Final Total Amount: ₹{total_amount:.2f}")
 
 # Advance Amount Validation
 while True:
 
     try:
-
         advance_amount = float(
             input("Enter Advance Amount: ")
         )
 
         if advance_amount < 0:
-
             print(
                 "Advance amount cannot be negative."
             )
 
         elif advance_amount > total_amount:
-
             print(
                 "Advance amount cannot be greater "
-                "than Total Amount."
+                "than Final Total Amount."
             )
 
         else:
-
             break
 
     except ValueError:
-
         print(
             "Please enter amount using numbers only."
         )
 
-
-# ==================================================
-# 12. AUTOMATIC BALANCE CALCULATION
-# ==================================================
-
+# Automatic Balance Calculation
 balance = total_amount - advance_amount
 # ----------------------------------------------
 # SAVE INITIAL PAYMENT RECORD
@@ -2834,7 +2861,17 @@ if order_type in ["2", "3"]:
 print("\n--- Payment ---")
 
 print(
-    "Total Amount:",
+    "Order Total:",
+    order_total
+)
+
+print(
+    "Less Amount:",
+    less_amount
+)
+
+print(
+    "Final Total Amount:",
     total_amount
 )
 
@@ -2847,7 +2884,6 @@ print(
     "Balance Amount:",
     balance
 )
-
 csv_file_exists = os.path.exists("customers.csv")
 # Save customer record to CSV
 with open("customers.csv", "a", newline="", encoding="utf-8") as file:
