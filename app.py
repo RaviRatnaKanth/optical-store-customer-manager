@@ -2168,47 +2168,77 @@ elif order_type in ["2", "3"]:
             "How long have you been using glasses?: "
         )
 
-        print("\n--- Previous Prescription ---")
-        print("Enter power with + or - sign.")
-        print("Example: -1.00, +2.00")
-        print("Leave ADD blank if not required.")
+        while True:
+            has_previous_prescription = input(
+                "Do you have previous prescription details? (y/n): "
+            ).strip().lower()
 
-        print("\nPrevious Right Eye (OD)")
+            if has_previous_prescription in ["y", "yes"]:
+                has_previous_prescription = "y"
+                break
 
-        previous_right_sph = input(
-            "Previous Right Eye SPH: "
-        )
+            elif has_previous_prescription in ["n", "no"]:
+                has_previous_prescription = "n"
+                break
 
-        previous_right_cyl = input(
-            "Previous Right Eye CYL: "
-        )
+            else:
+                print("Please enter y for Yes or n for No.")
 
-        previous_right_axis = input(
-            "Previous Right Eye AXIS (0-180): "
-        )
+        if has_previous_prescription == "y":
 
-        previous_right_add = input(
-            "Previous Right Eye ADD / Near Power: "
-        )
+            print("\n--- Previous Prescription ---")
+            print("Enter power with + or - sign.")
+            print("Example: -1.00, +2.00")
+            print("Leave ADD blank if not required.")
 
-        print("\nPrevious Left Eye (OS)")
+            print("\nPrevious Right Eye (OD)")
 
-        previous_left_sph = input(
-            "Previous Left Eye SPH: "
-        )
+            previous_right_sph = input(
+                "Previous Right Eye SPH: "
+            )
 
-        previous_left_cyl = input(
-            "Previous Left Eye CYL: "
-        )
+            previous_right_cyl = input(
+                "Previous Right Eye CYL: "
+            )
 
-        previous_left_axis = input(
-            "Previous Left Eye AXIS (0-180): "
-        )
+            previous_right_axis = input(
+                "Previous Right Eye AXIS (0-180): "
+            )
 
-        previous_left_add = input(
-            "Previous Left Eye ADD / Near Power: "
-        )
+            previous_right_add = input(
+                "Previous Right Eye ADD / Near Power: "
+            )
 
+            print("\nPrevious Left Eye (OS)")
+
+            previous_left_sph = input(
+                "Previous Left Eye SPH: "
+            )
+
+            previous_left_cyl = input(
+                "Previous Left Eye CYL: "
+            )
+
+            previous_left_axis = input(
+                "Previous Left Eye AXIS (0-180): "
+            )
+
+            previous_left_add = input(
+                "Previous Left Eye ADD / Near Power: "
+            )
+
+        else:
+            previous_right_sph = ""
+            previous_right_cyl = ""
+            previous_right_axis = ""
+            previous_right_add = ""
+
+            previous_left_sph = ""
+            previous_left_cyl = ""
+            previous_left_axis = ""
+            previous_left_add = ""
+
+            print("Previous prescription details skipped.")
     else:
         print(
             "First-time spectacle user - "
@@ -2677,28 +2707,41 @@ if spectacle_history == "Existing":
         years_using_glasses
     )
 
-    print(
-        "Previous Right Eye (OD):",
-        "SPH =", previous_right_sph,
-        "CYL =", previous_right_cyl,
-        "AXIS =", previous_right_axis,
-        "ADD =",
-        previous_right_add
-        if previous_right_add
-        else "Not Required"
-    )
-
-    print(
-        "Previous Left Eye (OS):",
-        "SPH =", previous_left_sph,
-        "CYL =", previous_left_cyl,
-        "AXIS =", previous_left_axis,
-        "ADD =",
+    if any([
+        previous_right_sph,
+        previous_right_cyl,
+        previous_right_axis,
+        previous_right_add,
+        previous_left_sph,
+        previous_left_cyl,
+        previous_left_axis,
         previous_left_add
-        if previous_left_add
-        else "Not Required"
-    )
+    ]):
 
+        print(
+            "Previous Right Eye (OD):",
+            "SPH =", previous_right_sph,
+            "CYL =", previous_right_cyl,
+            "AXIS =", previous_right_axis,
+            "ADD =",
+            previous_right_add
+            if previous_right_add
+            else "Not Required"
+        )
+
+        print(
+            "Previous Left Eye (OS):",
+            "SPH =", previous_left_sph,
+            "CYL =", previous_left_cyl,
+            "AXIS =", previous_left_axis,
+            "ADD =",
+            previous_left_add
+            if previous_left_add
+            else "Not Required"
+        )
+
+    else:
+        print("Previous Prescription: Not available")
 else:
 
     print(
@@ -3006,10 +3049,11 @@ if message_choice == "2":
         whatsapp_url = f"https://wa.me/91{phone}?text={whatsapp_message}"
 
         webbrowser.open(whatsapp_url)
-if order_type == "1":
-    print("Opening WhatsApp Order...")
-else:
-    print("Opening WhatsApp Prescription...")
+if message_choice == "2" and phone:
+    if order_type == "1":
+        print("Opening WhatsApp Order...")
+    else:
+        print("Opening WhatsApp Prescription...")
 if message_choice == "3":
     if not phone:
         print("WhatsApp Payment Receipt cannot be sent - Customer phone number is not available.")
