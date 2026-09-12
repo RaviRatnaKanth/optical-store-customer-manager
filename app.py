@@ -1852,10 +1852,24 @@ if order_type in ["1", "3"]:
         "Enter Frame Offer: "
     ).strip()
 
-    frame_price = float(
-        input("Enter Frame Price: ")
-    )
+    while True:
+        try:
+            frame_price = float(
+                input("Enter Frame Price: ").strip()
+            )
 
+            if frame_price < 0:
+                print(
+                    "Frame Price cannot be negative."
+                )
+                continue
+
+            break
+
+        except ValueError:
+            print(
+                "Please enter Frame Price using numbers only."
+            )
 else:
     frame_details = ""
     frame_category = ""
