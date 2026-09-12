@@ -2069,10 +2069,20 @@ if order_type in ["2", "3"]:
         "Enter Lens Offer: "
     ).strip()
 
-    lens_price = float(
-        input("Enter Lens Price: ")
-    )
+while True:
+    lens_price_input = input("Enter Lens Price: ").strip()
 
+    try:
+        lens_price = float(lens_price_input)
+
+        if lens_price < 0:
+            print("Lens Price cannot be negative.")
+            continue
+
+        break
+
+    except ValueError:
+        print("Please enter Lens Price using numbers only.")
 else:
     lens_type = ""
     add_requirement = ""
