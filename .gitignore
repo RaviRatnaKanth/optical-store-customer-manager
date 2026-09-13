@@ -3,3 +3,6 @@ customers.csv
 customers_*.csv
 payments.csv
 payments_*.csv
+
+demo_customers.csv
+demo_payments.csv
