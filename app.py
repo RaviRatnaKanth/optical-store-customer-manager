@@ -1354,9 +1354,23 @@ if customer_type == "2" and order_type == "5":
         print("Price      : ₹", selected_order[27])  
     if len(selected_order) > 45 and selected_order[45].strip():
         print("Features   :", selected_order[45])
+    if len(selected_order) > 49 and selected_order[49].strip():
+        print("--- Eye Surgery / IOL History ---")
+        print("Eye Surgery :", selected_order[49])
+
+        if selected_order[49].strip() == "Yes":
+
+            if len(selected_order) > 50 and selected_order[50].strip():
+                print("Surgery Eye :", selected_order[50])
+
+            if len(selected_order) > 51 and selected_order[51].strip():
+                print("Right Eye IOL :", selected_order[51])
+
+            if len(selected_order) > 52 and selected_order[52].strip():
+                print("Left Eye IOL  :", selected_order[52])
+
     if len(selected_order) > 44:
         print("--- Payment Details ---")
-
     if len(selected_order) > 47 and selected_order[47].strip():
         print("Order Total   : ₹", selected_order[47])
 
