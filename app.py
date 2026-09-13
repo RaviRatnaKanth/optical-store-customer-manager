@@ -6,6 +6,8 @@ from datetime import datetime
 from store_config import store_name, store_city, store_phone, store_email, store_website, store_logo
 record_date = datetime.now().strftime("%d-%m-%Y")
 record_time = datetime.now().strftime("%I:%M %p")
+CUSTOMER_DATA_FILE = "customers.csv"
+PAYMENT_DATA_FILE = "payments.csv"
 
 print("==================================================")
 print("          OPTICAL STORE CUSTOMER MANAGER")
@@ -13,7 +15,27 @@ print("==================================================")
 
 
 
+print("\n--- Data Mode ---")
+print("1. Real / Production Data")
+print("2. Demo / Test Data")
 
+while True:
+    data_mode = input(
+        "Select Data Mode (1/2): "
+    ).strip()
+
+    if data_mode == "1":
+        CUSTOMER_DATA_FILE = "customers.csv"
+        PAYMENT_DATA_FILE = "payments.csv"
+        break
+
+    elif data_mode == "2":
+        CUSTOMER_DATA_FILE = "demo_customers.csv"
+        PAYMENT_DATA_FILE = "demo_payments.csv"
+        break
+
+    else:
+        print("Please select 1 for Real Data or 2 for Demo Data.")
 
 # ==================================================
 # 2. CUSTOMER / PATIENT DETAILS
@@ -75,7 +97,7 @@ if customer_type == "3":
     latest_payment_orders = {}
 
     with open(
-        "payments.csv",
+        PAYMENT_DATA_FILE,
         "r",
         encoding="utf-8"
     ) as payment_file:
@@ -343,7 +365,7 @@ if customer_type == "3":
     )
 
     with open(
-        "payments.csv",
+        PAYMENT_DATA_FILE,
         "a",
         newline="",
         encoding="utf-8"
@@ -501,7 +523,7 @@ if customer_type == "2":
     matching_customers = []
 
     with open(
-        "customers.csv",
+        CUSTOMER_DATA_FILE,
         "r",
         encoding="utf-8"
     ) as file:
@@ -1162,7 +1184,7 @@ if customer_type == "2" and order_type == "4":
     selected_address_key = selected_customer[9].strip().lower()
 
     with open(
-        "customers.csv",
+        CUSTOMER_DATA_FILE,
         "r",
         encoding="utf-8"
     ) as customer_file:
@@ -1246,7 +1268,7 @@ if customer_type == "2" and order_type == "5":
     selected_address_key = selected_customer[9].strip().lower()
 
     with open(
-        "customers.csv",
+        CUSTOMER_DATA_FILE,
         "r",
         encoding="utf-8"
     ) as customer_file:
@@ -1381,7 +1403,7 @@ if customer_type == "2" and order_type == "6":
     payment_rows = []
 
     with open(
-        "payments.csv",
+        PAYMENT_DATA_FILE,
         "r",
         encoding="utf-8"
     ) as payment_file:
@@ -1691,7 +1713,7 @@ if customer_type == "2" and order_type == "6":
     )
 
     with open(
-        "payments.csv",
+        PAYMENT_DATA_FILE,
         "a",
         newline="",
         encoding="utf-8"
@@ -2752,7 +2774,7 @@ if order_type in ["1", "2", "3"]:
         payment_status = "Pending"
 
     with open(
-        "payments.csv",
+        PAYMENT_DATA_FILE,
         "a",
         newline="",
         encoding="utf-8"
@@ -3041,9 +3063,9 @@ print(
     "Balance Amount:",
     balance
 )
-csv_file_exists = os.path.exists("customers.csv")
+csv_file_exists = os.path.exists(CUSTOMER_DATA_FILE)
 # Save customer record to CSV
-with open("customers.csv", "a", newline="", encoding="utf-8") as file:
+with open(CUSTOMER_DATA_FILE, "a", newline="", encoding="utf-8") as file:
     writer = csv.writer(file)
 
     if not csv_file_exists:
