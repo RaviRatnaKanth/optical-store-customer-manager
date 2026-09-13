@@ -6,3 +6,6 @@ payments_*.csv
 
 demo_customers.csv
 demo_payments.csv
+build/
+dist/
+*.spec
