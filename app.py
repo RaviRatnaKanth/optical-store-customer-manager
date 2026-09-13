@@ -4227,7 +4227,7 @@ Please keep this prescription for your reference.
 """
 print(prescription_message)
 print("\n--- Send Message ---")
-print("1. Normal SMS")
+print("1. SMS Text / Copy")
 
 if order_type == "1":
     print("2. WhatsApp Order")
@@ -4254,11 +4254,11 @@ while True:
     print("Please select a valid Message Option (1-6).")
 if message_choice == "1":
     if not phone:
-        print("Normal SMS cannot be prepared - Customer phone number is not available.")
+        print("SMS Text cannot be prepared - Customer phone number is not available.")
     else:
         sms_message = prescription_message
 
-        print("\n--- NORMAL SMS TEXT ---")
+        print("\n--- SMS TEXT / COPY ---")
         print(sms_message)
 if message_choice == "2":
     if not phone:
