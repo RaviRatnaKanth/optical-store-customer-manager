@@ -2937,7 +2937,9 @@ with open("customers.csv", "a", newline="", encoding="utf-8") as file:
     "Advance Amount",
     "Balance",
     "Lens Features / Coating",
-    "Full Address"
+    "Full Address",
+    "Order Total",
+    "Less Amount"
  ])   
     writer.writerow([  
             
@@ -2989,8 +2991,9 @@ with open("customers.csv", "a", newline="", encoding="utf-8") as file:
     balance,
     lens_features,
     full_address,
- ])
-
+    order_total,
+    less_amount,
+])
 print("\n==================================================")
 print("        CUSTOMER RECORD COMPLETED SUCCESSFULLY")
 print("==================================================")
