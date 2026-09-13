@@ -1332,6 +1332,27 @@ if customer_type == "2" and order_type == "5":
         print("Price      : ₹", selected_order[27])  
     if len(selected_order) > 45 and selected_order[45].strip():
         print("Features   :", selected_order[45])
+    if len(selected_order) > 44:
+        print("--- Payment Details ---")
+
+    if len(selected_order) > 47 and selected_order[47].strip():
+        print("Order Total   : ₹", selected_order[47])
+
+    if (
+        len(selected_order) > 48
+        and selected_order[48].strip()
+        and selected_order[48].strip() not in ["0", "0.0"]
+    ):
+        print("Less Amount   : ₹", selected_order[48])
+
+    if selected_order[42].strip():
+        print("Final Total   : ₹", selected_order[42])
+
+    if selected_order[43].strip():
+        print("Advance Amount: ₹", selected_order[43])
+
+    if selected_order[44].strip():
+        print("Balance Amount: ₹", selected_order[44])     
     raise SystemExit
 # ==================================================
 # PAYMENT / DELIVERY UPDATE
@@ -2247,6 +2268,125 @@ elif order_type in ["2", "3"]:
 
 else:
     spectacle_history = "Not Applicable"
+    # ==================================================
+# 7. EYE SURGERY / IOL HISTORY
+# ==================================================
+
+eye_surgery = "No"
+surgery_eye = ""
+right_iol = "No"
+left_iol = "No"
+
+if order_type in ["2", "3"]:
+
+    print("\n--- Eye Surgery / IOL History ---")
+    print("1. No Eye Surgery")
+    print("2. Right Eye (OD)")
+    print("3. Left Eye (OS)")
+    print("4. Both Eyes")
+
+    while True:
+        surgery_choice = input(
+            "Select Eye Surgery Status (1/2/3/4): "
+        ).strip()
+
+        if surgery_choice == "1":
+            eye_surgery = "No"
+            surgery_eye = ""
+            break
+
+        elif surgery_choice == "2":
+            eye_surgery = "Yes"
+            surgery_eye = "Right Eye (OD)"
+
+            while True:
+                right_iol_input = input(
+                    "Right Eye IOL implanted? (y/n): "
+                ).strip().lower()
+
+                if right_iol_input in ["y", "yes"]:
+                    right_iol = "Yes"
+                    break
+
+                elif right_iol_input in ["n", "no"]:
+                    right_iol = "No"
+                    break
+
+                else:
+                    print(
+                        "Please enter y for Yes or n for No."
+                    )
+
+            break
+
+        elif surgery_choice == "3":
+            eye_surgery = "Yes"
+            surgery_eye = "Left Eye (OS)"
+
+            while True:
+                left_iol_input = input(
+                    "Left Eye IOL implanted? (y/n): "
+                ).strip().lower()
+
+                if left_iol_input in ["y", "yes"]:
+                    left_iol = "Yes"
+                    break
+
+                elif left_iol_input in ["n", "no"]:
+                    left_iol = "No"
+                    break
+
+                else:
+                    print(
+                        "Please enter y for Yes or n for No."
+                    )
+
+            break
+
+        elif surgery_choice == "4":
+            eye_surgery = "Yes"
+            surgery_eye = "Both Eyes"
+
+            while True:
+                right_iol_input = input(
+                    "Right Eye IOL implanted? (y/n): "
+                ).strip().lower()
+
+                if right_iol_input in ["y", "yes"]:
+                    right_iol = "Yes"
+                    break
+
+                elif right_iol_input in ["n", "no"]:
+                    right_iol = "No"
+                    break
+
+                else:
+                    print(
+                        "Please enter y for Yes or n for No."
+                    )
+
+            while True:
+                left_iol_input = input(
+                    "Left Eye IOL implanted? (y/n): "
+                ).strip().lower()
+
+                if left_iol_input in ["y", "yes"]:
+                    left_iol = "Yes"
+                    break
+
+                elif left_iol_input in ["n", "no"]:
+                    left_iol = "No"
+                    break
+
+                else:
+                    print(
+                        "Please enter y for Yes or n for No."
+                    )
+
+            break
+
+        else:
+            print("Please select 1, 2, 3 or 4.")
 # ==================================================
 # 8. CURRENT PRESCRIPTION
 # ==================================================
@@ -2722,6 +2862,23 @@ print(
     spectacle_history
 )
 
+if order_type in ["2", "3"]:
+
+    print("\n--- Eye Surgery / IOL History ---")
+
+    if eye_surgery == "No":
+        print("Eye Surgery: No")
+
+    else:
+        print("Eye Surgery: Yes")
+        print("Surgery Eye:", surgery_eye)
+
+        if surgery_eye in ["Right Eye (OD)", "Both Eyes"]:
+            print("Right Eye IOL:", right_iol)
+
+        if surgery_eye in ["Left Eye (OS)", "Both Eyes"]:
+            print("Left Eye IOL:", left_iol)
+
 
 # ---------------- PREVIOUS PRESCRIPTION ----------------
 
@@ -2939,8 +3096,12 @@ with open("customers.csv", "a", newline="", encoding="utf-8") as file:
     "Lens Features / Coating",
     "Full Address",
     "Order Total",
-    "Less Amount"
- ])   
+    "Less Amount",
+    "Eye Surgery",
+    "Surgery Eye",
+    "Right Eye IOL",
+    "Left Eye IOL"
+    ])
     writer.writerow([  
             
     datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -2993,7 +3154,11 @@ with open("customers.csv", "a", newline="", encoding="utf-8") as file:
     full_address,
     order_total,
     less_amount,
-])
+    eye_surgery,
+    surgery_eye,
+    right_iol,
+    left_iol,
+    ])
 print("\n==================================================")
 print("        CUSTOMER RECORD COMPLETED SUCCESSFULLY")
 print("==================================================")
