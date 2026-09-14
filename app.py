@@ -505,10 +505,43 @@ Thank you for choosing {store_name}.
 
 if customer_type == "2":
 
-    search_value = input(
-        "Enter Existing Customer Name or Phone: "
-    ).strip()
+    while True:
+        search_value = input(
+            "Enter Existing Customer Name or Phone: "
+        ).strip()
 
+        if not search_value:
+            print(
+                "Please enter Customer Name or Phone Number."
+            )
+            continue
+
+        phone_candidate = (
+            search_value
+            .replace("+", "")
+            .replace(" ", "")
+            .replace("-", "")
+        )
+
+        if phone_candidate.isdigit():
+            validated_phone = normalize_indian_phone(
+                search_value
+            )
+
+            if (
+                validated_phone.isdigit()
+                and len(validated_phone) == 10
+                and validated_phone[0] in ["6", "7", "8", "9"]
+            ):
+                break
+
+            print(
+                "Invalid phone number. Please enter a valid "
+                "Indian 10-digit mobile number."
+            )
+            continue
+
+        break
     search_name = search_value.lower()
 
     search_phone = normalize_indian_phone(
@@ -1407,7 +1440,79 @@ if customer_type == "2" and order_type == "5":
         print("Advance Amount: ₹", selected_order[43])
 
     if selected_order[44].strip():
-        print("Balance Amount: ₹", selected_order[44])     
+        print("Balance Amount: ₹", selected_order[44]) 
+    # --------------------------------------------------
+    # SEND OLD PRESCRIPTION ON WHATSAPP
+    # --------------------------------------------------
+
+    old_prescription_available = (
+        selected_order[24].strip()
+        and any(
+            selected_order[index].strip()
+            for index in range(28, 36)
+        )
+    )
+
+    if old_prescription_available:
+
+        while True:
+            resend_choice = input(
+                "\nSend this old prescription on WhatsApp? (y/n): "
+            ).strip().lower()
+
+            if resend_choice in ["y", "yes", "n", "no"]:
+                break
+
+            print("Please enter y for Yes or n for No.")
+
+        if resend_choice in ["y", "yes"]:
+
+            if not phone:
+                print(
+                    "WhatsApp Prescription cannot be sent - "
+                    "Customer phone number is not available."
+                )
+
+            else:
+                import urllib.parse
+                import webbrowser
+
+                old_prescription_message = f"""
+{store_name}
+Customer Name: {customer_name}
+Old Prescription Date: {selected_order[0]}
+
+Spectacle Prescription
+
+Right Eye (OD):
+SPH: {selected_order[28]}
+CYL: {selected_order[29]}
+AXIS: {selected_order[30]}
+ADD: {selected_order[31] if selected_order[31] else "Not Required"}
+
+Left Eye (OS):
+SPH: {selected_order[32]}
+CYL: {selected_order[33]}
+AXIS: {selected_order[34]}
+ADD: {selected_order[35] if selected_order[35] else "Not Required"}
+
+Please keep this prescription for your reference.
+"""
+
+                whatsapp_message = urllib.parse.quote(
+                    old_prescription_message
+                )
+
+                whatsapp_url = (
+                    f"https://wa.me/91{phone}"
+                    f"?text={whatsapp_message}"
+                )
+
+                webbrowser.open(whatsapp_url)
+
+                print(
+                    "Opening WhatsApp Old Prescription..."
+                )            
     raise SystemExit
 # ==================================================
 # PAYMENT / DELIVERY UPDATE
