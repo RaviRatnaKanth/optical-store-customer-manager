@@ -1373,7 +1373,7 @@ if customer_type == "2" and order_type == "5":
         print("Price      : ₹", selected_order[27])  
     if len(selected_order) > 45 and selected_order[45].strip():
         print("Features   :", selected_order[45])
-    if len(selected_order) > 49 and selected_order[49].strip():
+    if selected_order[24].strip() and len(selected_order) > 49 and selected_order[49].strip():
         print("--- Eye Surgery / IOL History ---")
         print("Eye Surgery :", selected_order[49])
 
