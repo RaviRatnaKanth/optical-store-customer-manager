@@ -1410,6 +1410,7 @@ if customer_type == "2" and order_type == "4":
         )
     else:
         print("No previous prescription found.")
+    input("\nPress Enter to close...")
 
     raise SystemExit
 # ==================================================
