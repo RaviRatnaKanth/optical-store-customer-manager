@@ -37,6 +37,46 @@ while True:
     else:
         print("Please select 1 for Real Data or 2 for Demo Data.")
 
+def migrate_customer_csv(file_name):
+    if not os.path.exists(file_name):
+        return
+
+    with open(
+        file_name,
+        "r",
+        newline="",
+        encoding="utf-8-sig"
+    ) as file:
+        rows = list(csv.reader(file))
+
+    if not rows:
+        return
+
+    changed = False
+
+    if len(rows[0]) == 53:
+        rows[0].append("Previous Prescription Date")
+        changed = True
+
+    for row in rows[1:]:
+        while len(row) < 54:
+            row.append("")
+            changed = True
+
+    if not changed:
+        return
+
+    with open(
+        file_name,
+        "w",
+        newline="",
+        encoding="utf-8"
+    ) as file:
+        writer = csv.writer(file)
+        writer.writerows(rows)
+
+
+migrate_customer_csv(CUSTOMER_DATA_FILE)
 # ==================================================
 # 2. CUSTOMER / PATIENT DETAILS
 # ==================================================
@@ -884,6 +924,15 @@ if customer_type == "2":
             for value in history_row[28:36]
         ):
             selected_customer[12:20] = history_row[28:36]
+
+            try:
+                selected_customer[53] = datetime.strptime(
+                    history_row[0],
+                    "%Y-%m-%d %H:%M:%S"
+                ).strftime("%d-%m-%Y")
+            except ValueError:
+                selected_customer[53] = history_row[0]
+
             break
 
         if any(
@@ -891,8 +940,16 @@ if customer_type == "2":
             for value in history_row[12:20]
         ):
             selected_customer[12:20] = history_row[12:20]
-            break
 
+            if (
+                len(history_row) > 53
+                and history_row[53].strip()
+            ):
+                selected_customer[53] = history_row[53]
+            else:
+                selected_customer[53] = history_row[0]
+
+            break
 
 # ==================================================
 # CUSTOMER DETAILS
@@ -1173,6 +1230,7 @@ else:
 # ==================================================
 
 years_using_glasses = ""
+previous_prescription_date = ""
 
 previous_right_sph = ""
 previous_right_cyl = ""
@@ -1281,27 +1339,75 @@ if customer_type == "2" and order_type == "4":
     print("\n--- Previous Prescription ---")
 
     if latest_prescription is not None:
+        has_current_prescription = any(
+            value.strip()
+            for value in latest_prescription[28:36]
+        )
+
+        if has_current_prescription:
+            try:
+                display_prescription_date = datetime.strptime(
+                    latest_prescription[0],
+                    "%Y-%m-%d %H:%M:%S"
+                ).strftime("%d-%m-%Y")
+            except ValueError:
+                display_prescription_date = latest_prescription[0]
+
+            right_sph = latest_prescription[28]
+            right_cyl = latest_prescription[29]
+            right_axis = latest_prescription[30]
+            right_add = latest_prescription[31]
+
+            left_sph = latest_prescription[32]
+            left_cyl = latest_prescription[33]
+            left_axis = latest_prescription[34]
+            left_add = latest_prescription[35]
+
+        else:
+            if (
+                len(latest_prescription) > 53
+                and latest_prescription[53].strip()
+            ):
+                display_prescription_date = latest_prescription[53]
+            else:
+                try:
+                    display_prescription_date = datetime.strptime(
+                        latest_prescription[0],
+                        "%Y-%m-%d %H:%M:%S"
+                    ).strftime("%d-%m-%Y")
+                except ValueError:
+                    display_prescription_date = latest_prescription[0]
+
+            right_sph = latest_prescription[12]
+            right_cyl = latest_prescription[13]
+            right_axis = latest_prescription[14]
+            right_add = latest_prescription[15]
+
+            left_sph = latest_prescription[16]
+            left_cyl = latest_prescription[17]
+            left_axis = latest_prescription[18]
+            left_add = latest_prescription[19]
+
         print(
-            "Prescription Date / Time:",
-            latest_prescription[0]
+            "Previous Prescription Date:",
+            display_prescription_date
         )
 
         print("OD:")
         print(
-            f"SPH: {latest_prescription[28]} | "
-            f"CYL: {latest_prescription[29]} | "
-            f"AXIS: {latest_prescription[30]} | "
-            f"ADD: {latest_prescription[31]}"
+            f"SPH: {right_sph} | "
+            f"CYL: {right_cyl} | "
+            f"AXIS: {right_axis} | "
+            f"ADD: {right_add}"
         )
 
         print("OS:")
         print(
-            f"SPH: {latest_prescription[32]} | "
-            f"CYL: {latest_prescription[33]} | "
-            f"AXIS: {latest_prescription[34]} | "
-            f"ADD: {latest_prescription[35]}"
+            f"SPH: {left_sph} | "
+            f"CYL: {left_cyl} | "
+            f"AXIS: {left_axis} | "
+            f"ADD: {left_add}"
         )
-
     else:
         print("No previous prescription found.")
 
@@ -1477,28 +1583,56 @@ if customer_type == "2" and order_type == "5":
                 import urllib.parse
                 import webbrowser
 
+                if (
+                    len(selected_order) > 53
+                    and selected_order[53].strip()
+                ):
+                    old_prescription_date = selected_order[53]
+
+                    old_right_sph = selected_order[12]
+                    old_right_cyl = selected_order[13]
+                    old_right_axis = selected_order[14]
+                    old_right_add = selected_order[15]
+
+                    old_left_sph = selected_order[16]
+                    old_left_cyl = selected_order[17]
+                    old_left_axis = selected_order[18]
+                    old_left_add = selected_order[19]
+
+                else:
+                    old_prescription_date = selected_order[0]
+
+                    old_right_sph = selected_order[28]
+                    old_right_cyl = selected_order[29]
+                    old_right_axis = selected_order[30]
+                    old_right_add = selected_order[31]
+
+                    old_left_sph = selected_order[32]
+                    old_left_cyl = selected_order[33]
+                    old_left_axis = selected_order[34]
+                    old_left_add = selected_order[35]
+
                 old_prescription_message = f"""
 {store_name}
 Customer Name: {customer_name}
-Old Prescription Date: {selected_order[0]}
+Old Prescription Date: {old_prescription_date}
 
 Spectacle Prescription
 
 Right Eye (OD):
-SPH: {selected_order[28]}
-CYL: {selected_order[29]}
-AXIS: {selected_order[30]}
-ADD: {selected_order[31] if selected_order[31] else "Not Required"}
+SPH: {old_right_sph}
+CYL: {old_right_cyl}
+AXIS: {old_right_axis}
+ADD: {old_right_add if old_right_add else "Not Required"}
 
 Left Eye (OS):
-SPH: {selected_order[32]}
-CYL: {selected_order[33]}
-AXIS: {selected_order[34]}
-ADD: {selected_order[35] if selected_order[35] else "Not Required"}
+SPH: {old_left_sph}
+CYL: {old_left_cyl}
+AXIS: {old_left_axis}
+ADD: {old_left_add if old_left_add else "Not Required"}
 
 Please keep this prescription for your reference.
 """
-
                 whatsapp_message = urllib.parse.quote(
                     old_prescription_message
                 )
@@ -2282,6 +2416,12 @@ if customer_type == "2":
 
     years_using_glasses = selected_customer[11]
 
+    previous_prescription_date = (
+        selected_customer[53]
+        if len(selected_customer) > 53
+        else ""
+    )
+
     previous_right_sph = selected_customer[12]
     previous_right_cyl = selected_customer[13]
     previous_right_axis = selected_customer[14]
@@ -2298,6 +2438,12 @@ if customer_type == "2":
     )
 
     print("\n--- Previous Prescription ---")
+
+    if previous_prescription_date:
+        print(
+            "Previous Prescription Date:",
+            previous_prescription_date
+        )
 
     print("OD:")
     print(
@@ -2366,6 +2512,29 @@ elif order_type in ["2", "3"]:
                 print("Please enter y for Yes or n for No.")
 
         if has_previous_prescription == "y":
+            while True:
+                previous_prescription_date = input(
+                    "Enter Previous Prescription Date "
+                    "(DD-MM-YYYY, Optional - press Enter if unknown): "
+                ).strip()
+
+                if previous_prescription_date == "":
+                    break
+
+                try:
+                    from datetime import datetime
+
+                    datetime.strptime(
+                        previous_prescription_date,
+                        "%d-%m-%Y"
+                    )
+                    break
+
+                except ValueError:
+                    print(
+                        "Invalid date. Please enter date as "
+                        "DD-MM-YYYY or leave blank."
+                    )
 
             print("\n--- Previous Prescription ---")
             print("Enter power with + or - sign.")
@@ -4013,7 +4182,11 @@ if spectacle_history == "Existing":
         "Using Glasses Since:",
         years_using_glasses
     )
-
+    if previous_prescription_date:
+        print(
+            "Previous Prescription Date:",
+            previous_prescription_date
+        )
     if any([
         previous_right_sph,
         previous_right_cyl,
@@ -4223,7 +4396,8 @@ with open(CUSTOMER_DATA_FILE, "a", newline="", encoding="utf-8") as file:
     "Eye Surgery",
     "Surgery Eye",
     "Right Eye IOL",
-    "Left Eye IOL"
+    "Left Eye IOL",
+    "Previous Prescription Date"
     ])
     writer.writerow([  
             
@@ -4281,6 +4455,7 @@ with open(CUSTOMER_DATA_FILE, "a", newline="", encoding="utf-8") as file:
     surgery_eye,
     right_iol,
     left_iol,
+    previous_prescription_date,
     ])
 print("\n==================================================")
 print("        CUSTOMER RECORD COMPLETED SUCCESSFULLY")
