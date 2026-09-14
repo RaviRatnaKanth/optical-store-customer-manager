@@ -1244,7 +1244,7 @@ previous_left_add = ""
 
 
 
-                                
+
 
 # ==================================================
 # 6. FRAME DETAILS
@@ -1508,9 +1508,9 @@ if customer_type == "2" and order_type == "5":
     if selected_order[25].strip():
         print("Brand      :", selected_order[25])
     if selected_order[26].strip() and selected_order[26].strip() not in ["0", "0.0"]:
-        print("Offer      :", selected_order[26]) 
+        print("Offer      :", selected_order[26])
     if selected_order[27].strip() and selected_order[27].strip() not in ["0", "0.0"]:
-        print("Price      : ₹", selected_order[27])  
+        print("Price      : ₹", selected_order[27])
     if len(selected_order) > 45 and selected_order[45].strip():
         print("Features   :", selected_order[45])
     if selected_order[24].strip() and len(selected_order) > 49 and selected_order[49].strip():
@@ -1547,7 +1547,7 @@ if customer_type == "2" and order_type == "5":
         print("Advance Amount: ₹", selected_order[43])
 
     if selected_order[44].strip():
-        print("Balance Amount: ₹", selected_order[44]) 
+        print("Balance Amount: ₹", selected_order[44])
     # --------------------------------------------------
     # SEND OLD PRESCRIPTION ON WHATSAPP
     # --------------------------------------------------
@@ -1647,7 +1647,7 @@ Please keep this prescription for your reference.
 
                 print(
                     "Opening WhatsApp Old Prescription..."
-                )            
+                )
     raise SystemExit
 # ==================================================
 # PAYMENT / DELIVERY UPDATE
@@ -3069,7 +3069,7 @@ while True:
     print("7. Edit Lens Details")
     print("8. Edit Eye Surgery / IOL")
     print("9. Confirm & Save")
-    
+
 
     edit_choice = input(
         "Select Option (1/2/3/4/5/6/7/8/9): "
@@ -4400,8 +4400,8 @@ with open(CUSTOMER_DATA_FILE, "a", newline="", encoding="utf-8") as file:
     "Left Eye IOL",
     "Previous Prescription Date"
     ])
-    writer.writerow([  
-            
+    writer.writerow([
+
     datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     store_name,
     store_city,
@@ -4428,7 +4428,7 @@ with open(CUSTOMER_DATA_FILE, "a", newline="", encoding="utf-8") as file:
     frame_price,
     lens_type,
     lens_brand,
-    
+
     lens_offer,
     lens_price,
     right_sph,
@@ -4629,3 +4629,287 @@ Thank you for choosing {store_name}.
 
         webbrowser.open(whatsapp_url)
         print("Opening WhatsApp Prescription + Payment...")
+# ==================================================
+# PRINT HELPERS
+# ==================================================
+
+def print_text_document(document_text):
+    import tempfile
+
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            suffix=".txt",
+            delete=False,
+            encoding="utf-8-sig"
+        ) as print_file:
+            print_file.write(document_text)
+            print_file_path = print_file.name
+
+        os.startfile(print_file_path, "print")
+
+        print(
+            "Print job sent to the Windows default printer."
+        )
+
+    except Exception as error:
+        print(
+            "Unable to print document:",
+            error
+        )
+# ==================================================
+# PRINT MENU
+# ==================================================
+
+print("\n--- Print ---")
+print("1. Print Prescription")
+print("2. Print Bill / Payment Receipt")
+print("3. Print Full Customer Record")
+print("4. Print Prescription + Bill")
+print("5. Skip")
+
+while True:
+    print_choice = input(
+        "Select Print Option (1/2/3/4/5): "
+    ).strip()
+
+    if print_choice in ["1", "2", "3", "4", "5"]:
+        break
+
+    print("Please select a valid Print Option (1-5).")
+if print_choice == "1":
+    if order_type in ["2", "3"]:
+        print_text_document(
+            prescription_message
+        )
+    else:
+        print(
+            "Prescription print is not available "
+            "for Frame Only orders."
+        )
+if print_choice == "2":
+    bill_print_text = f"""
+{store_name}
+{store_city}
+Phone: {store_phone}
+
+PAYMENT RECEIPT
+========================================
+
+Customer Name : {customer_name}
+Phone         : {phone}
+Address       : {address}
+
+----------------------------------------
+Order Total   : Rs. {order_total}
+Less Amount   : Rs. {less_amount}
+Final Total   : Rs. {total_amount}
+Advance       : Rs. {advance_amount}
+Balance       : Rs. {balance}
+----------------------------------------
+
+Thank you for choosing {store_name}.
+"""
+
+    print_text_document(
+        bill_print_text
+    )
+
+if print_choice == "3":
+    full_record_lines = [
+        store_name,
+        store_city,
+        f"Phone: {store_phone}",
+        "",
+        "FULL CUSTOMER RECORD",
+        "=" * 45,
+        "",
+        "CUSTOMER DETAILS",
+        f"Customer Name : {customer_name}",
+        f"Gender        : {gender}",
+        f"Age           : {age if age != '' else 'Not Provided'}",
+        f"Phone         : {phone if phone else 'Not Provided'}",
+        f"Town/Village  : {address}",
+    ]
+    if full_address:
+        full_record_lines.append(
+            f"Full Address  : {full_address}"
+        )
+
+    full_record_lines.extend([
+        "",
+        "SPECTACLE HISTORY",
+        f"History       : {spectacle_history}",
+    ])
+    if spectacle_history == "Existing":
+        full_record_lines.append(
+            f"Using Glasses : {years_using_glasses}"
+        )
+
+        if previous_prescription_date:
+            full_record_lines.append(
+                f"Previous Rx Date: {previous_prescription_date}"
+            )
+
+        if any([
+            previous_right_sph,
+            previous_right_cyl,
+            previous_right_axis,
+            previous_right_add,
+            previous_left_sph,
+            previous_left_cyl,
+            previous_left_axis,
+            previous_left_add
+        ]):
+            full_record_lines.extend([
+                "",
+                "PREVIOUS PRESCRIPTION",
+                (
+                    "OD: "
+                    f"SPH {previous_right_sph} | "
+                    f"CYL {previous_right_cyl} | "
+                    f"AXIS {previous_right_axis} | "
+                    f"ADD {previous_right_add if previous_right_add else 'Not Required'}"
+                ),
+                (
+                    "OS: "
+                    f"SPH {previous_left_sph} | "
+                    f"CYL {previous_left_cyl} | "
+                    f"AXIS {previous_left_axis} | "
+                    f"ADD {previous_left_add if previous_left_add else 'Not Required'}"
+                ),
+            ])
+
+        if order_type in ["1", "3"]:
+            full_record_lines.extend([
+            "",
+            "FRAME DETAILS",
+            f"Frame Details : {frame_details}",
+            f"Frame Brand   : {frame_brand if frame_brand else 'Not Provided'}",
+            f"Frame Offer   : {frame_offer if frame_offer else 'None'}",
+            f"Frame Price   : Rs. {frame_price}",
+        ])
+
+        if order_type in ["2", "3"]:
+            full_record_lines.extend([
+            "",
+            "LENS DETAILS",
+            f"Lens Type     : {lens_type}",
+            f"Lens Features : {lens_features if lens_features else 'Not Provided'}",
+            f"Lens Brand    : {lens_brand if lens_brand else 'Not Provided'}",
+            f"Lens Offer    : {lens_offer if lens_offer else 'None'}",
+            f"Lens Price    : Rs. {lens_price}",
+        ])
+            full_record_lines.extend([
+            "",
+            "CURRENT PRESCRIPTION",
+            (
+                "OD: "
+                f"SPH {right_sph} | "
+                f"CYL {right_cyl} | "
+                f"AXIS {right_axis} | "
+                f"ADD {right_add if right_add else 'Not Required'}"
+            ),
+            (
+                "OS: "
+                f"SPH {left_sph} | "
+                f"CYL {left_cyl} | "
+                f"AXIS {left_axis} | "
+                f"ADD {left_add if left_add else 'Not Required'}"
+            ),
+        ])
+        if distance_pd or near_pd:
+            full_record_lines.extend([
+                "",
+                "PUPILLARY DISTANCE (PD)",
+                f"Distance PD   : {distance_pd if distance_pd else 'Not Measured'}",
+                f"Near PD       : {near_pd if near_pd else 'Not Measured'}",
+            ])
+            if any([
+            right_va,
+            left_va,
+            right_pinhole,
+            left_pinhole
+        ]):
+                full_record_lines.extend([
+                "",
+                "VISUAL ACUITY / PINHOLE",
+                f"Right VA      : {right_va if right_va else 'Not Measured'}",
+                f"Left VA       : {left_va if left_va else 'Not Measured'}",
+                f"Right Pinhole : {right_pinhole if right_pinhole else 'Not Measured'}",
+                f"Left Pinhole  : {left_pinhole if left_pinhole else 'Not Measured'}",
+            ])
+                full_record_lines.extend([
+            "",
+            "EYE SURGERY / IOL",
+            f"Eye Surgery   : {eye_surgery}",
+        ])
+
+        if eye_surgery != "No":
+            full_record_lines.append(
+                f"Surgery Eye   : {surgery_eye}"
+            )
+
+            if surgery_eye in ["Right Eye (OD)", "Both Eyes"]:
+                full_record_lines.append(
+                    f"Right Eye IOL : {right_iol}"
+                )
+
+            if surgery_eye in ["Left Eye (OS)", "Both Eyes"]:
+                full_record_lines.append(
+                    f"Left Eye IOL  : {left_iol}"
+                )
+
+
+        full_record_lines.extend([
+        "",
+        "PAYMENT DETAILS",
+        f"Order Total   : Rs. {order_total}",
+        f"Less Amount   : Rs. {less_amount}",
+        f"Final Total   : Rs. {total_amount}",
+        f"Advance       : Rs. {advance_amount}",
+        f"Balance       : Rs. {balance}",
+        "",
+        "=" * 45,
+        f"Thank you for choosing {store_name}.",
+    ])
+
+    full_customer_record = "\n".join(
+        full_record_lines
+    )
+
+    print_text_document(
+        full_customer_record
+    )
+
+if print_choice == "4":
+    if order_type in ["2", "3"]:
+        prescription_bill_text = f"""{prescription_message}
+
+========================================
+PAYMENT RECEIPT
+========================================
+
+Customer Name : {customer_name}
+Phone         : {phone}
+
+Order Total   : Rs. {order_total}
+Less Amount   : Rs. {less_amount}
+Final Total   : Rs. {total_amount}
+Advance       : Rs. {advance_amount}
+Balance       : Rs. {balance}
+
+Thank you for choosing {store_name}.
+"""
+
+        print_text_document(
+            prescription_bill_text
+        )
+
+    else:
+        print(
+            "Prescription + Bill print is not available "
+            "for Frame Only orders."
+        )
+
+input("\nPress Enter to close...")
