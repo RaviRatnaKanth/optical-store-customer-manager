@@ -4,6 +4,48 @@ import webbrowser
 import urllib.parse
 from datetime import datetime
 from store_config import store_name, store_city, store_phone, store_email, store_website, store_logo
+def print_text_document(document_text):
+    import tempfile
+
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            suffix=".txt",
+            delete=False,
+            encoding="utf-8-sig"
+        ) as print_file:
+            print_file.write(document_text)
+            print_file_path = print_file.name
+
+        os.startfile(print_file_path, "print")
+
+        print(
+            "Print job sent to the Windows default printer."
+        )
+
+    except Exception as error:
+        print(
+            "Unable to print document:",
+            error
+        )
+def normalize_offer(offer):
+    offer = offer.strip()
+
+    if not offer:
+        return ""
+
+    offer = offer.rstrip("%").strip()
+
+    try:
+        value = float(offer)
+
+        if value.is_integer():
+            return f"{int(value)}%"
+
+        return f"{value}%"
+
+    except ValueError:
+        return offer
 record_date = datetime.now().strftime("%d-%m-%Y")
 record_time = datetime.now().strftime("%I:%M %p")
 CUSTOMER_DATA_FILE = "customers.csv"
@@ -58,8 +100,31 @@ def migrate_customer_csv(file_name):
         rows[0].append("Previous Prescription Date")
         changed = True
 
+    if len(rows[0]) == 54:
+        rows[0].append("Prescription Source")
+        changed = True
+
+    if len(rows[0]) == 55:
+        rows[0].append("Prescription From")
+        changed = True
+
+    if len(rows[0]) == 56:
+        rows[0].append("C/O / S/O Details")
+        changed = True
+
+    if len(rows[0]) == 57:
+        rows[0].append("Delivery Status")
+        changed = True
+
+    if len(rows[0]) == 58:
+        rows[0].append("Delivered To")
+        changed = True
+
+    if len(rows[0]) == 59:
+        rows[0].append("Receiver Name")
+        changed = True
     for row in rows[1:]:
-        while len(row) < 54:
+        while len(row) < 60:
             row.append("")
             changed = True
 
@@ -75,8 +140,49 @@ def migrate_customer_csv(file_name):
         writer = csv.writer(file)
         writer.writerows(rows)
 
+def migrate_payment_csv(file_name):
+    if not os.path.exists(file_name):
+        return
 
+    with open(
+        file_name,
+        "r",
+        newline="",
+        encoding="utf-8-sig"
+    ) as file:
+        rows = list(csv.reader(file))
+
+    if not rows:
+        return
+
+    changed = False
+
+    if len(rows[0]) == 14:
+        rows[0].append("Delivered To")
+        changed = True
+
+    if len(rows[0]) == 15:
+        rows[0].append("Receiver Name")
+        changed = True
+
+    for row in rows[1:]:
+        while len(row) < 16:
+            row.append("")
+            changed = True
+
+    if not changed:
+        return
+
+    with open(
+        file_name,
+        "w",
+        newline="",
+        encoding="utf-8"
+    ) as file:
+        writer = csv.writer(file)
+        writer.writerows(rows)
 migrate_customer_csv(CUSTOMER_DATA_FILE)
+migrate_payment_csv(PAYMENT_DATA_FILE)
 # ==================================================
 # 2. CUSTOMER / PATIENT DETAILS
 # ==================================================
@@ -85,21 +191,24 @@ print("\n--- Customer Type ---")
 print("1. New Customer")
 print("2. Existing Customer")
 print("3. Pending Balance Customers")
+print("4. Pending Delivery Customers")
+print("5. Old Customer / Historical Entry")
 
 while True:
     customer_type = input(
-        "Select Customer Type (1/2/3): "
+        "Select Customer Type (1/2/3/4/5): "
     ).strip()
 
-    if customer_type in ["1", "2", "3"]:
+    if customer_type in ["1", "2", "3", "4", "5"]:
         break
 
     print(
         "Please select 1 for New Customer, "
         "2 for Existing Customer, "
-        "or 3 for Pending Balance Customers."
+        "3 for Pending Balance Customers, "
+        "4 for Pending Delivery Customers, "
+        "or 5 for Old Customer / Historical Entry."
     )
-
 # --------------------------------------------------
 # PHONE NORMALIZATION HELPER
 # --------------------------------------------------
@@ -126,8 +235,287 @@ def normalize_indian_phone(value):
         clean_phone = clean_phone[2:]
 
     return clean_phone
+def get_old_prescription_date():
+    while True:
+        old_prescription_date = input(
+            "Enter Old Prescription Date "
+            "(DD-MM-YYYY or DD/MM/YYYY): "
+        ).strip()
+
+        accepted_formats = (
+            "%d-%m-%Y",
+            "%d/%m/%Y",
+            "%d-%m-%y",
+            "%d/%m/%y",
+        )
+
+        parsed_date = None
+
+        for date_format in accepted_formats:
+            try:
+                parsed_date = datetime.strptime(
+                    old_prescription_date,
+                    date_format
+                )
+                break
+            except ValueError:
+                continue
+
+        if parsed_date is not None:
+            return parsed_date.strftime("%d-%m-%Y")
+
+        print(
+            "Invalid date. Examples: "
+            "01-01-2025, 1-1-2025, "
+            "01/01/2025 or 1/1/25."
+        )
+def get_old_add_requirement():
+    print("\n--- Old Prescription ADD Requirement ---")
+    print("1. No ADD")
+    print("2. Both Eyes")
+    print("3. Right Eye (OD) Only")
+    print("4. Left Eye (OS) Only")
+
+    while True:
+        old_add_requirement = input(
+            "Select ADD Requirement (1/2/3/4): "
+        ).strip()
+
+        if old_add_requirement in ("1", "2", "3", "4"):
+            return old_add_requirement
+
+        print("Please select 1, 2, 3 or 4.")
+
+def get_old_sph(eye_name):
+    while True:
+        old_sph = input(
+            f"Enter {eye_name} SPH (+/-): "
+        ).strip()
+
+        if old_sph.lower() == "plano":
+            return "Plano"
+
+        if old_sph == "0":
+            return old_sph
+
+        if old_sph.startswith(("+", "-")):
+            number_part = old_sph[1:]
+            parts = number_part.split(".")
+
+            if (
+                len(parts) == 2
+                and parts[0].isdigit()
+                and len(parts[1]) == 2
+                and parts[1] in ["00", "25", "50", "75"]
+                and float(number_part) <= 30
+            ):
+                return old_sph
+
+        print(
+            "Invalid SPH. "
+            "Enter like -1.00, +1.25, 0 or Plano."
+        )
+
+def get_old_cyl(eye_name):
+    while True:
+        old_cyl = input(
+            f"Enter {eye_name} CYL (+/-): "
+        ).strip()
+
+        if old_cyl in ("", "0"):
+            return old_cyl
+
+        if old_cyl.startswith(("+", "-")):
+            number_part = old_cyl[1:]
+            parts = number_part.split(".")
+
+            if (
+                len(parts) == 2
+                and parts[0].isdigit()
+                and len(parts[1]) == 2
+                and parts[1] in ["00", "25", "50", "75"]
+                and float(number_part) <= 10
+            ):
+                return old_cyl
+
+        print(
+            "Invalid CYL. "
+            "Enter like -0.50, +1.25, 0 or leave blank."
+        )
+
+def get_old_axis(eye_name):
+    while True:
+        old_axis = input(
+            f"Enter {eye_name} AXIS (0-180): "
+        ).strip()
+
+        if old_axis == "":
+            return old_axis
+
+        if old_axis.isdigit():
+            axis_value = int(old_axis)
+
+            if 0 <= axis_value <= 180:
+                return old_axis
+
+        print(
+            "Invalid AXIS. "
+            "Enter a number from 0 to 180 or leave blank."
+        )
+
+def get_old_add(eye_name):
+    while True:
+        old_add = input(
+            f"Enter {eye_name} ADD / Near Power (+): "
+        ).strip()
+
+        if old_add in ("", "0"):
+            print(f"ADD is required for {eye_name}.")
+            continue
+
+        if old_add.startswith("+"):
+            number_part = old_add[1:]
+            parts = number_part.split(".")
+
+            if (
+                len(parts) == 2
+                and parts[0].isdigit()
+                and len(parts[1]) == 2
+                and parts[1] in ["00", "25", "50", "75"]
+                and float(number_part) <= 5
+            ):
+                return old_add
+
+        print(
+            "Invalid ADD. "
+            "Enter like +1.00, +1.25, +1.50 or +2.00."
+        )
+def get_old_prescription_details():
+    print("\n--- Old Prescription Details ---")
+
+    old_prescription_date = get_old_prescription_date()
+    old_add_requirement = get_old_add_requirement()
+
+    print("\n--- Old Prescription ---")
+    print("\nRight Eye (OD)")
+
+    old_right_sph = get_old_sph("Right Eye")
+    old_right_cyl = get_old_cyl("Right Eye")
+    old_right_axis = get_old_axis("Right Eye")
+
+    if old_add_requirement in ("1", "4"):
+        old_right_add = ""
+    else:
+        old_right_add = get_old_add("Right Eye")
+
+    print("\nLeft Eye (OS)")
+
+    old_left_sph = get_old_sph("Left Eye")
+    old_left_cyl = get_old_cyl("Left Eye")
+    old_left_axis = get_old_axis("Left Eye")
+
+    if old_add_requirement in ("1", "3"):
+        old_left_add = ""
+    else:
+        old_left_add = get_old_add("Left Eye")
+
+    return (
+        old_prescription_date,
+        old_right_sph,
+        old_right_cyl,
+        old_right_axis,
+        old_right_add,
+        old_left_sph,
+        old_left_cyl,
+        old_left_axis,
+        old_left_add,
+    )
+def build_old_prescription_row(
+    customer_name,
+    gender,
+    age,
+    phone,
+    address,
+    spectacle_history,
+    years_using_glasses,
+    previous_right_sph,
+    previous_right_cyl,
+    previous_right_axis,
+    previous_right_add,
+    previous_left_sph,
+    previous_left_cyl,
+    previous_left_axis,
+    previous_left_add,
+    full_address,
+    previous_prescription_date,
+    prescription_source,
+    prescription_from,
+    customer_relation,
+):
+    return [
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        store_name,
+        store_city,
+        store_phone,
+        store_logo,
+        customer_name,
+        gender,
+        age,
+        phone,
+        address,
+        spectacle_history,
+        years_using_glasses,
+        previous_right_sph,
+        previous_right_cyl,
+        previous_right_axis,
+        previous_right_add,
+        previous_left_sph,
+        previous_left_cyl,
+        previous_left_axis,
+        previous_left_add,
+        "",
+        "",
+        "",
+        0.0,
+        "",
+        "",
+        "",
+        0.0,
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        0.0,
+        0.0,
+        0.0,
+        "",
+        full_address,
+        0.0,
+        0.0,
+        "",
+        "",
+        "",
+        "",
+        previous_prescription_date,
+        prescription_source,
+        prescription_from,
+        customer_relation,
+        "",
+        "",
+        "",
+    ]
 # ==================================================
-# PENDING BALANCE CUSTOMERS
+# PENDING BALANCE CUST OMERS
 # ==================================================
 
 if customer_type == "3":
@@ -177,6 +565,12 @@ if customer_type == "3":
         except ValueError:
             continue
 
+        delivery_status = (
+            payment_row[12].strip().lower()
+            if len(payment_row) > 12
+            else ""
+        )
+
         if remaining_balance > 0:
             pending_balance_orders.append(
                 payment_row
@@ -185,7 +579,7 @@ if customer_type == "3":
     if not pending_balance_orders:
 
         print(
-            "No pending balance customers found."
+            "No pending payment or delivery orders found."
         )
 
         raise SystemExit
@@ -194,7 +588,84 @@ if customer_type == "3":
         key=lambda row: row[4],
         reverse=True
     )
+    print("\n--- Pending Balance View ---")
+    print("1. Search Customer")
+    print("2. View All Pending Balance Customers")
 
+    while True:
+        pending_view_choice = input(
+            "Select Option (1/2): "
+        ).strip()
+
+        if pending_view_choice in ("1", "2"):
+            break
+
+        print("Please select 1 or 2.")
+    while True:
+
+        if pending_view_choice == "2":
+            matched_pending_orders = pending_balance_orders.copy()
+            break
+
+        pending_search = input(
+            "\nEnter Customer Name / Phone / Town-Village: "
+        ).strip()
+        pending_search = input(
+            "\nEnter Customer Name / Phone / Town-Village: "
+        ).strip()
+
+        if not pending_search:
+            print(
+                "Please enter Customer Name, Phone, "
+                "or Town / Village."
+            )
+            continue
+
+        search_text = pending_search.lower()
+        search_phone = normalize_indian_phone(
+            pending_search
+        )
+
+        matched_pending_orders = []
+
+        for payment_row in pending_balance_orders:
+            customer_name_match = (
+                search_text
+                in payment_row[1].strip().lower()
+            )
+
+            phone_match = (
+                search_phone
+                and search_phone
+                in normalize_indian_phone(
+                    payment_row[2]
+                )
+            )
+
+            town_match = (
+                search_text
+                in payment_row[3].strip().lower()
+            )
+
+            if (
+                customer_name_match
+                or phone_match
+                or town_match
+            ):
+                matched_pending_orders.append(
+                    payment_row
+                )
+
+        if matched_pending_orders:
+            pending_balance_orders = (
+                matched_pending_orders
+            )
+            break
+
+        print(
+            "No pending payment / delivery "
+            "records found for this search."
+        )
     for number, payment_row in enumerate(
         pending_balance_orders,
         start=1
@@ -226,6 +697,12 @@ if customer_type == "3":
         )
 
         print(
+            "   Town / Village:",
+            payment_row[3]
+            if payment_row[3].strip()
+            else "Not Provided"
+        )
+        print(
             f"   Order: {payment_row[5]} | "
             f"Date: {payment_row[4]}"
         )
@@ -247,9 +724,25 @@ if customer_type == "3":
             print(
                 f"   Delivered On: {payment_row[13]}"
             )
+    if pending_view_choice == "2":
+        total_pending_balance_amount = sum(
+            float(row[9])
+            for row in matched_pending_orders
+        )
+
+        print("\n--- Pending Balance Summary ---")
+        print(
+            f"Total Pending Balance Orders: "
+            f"{len(matched_pending_orders)}"
+        )
+        print(
+            f"Total Pending Balance Amount: "
+            f"₹{total_pending_balance_amount:.2f}"
+        )
+
     while True:
         pending_choice_input = input(
-            "\nSelect Pending Order Number: "
+            "\nSelect Pending Order Number (0 to Exit): "
         ).strip()
 
         if not pending_choice_input.isdigit():
@@ -262,6 +755,9 @@ if customer_type == "3":
             pending_choice_input
         )
 
+        if pending_choice == 0:
+            print("Pending Balance Customers closed.")
+            raise SystemExit
         if (
             1
             <= pending_choice
@@ -324,6 +820,101 @@ if customer_type == "3":
         - current_balance
     )
 
+    print("\n--- Pending Balance Action ---")
+    print("1. Record Payment / Delivery Update")
+    print("2. WhatsApp - Balance Payment Request")
+    print("3. WhatsApp - Balance + Spectacles Collection Request")
+    print("4. View Only / Close")
+
+    while True:
+        pending_action = input(
+            "Select Action (1/2/3/4): "
+        ).strip()
+
+        if pending_action in ["1", "2", "3", "4"]:
+            break
+
+        print("Please select 1, 2, 3, or 4.")
+
+    if pending_action == "4":
+        raise SystemExit
+
+    if pending_action in ["2", "3"]:
+
+        pending_request_phone = normalize_indian_phone(
+            selected_pending_order[2]
+        )
+
+        if not pending_request_phone:
+            print(
+                "WhatsApp Request cannot be sent - "
+                "Customer phone number is not available."
+            )
+            raise SystemExit
+
+        if pending_action == "2":
+
+            request_message = f"""
+{store_name}
+
+Dear {selected_pending_order[1]},
+
+This is a friendly reminder regarding your pending balance.
+
+Order Type: {selected_pending_order[5]}
+Order Date / Time: {selected_pending_order[4]}
+Pending Balance: ₹{current_balance:.2f}
+
+Kindly make the pending payment at your convenience.
+
+Thank you,
+{store_name}
+"""
+
+        else:
+
+            if (
+                len(selected_pending_order) > 12
+                and selected_pending_order[12].strip().lower()
+                == "delivered"
+            ):
+                print(
+                    "This order is already marked as Delivered. "
+                    "Use Balance Payment Request instead."
+                )
+                raise SystemExit
+
+            request_message = f"""
+{store_name}
+
+Dear {selected_pending_order[1]},
+
+Your spectacles/order are ready for collection.
+
+Order Type: {selected_pending_order[5]}
+Order Date / Time: {selected_pending_order[4]}
+Pending Balance: ₹{current_balance:.2f}
+
+Kindly collect your spectacles/order and complete the pending payment.
+
+Thank you,
+{store_name}
+"""
+
+        whatsapp_message = urllib.parse.quote(
+            request_message
+        )
+
+        whatsapp_url = (
+            f"https://wa.me/91{pending_request_phone}"
+            f"?text={whatsapp_message}"
+        )
+
+        webbrowser.open(whatsapp_url)
+
+        print("Opening WhatsApp Request Message...")
+
+        raise SystemExit
     print("\n--- Current Payment Status ---")
     print(
         f"Total Amount: ₹{total_amount_value:.2f}"
@@ -369,6 +960,9 @@ if customer_type == "3":
         2
     )
 
+    delivered_to = ""
+    receiver_name = ""
+
     print("\n--- Delivery Status ---")
     print("1. Pending")
     print("2. Delivered")
@@ -384,10 +978,34 @@ if customer_type == "3":
 
         if delivery_choice == "2":
             delivery_status = "Delivered"
+
+            print("\n--- Delivered To / Received By ---")
+            print("1. Customer / Same Person")
+            print("2. Other Person")
+
+            while True:
+                delivered_to_choice = input(
+                    "Select Delivered To (1/2): "
+                ).strip()
+
+                if delivered_to_choice == "1":
+                    delivered_to = "Customer / Same Person"
+                    receiver_name = selected_pending_order[1]
+                    break
+
+                if delivered_to_choice == "2":
+                    delivered_to = "Other Person"
+                    receiver_name = input(
+                        "Receiver Name "
+                        "(Optional - press Enter to skip): "
+                    ).strip()
+                    break
+
+                print("Please select 1 or 2.")
+
             break
 
         print("Please select 1 or 2.")
-
     if new_balance == 0:
         payment_status = "Paid"
     else:
@@ -428,18 +1046,20 @@ if customer_type == "3":
             new_balance,
             payment_type,
             payment_status,
-delivery_status,
-(
-    selected_pending_order[13]
-    if len(selected_pending_order) > 13
-    and selected_pending_order[13].strip()
-    else (
-        payment_datetime
-        if delivery_status == "Delivered"
-        else ""
-    )
-)
-])
+            delivery_status,
+            (
+                selected_pending_order[13]
+                if len(selected_pending_order) > 13
+                and selected_pending_order[13].strip()
+                else (
+                    payment_datetime
+                    if delivery_status == "Delivered"
+                    else ""
+                )
+            ),
+            delivered_to,
+            receiver_name
+        ])
     print("\n--- Payment Update Completed ---")
     print(
         f"Previous Paid: ₹{previous_paid:.2f}"
@@ -539,159 +1159,912 @@ Thank you for choosing {store_name}.
         )
 
     raise SystemExit
+# ==================================================
+# PENDING DELIVERY CUSTOMERS
+# ==================================================
+
+if customer_type == "4":
+
+    print("\n--- Pending Delivery Customers ---")
+
+    latest_delivery_orders = {}
+
+    with open(
+        PAYMENT_DATA_FILE,
+        "r",
+        encoding="utf-8"
+    ) as payment_file:
+
+        payment_reader = csv.reader(payment_file)
+        next(payment_reader, None)
+
+        for payment_row in payment_reader:
+
+            if len(payment_row) < 13:
+                continue
+
+            order_key = (
+                payment_row[1].strip().lower(),
+                normalize_indian_phone(payment_row[2]),
+                payment_row[3].strip().lower(),
+                payment_row[4],
+                payment_row[5],
+                payment_row[6]
+            )
+
+            latest_delivery_orders[order_key] = payment_row
+
+    pending_delivery_orders = []
+
+    for payment_row in latest_delivery_orders.values():
+
+        delivery_status = (
+            payment_row[12].strip().lower()
+            if len(payment_row) > 12
+            else ""
+        )
+
+        if delivery_status != "delivered":
+            pending_delivery_orders.append(
+                payment_row
+            )
+
+    if not pending_delivery_orders:
+
+        print("No pending delivery customers found.")
+        raise SystemExit
+
+    pending_delivery_orders.sort(
+        key=lambda row: row[4],
+        reverse=True
+    )
+    print("\n--- Pending Delivery View ---")
+    print("1. Search Customer")
+    print("2. View All Pending Delivery Customers")
+
+    while True:
+        delivery_view_choice = input(
+            "Select Option (1/2): "
+        ).strip()
+
+        if delivery_view_choice in ("1", "2"):
+            break
+
+        print("Please select 1 or 2.")
+
+    while True:
+        if delivery_view_choice == "2":
+            matched_delivery_orders = pending_delivery_orders.copy()
+            break
+        delivery_search = input(
+            "\nEnter Customer Name / Phone / Town-Village: "
+        ).strip()
+
+        if not delivery_search:
+            print(
+                "Please enter Customer Name, Phone, "
+                "or Town / Village."
+            )
+            continue
+
+        search_text = delivery_search.lower()
+        search_phone = normalize_indian_phone(
+            delivery_search
+        )
+
+        matched_delivery_orders = []
+
+        for payment_row in pending_delivery_orders:
+
+            name_match = (
+                search_text
+                in payment_row[1].strip().lower()
+            )
+
+            phone_match = (
+                search_phone
+                and search_phone
+                in normalize_indian_phone(
+                    payment_row[2]
+                )
+            )
+
+            town_match = (
+                search_text
+                in payment_row[3].strip().lower()
+            )
+
+            if name_match or phone_match or town_match:
+                matched_delivery_orders.append(
+                    payment_row
+                )
+
+        if matched_delivery_orders:
+            pending_delivery_orders = (
+                matched_delivery_orders
+            )
+            break
+
+        print(
+            "No pending delivery records "
+            "found for this search."
+        )
+
+    for number, payment_row in enumerate(
+        pending_delivery_orders,
+        start=1
+    ):
+
+        try:
+            total_value = float(payment_row[6])
+            balance_value = float(payment_row[9])
+        except ValueError:
+            total_value = 0.0
+            balance_value = 0.0
+
+        phone_display = (
+            payment_row[2]
+            if payment_row[2].strip()
+            else "No Phone"
+        )
+
+        print(
+            f"\n{number}. "
+            f"{payment_row[1]} | "
+            f"{phone_display}"
+        )
+
+        print(
+            "   Town / Village:",
+            payment_row[3]
+            if payment_row[3].strip()
+            else "Not Provided"
+        )
+
+        print(
+            f"   Order: {payment_row[5]} | "
+            f"Date: {payment_row[4]}"
+        )
+
+        print(
+            f"   Total: ₹{total_value:.2f} | "
+            f"Balance: ₹{balance_value:.2f}"
+        )
+
+        print(
+            f"   Payment: {payment_row[11]} | "
+            f"Delivery: {payment_row[12]}"
+        )
+
+    if delivery_view_choice == "2":
+        print("\n--- Pending Delivery Summary ---")
+        print(
+            f"Total Pending Delivery Orders: "
+            f"{len(pending_delivery_orders)}"
+        )
+
+    while True:
+        delivery_choice_input = input(
+            "\nSelect Pending Delivery Order Number (0 to Exit): "
+        ).strip()
+
+        if not delivery_choice_input.isdigit():
+            print(
+                "Please enter a valid order number."
+            )
+            continue
+
+        delivery_choice = int(
+            delivery_choice_input
+        )
+
+        if delivery_choice == 0:
+            print("Pending Delivery Customers closed.")
+            raise SystemExit
+        if (
+            1
+            <= delivery_choice
+            <= len(pending_delivery_orders)
+        ):
+            break
+
+        print(
+            "Please select an order number "
+            "from the list."
+        )
+    selected_delivery_order = (
+        pending_delivery_orders[
+         delivery_choice - 1
+        ]
+    )
+
+    print("\n--- Selected Delivery Order ---")
+    print(
+        "Customer:",
+        selected_delivery_order[1]
+    )
+    print(
+        "Phone:",
+        selected_delivery_order[2]
+        if selected_delivery_order[2].strip()
+        else "No Phone"
+    )
+    print(
+        "Town / Village:",
+        selected_delivery_order[3]
+        if selected_delivery_order[3].strip()
+        else "Not Provided"
+    )
+    print(
+        "Order:",
+        selected_delivery_order[5]
+    )
+    print(
+        "Order Date / Time:",
+        selected_delivery_order[4]
+    )
+    print(
+        "Balance Due: ₹"
+        f"{float(selected_delivery_order[9]):.2f}"
+    )
+    print(
+        "Payment Status:",
+        selected_delivery_order[11]
+    )
+    print(
+        "Delivery Status:",
+        selected_delivery_order[12]
+    )
+
+    print("\n--- Pending Delivery Action ---")
+    print("1. Mark / Update as Delivered")
+    print("2. WhatsApp - Spectacles Ready / Please Collect")
+    print("3. WhatsApp - Balance + Spectacles Collection Request")
+    print("4. View Only / Close")
+
+    while True:
+        delivery_action = input(
+            "Select Action (1/2/3/4): "
+        ).strip()
+
+        if delivery_action in ["1", "2", "3", "4"]:
+            break
+
+        print("Please select 1, 2, 3, or 4.")
+
+    if delivery_action == "4":
+        raise SystemExit
+
+    if delivery_action == "1":
+
+        current_balance = float(
+            selected_delivery_order[9]
+        )
+
+        total_amount_value = float(
+            selected_delivery_order[6]
+        )
+
+        previous_paid = (
+            total_amount_value - current_balance
+        )
+
+        print("\n--- Payment at Delivery ---")
+        print(
+            f"Total Amount      : ₹{total_amount_value:.2f}"
+        )
+        print(
+            f"Already Paid      : ₹{previous_paid:.2f}"
+        )
+        print(
+            f"Current Balance   : ₹{current_balance:.2f}"
+        )
+
+        while True:
+            try:
+                amount_paid_now = float(
+                    input(
+                        "Enter Amount Paid Now "
+                        "(0 if no payment): "
+                    )
+                )
+
+                if amount_paid_now < 0:
+                    print(
+                        "Payment amount cannot be negative."
+                    )
+                    continue
+
+                if amount_paid_now > current_balance:
+                    print(
+                        "Payment cannot be greater "
+                        "than the Current Balance."
+                    )
+                    continue
+
+                break
+
+            except ValueError:
+                print(
+                    "Please enter amount using numbers only."
+                )
+
+        new_balance = round(
+            current_balance - amount_paid_now,
+            2
+        )
+
+        if new_balance == 0:
+            payment_status = "Paid"
+        else:
+            payment_status = "Pending"
+
+        print(
+            f"\nPaid Now          : ₹{amount_paid_now:.2f}"
+        )
+        print(
+            f"Remaining Balance : ₹{new_balance:.2f}"
+        )
+        print(
+            f"Payment Status    : {payment_status}"
+        )
+
+        print("\n--- Delivery Status ---")
+        print("1. Delivered")
+        print("2. Pending")
+
+        while True:
+            delivery_status_choice = input(
+                "Select Delivery Status (1/2): "
+            ).strip()
+
+            if delivery_status_choice == "1":
+                delivery_status = "Delivered"
+                break
+
+            if delivery_status_choice == "2":
+                delivery_status = "Pending"
+                break
+
+            print("Please select 1 or 2.")
+
+        delivered_to = ""
+        receiver_name = ""
+
+        if delivery_status == "Delivered":
+
+            print("\n--- Delivered To / Received By ---")
+            print("1. Customer / Same Person")
+            print("2. Other Person")
+
+            while True:
+                delivered_to_choice = input(
+                    "Select Delivered To (1/2): "
+                ).strip()
+
+                if delivered_to_choice == "1":
+                    delivered_to = (
+                        "Customer / Same Person"
+                    )
+                    receiver_name = (
+                        selected_delivery_order[1]
+                    )
+                    break
+
+                if delivered_to_choice == "2":
+                    delivered_to = "Other Person"
+                    receiver_name = input(
+                        "Receiver Name "
+                        "(Optional - press Enter to skip): "
+                    ).strip()
+                    break
+
+                print("Please select 1 or 2.")
+
+        delivery_update_datetime = (
+            datetime.now().strftime(
+                "%Y-%m-%d %H:%M:%S"
+            )
+        )
+
+        if amount_paid_now == 0:
+            payment_type = "Delivery Update"
+        elif new_balance == 0:
+            payment_type = "Balance Payment"
+        else:
+            payment_type = "Part Payment"
+
+        with open(
+            PAYMENT_DATA_FILE,
+            "a",
+            newline="",
+            encoding="utf-8"
+        ) as payment_file:
+
+            payment_writer = csv.writer(
+                payment_file
+            )
+
+            payment_writer.writerow([
+                delivery_update_datetime,
+                selected_delivery_order[1],
+                selected_delivery_order[2],
+                selected_delivery_order[3],
+                selected_delivery_order[4],
+                selected_delivery_order[5],
+                total_amount_value,
+                previous_paid,
+                amount_paid_now,
+                new_balance,
+                payment_type,
+                payment_status,
+                delivery_status,
+                (
+                    delivery_update_datetime
+                    if delivery_status == "Delivered"
+                    else ""
+                ),
+                delivered_to,
+                receiver_name
+            ])
+
+        print("\n--- Payment / Delivery Update Completed ---")
+        print(
+            f"Previously Paid   : ₹{previous_paid:.2f}"
+        )
+        print(
+            f"Paid Now          : ₹{amount_paid_now:.2f}"
+        )
+        print(
+            f"Remaining Balance : ₹{new_balance:.2f}"
+        )
+        print(
+            f"Payment Status    : {payment_status}"
+        )
+        print(
+            f"Delivery Status   : {delivery_status}"
+        )
+
+        if delivery_status == "Delivered":
+            print(
+                "Delivered To      :",
+                delivered_to
+            )
+
+            if receiver_name:
+                print(
+                    "Receiver Name     :",
+                    receiver_name
+                )
+
+        raise SystemExit
+    delivery_request_phone = normalize_indian_phone(
+        selected_delivery_order[2]
+    )
+
+    if not delivery_request_phone:
+        print(
+            "WhatsApp Request cannot be sent - "
+            "Customer phone number is not available."
+        )
+        raise SystemExit
+
+    delivery_balance = float(
+        selected_delivery_order[9]
+    )
+
+    if delivery_action == "2":
+
+        request_message = f"""
+{store_name}
+
+Dear {selected_delivery_order[1]},
+
+Your spectacles/order are ready for collection.
+
+Order Type: {selected_delivery_order[5]}
+Order Date / Time: {selected_delivery_order[4]}
+
+Kindly collect your spectacles/order at your convenience.
+
+Thank you,
+{store_name}
+"""
+
+    else:
+
+        if delivery_balance <= 0:
+            print(
+                "There is no pending balance for this order. "
+                "Please use Spectacles Ready / Please Collect."
+            )
+            raise SystemExit
+
+        request_message = f"""
+{store_name}
+
+Dear {selected_delivery_order[1]},
+
+Your spectacles/order are ready for collection.
+
+Order Type: {selected_delivery_order[5]}
+Order Date / Time: {selected_delivery_order[4]}
+Pending Balance: ₹{delivery_balance:.2f}
+
+Kindly collect your spectacles/order and complete the pending payment.
+
+Thank you,
+{store_name}
+"""
+
+    whatsapp_message = urllib.parse.quote(
+        request_message
+    )
+
+    whatsapp_url = (
+        f"https://wa.me/91{delivery_request_phone}"
+        f"?text={whatsapp_message}"
+    )
+
+    webbrowser.open(whatsapp_url)
+
+    print("Opening WhatsApp Request Message...")
+
+    raise SystemExit
 # --------------------------------------------------
 # EXISTING CUSTOMER SEARCH
 # --------------------------------------------------
 
 if customer_type == "2":
 
+    # --------------------------------------------------
+    # EXISTING CUSTOMER SEARCH
+    # Search by Name OR Phone OR Town/Village
+    # --------------------------------------------------
+
     while True:
-        search_value = input(
-            "Enter Existing Customer Name or Phone: "
-        ).strip()
 
-        if not search_value:
-            print(
-                "Please enter Customer Name or Phone Number."
-            )
-            continue
+        while True:
+            search_value = input(
+                "Enter Customer Name / Phone / Town-Village: "
+            ).strip()
 
-        phone_candidate = (
-            search_value
-            .replace("+", "")
-            .replace(" ", "")
-            .replace("-", "")
-        )
-
-        if phone_candidate.isdigit():
-            validated_phone = normalize_indian_phone(
-                search_value
-            )
-
-            if (
-                validated_phone.isdigit()
-                and len(validated_phone) == 10
-                and validated_phone[0] in ["6", "7", "8", "9"]
-            ):
-                break
-
-            print(
-                "Invalid phone number. Please enter a valid "
-                "Indian 10-digit mobile number."
-            )
-            continue
-
-        break
-    search_name = search_value.lower()
-
-    search_phone = normalize_indian_phone(
-        search_value
-    )
-
-    searching_by_phone = (
-        search_phone.isdigit()
-        and len(search_phone) == 10
-    )
-
-    matching_customers = []
-
-    with open(
-        CUSTOMER_DATA_FILE,
-        "r",
-        encoding="utf-8"
-    ) as file:
-
-        reader = csv.reader(file)
-
-        next(reader, None)
-
-        for row in reader:
-
-            if len(row) <= 9:
+            if not search_value:
+                print(
+                    "Please enter Customer Name, Phone Number "
+                    "or Town/Village."
+                )
                 continue
 
-            row_name = row[5].strip().lower()
-
-            row_phone = normalize_indian_phone(
-                row[8]
+            phone_candidate = (
+                search_value
+                .replace("+", "")
+                .replace(" ", "")
+                .replace("-", "")
             )
+
+            searching_by_phone = phone_candidate.isdigit()
 
             if searching_by_phone:
+                search_phone = normalize_indian_phone(
+                    search_value
+                )
 
-                if row_phone == search_phone:
-                    matching_customers.append(
-                        row
+                if not (
+                    search_phone.isdigit()
+                    and len(search_phone) == 10
+                    and search_phone[0] in ["6", "7", "8", "9"]
+                ):
+                    print(
+                        "Invalid phone number. Please enter a valid "
+                        "Indian 10-digit mobile number."
                     )
-
+                    continue
             else:
+                search_phone = ""
 
-                if row_name == search_name:
-                    matching_customers.append(
-                        row
+            break
+
+        search_text = search_value.lower()
+
+        matching_customers = []
+
+        with open(
+            CUSTOMER_DATA_FILE,
+            "r",
+            encoding="utf-8"
+        ) as file:
+
+            reader = csv.reader(file)
+            next(reader, None)
+
+            for row in reader:
+
+                if len(row) <= 9:
+                    continue
+
+                row_name = row[5].strip().lower()
+
+                row_phone = normalize_indian_phone(
+                    row[8]
+                )
+
+                row_town = row[9].strip().lower()
+
+                if searching_by_phone:
+
+                    if row_phone == search_phone:
+                        matching_customers.append(
+                            row
+                        )
+
+                else:
+
+                    if (
+                        search_text in row_name
+                        or search_text in row_town
+                    ):
+                        matching_customers.append(
+                            row
+                        )
+
+        # --------------------------------------------------
+        # NO CUSTOMER FOUND
+        # --------------------------------------------------
+
+        if not matching_customers:
+
+            print("\nCustomer not found.")
+
+            while True:
+                search_again = input(
+                    "Search again? (y/n): "
+                ).strip().lower()
+
+                if search_again == "y":
+                    break
+
+                if search_again == "n":
+                    print(
+                        "Existing Customer search cancelled."
                     )
+                    raise SystemExit
 
-    customer_history_rows = matching_customers.copy()
+                print(
+                    "Please enter y for Yes or n for No."
+                )
 
-    # ----------------------------------------------
-    # REMOVE DUPLICATE CUSTOMER RESULTS
-    # ----------------------------------------------
+            # Return to main Existing Customer search prompt
+            continue
 
-    unique_customers = {}
-
-    for customer in matching_customers:
-
-        customer_name_key = (
-            customer[5]
-            .strip()
-            .lower()
+        # Keep complete matching history before
+        # duplicate customer results are removed.
+        customer_history_rows = (
+            matching_customers.copy()
         )
 
-        customer_phone_key = (
-            normalize_indian_phone(
-                customer[8]
-            )
-        )
+        # --------------------------------------------------
+        # REMOVE DUPLICATE CUSTOMER RESULTS
+        # --------------------------------------------------
 
-        if customer_phone_key:
+        unique_customers = {}
 
-            customer_key = (
-                customer_name_key,
-                customer_phone_key
-            )
+        for customer in matching_customers:
 
-        else:
-
-            customer_address_key = (
-                customer[9]
+            customer_name_key = (
+                customer[5]
                 .strip()
                 .lower()
             )
 
-            customer_key = (
-                customer_name_key,
-                customer_address_key
+            customer_phone_key = (
+                normalize_indian_phone(
+                    customer[8]
+                )
             )
 
-        # Keeps latest matching record
-        unique_customers[
-            customer_key
-        ] = customer
+            if customer_phone_key:
 
+                customer_key = (
+                    customer_name_key,
+                    customer_phone_key
+                )
 
-    matching_customers = list(
-        unique_customers.values()
-    )
+            else:
 
+                customer_address_key = (
+                    customer[9]
+                    .strip()
+                    .lower()
+                )
 
-    # ----------------------------------------------
-    # ONE CUSTOMER FOUND
-    # ----------------------------------------------
+                customer_key = (
+                    customer_name_key,
+                    customer_address_key
+                )
 
-    if len(matching_customers) == 1:
+            # Keeps latest matching record
+            unique_customers[
+                customer_key
+            ] = customer
 
-        selected_customer = (
-            matching_customers[0]
+        matching_customers = list(
+            unique_customers.values()
         )
+
+        # --------------------------------------------------
+        # CUSTOMER SELECTION / OPTIONAL REFINE SEARCH
+        # --------------------------------------------------
+
+        selected_customer = None
+
+        while len(matching_customers) > 1:
+
+            print(
+                f"\nMatching Customers: "
+                f"{len(matching_customers)}"
+            )
+
+            for number, customer in enumerate(
+                matching_customers,
+                start=1
+            ):
+
+                display_phone = (
+                    customer[8].strip()
+                    if customer[8].strip()
+                    else "No Phone"
+                )
+
+                display_town = (
+                    customer[9].strip()
+                    if customer[9].strip()
+                    else "No Town/Village"
+                )
+
+                print(
+                    f"{number}. "
+                    f"{customer[5]} | "
+                    f"{display_phone} | "
+                    f"{display_town}"
+                )
+
+            print(
+                "\n--- Select / Refine Customer ---"
+            )
+
+            selection_value = input(
+                "Enter Customer Number / Name / Phone: "
+            ).strip()
+
+            if not selection_value:
+                print(
+                    "Please enter Customer Number, "
+                    "Name or Phone."
+                )
+                continue
+
+            # ----------------------------------------------
+            # DIRECT CUSTOMER NUMBER SELECTION
+            # ----------------------------------------------
+
+            if selection_value.isdigit():
+
+                selection_number = int(
+                    selection_value
+                )
+
+                if (
+                    1
+                    <= selection_number
+                    <= len(matching_customers)
+                ):
+                    selected_customer = (
+                        matching_customers[
+                            selection_number - 1
+                        ]
+                    )
+                    break
+
+            # ----------------------------------------------
+            # PHONE REFINE
+            # ----------------------------------------------
+
+            phone_candidate = (
+                selection_value
+                .replace("+", "")
+                .replace(" ", "")
+                .replace("-", "")
+            )
+
+            refined_customers = []
+
+            if phone_candidate.isdigit():
+
+                refine_phone = (
+                    normalize_indian_phone(
+                        selection_value
+                    )
+                )
+
+                if not (
+                    refine_phone.isdigit()
+                    and len(refine_phone) == 10
+                    and refine_phone[0]
+                    in ["6", "7", "8", "9"]
+                ):
+                    print(
+                        "Please enter a valid displayed "
+                        "Customer Number or valid Phone Number."
+                    )
+                    continue
+
+                for customer in matching_customers:
+
+                    customer_phone = (
+                        normalize_indian_phone(
+                            customer[8]
+                        )
+                    )
+
+                    if customer_phone == refine_phone:
+                        refined_customers.append(
+                            customer
+                        )
+
+            # ----------------------------------------------
+            # NAME REFINE
+            # ----------------------------------------------
+
+            else:
+
+                refine_name = (
+                    selection_value
+                    .strip()
+                    .lower()
+                )
+
+                for customer in matching_customers:
+
+                    customer_name_for_refine = (
+                        customer[5]
+                        .strip()
+                        .lower()
+                    )
+
+                    if (
+                        refine_name
+                        in customer_name_for_refine
+                    ):
+                        refined_customers.append(
+                            customer
+                        )
+
+            if not refined_customers:
+
+                print(
+                    "No matching customers found "
+                    "for that Name / Phone."
+                )
+                continue
+
+            matching_customers = (
+                refined_customers
+            )
+
+        # --------------------------------------------------
+        # ONE CUSTOMER REMAINS AFTER SEARCH / REFINE
+        # --------------------------------------------------
+
+        if selected_customer is None:
+
+            if len(matching_customers) == 1:
+                selected_customer = (
+                    matching_customers[0]
+                )
+        # --------------------------------------------------
+        # CUSTOMER CONFIRMATION
+        # --------------------------------------------------
 
         customer_name = (
             selected_customer[5]
@@ -701,11 +2074,26 @@ if customer_type == "2":
             selected_customer[8]
         )
 
-        print("\nSelected Customer:")
+        display_phone = (
+            phone.strip()
+            if phone.strip()
+            else "No Phone"
+        )
+
+        display_town = (
+            selected_customer[9].strip()
+            if selected_customer[9].strip()
+            else "No Town/Village"
+        )
+
+        print(
+            "\nSelected Customer:"
+        )
 
         print(
             f"Name: {customer_name} | "
-            f"Phone: {phone}"
+            f"Phone: {display_phone} | "
+            f"Town/Village: {display_town}"
         )
 
         while True:
@@ -732,7 +2120,7 @@ if customer_type == "2":
                     "Customer not confirmed."
                 )
 
-                raise SystemExit
+                break
 
             else:
 
@@ -740,142 +2128,17 @@ if customer_type == "2":
                     "Please enter y for Yes or n for No."
                 )
 
-
-    # ----------------------------------------------
-    # MULTIPLE CUSTOMERS FOUND
-    # ----------------------------------------------
-
-    elif len(matching_customers) > 1:
-
-        print(
-            "\nMultiple customers found:"
-        )
-
-        for number, customer in enumerate(
-            matching_customers,
-            start=1
-        ):
-
-            print(
-                f"{number}. "
-                f"Name: {customer[5]} | "
-                f"Phone: {customer[8]} | "
-                f"Address: {customer[9]}"
-            )
-
-
-        while True:
-
-            choice = input(
-                "Select Customer Number: "
-            ).strip()
-
-
-            # Customer number must contain digits
-            if not choice.isdigit():
-
-                print(
-                    "Please enter a valid customer number."
-                )
-
-                continue
-
-
-            choice = int(choice)
-
-
-            # Customer number must be in displayed range
-            if not (
-                1
-                <= choice
-                <= len(matching_customers)
-            ):
-
-                print(
-                    "Invalid customer number. Please try again."
-                )
-
-                continue
-
-
-            selected_customer = (
-                matching_customers[
-                    choice - 1
-                ]
-            )
-
-            customer_name = (
-                selected_customer[5]
-            )
-
-            phone = (
-                selected_customer[8]
-            )
-
-
-            print(
-                "\nSelected Customer:"
-            )
-
-            print(
-                f"Name: {customer_name} | "
-                f"Phone: {phone}"
-            )
-
-
-            # --------------------------------------
-            # CUSTOMER CONFIRMATION
-            # --------------------------------------
-
-            while True:
-
-                confirm = input(
-                    "Is this the correct customer? (y/n): "
-                ).strip().lower()
-
-                if confirm == "y":
-
-                    print(
-                        "Customer confirmed."
-                    )
-
-                    print(
-                        "Customer selection successful."
-                    )
-
-                    break
-
-                elif confirm == "n":
-
-                    print(
-                        "Customer not confirmed."
-                    )
-
-                    raise SystemExit
-
-                else:
-
-                    print(
-                        "Please enter y for Yes or n for No."
-                    )
-
-
-            # Leave customer-number selection loop
+        # Correct customer confirmed:
+        # leave the main search loop.
+        if confirm == "y":
             break
 
-
-    # ----------------------------------------------
-    # NO CUSTOMER FOUND
-    # ----------------------------------------------
-
-    else:
-
+        # confirm == "n":
+        # return to search instead of closing app.
         print(
-            "Customer not found."
+            "Please search for the customer again."
         )
-
-        raise SystemExit
-        # ----------------------------------------------
+    # ----------------------------------------------
     # LOAD LATEST AVAILABLE PRESCRIPTION
     # ----------------------------------------------
 
@@ -955,17 +2218,44 @@ if customer_type == "2":
 # CUSTOMER DETAILS
 # ==================================================
 
+if customer_type == "5":
+    print("\n--- Old Prescription Entry ---")
+
+    print("\n--- Old Prescription Source ---")
+    print("1. Our Shop Testing")
+    print("2. External Doctor / Hospital Prescription")
+
+    while True:
+        old_prescription_source = input(
+            "Select Prescription Source (1/2): "
+        ).strip()
+
+        if old_prescription_source in ("1", "2"):
+            break
+
+        print("Please select 1 or 2.")
+    if old_prescription_source == "2":
+        old_prescription_from = input(
+            "Prescription From "
+            "(Optional - Hospital / Doctor / Optical Shop): "
+        ).strip()
+    else:
+        old_prescription_from = ""
+    print("\n--- Old Customer / Historical Entry ---")
+    old_customer_type = "1"
+
 print(
     "\n--- Customer Details ---"
 )
-
 
 # --------------------------------------------------
 # CUSTOMER NAME
 # --------------------------------------------------
 
-if customer_type == "1":
-
+if customer_type == "1" or (
+    customer_type == "5"
+    and old_customer_type == "1"
+):
     while True:
 
         customer_name = input(
@@ -974,12 +2264,8 @@ if customer_type == "1":
 
         if (
             customer_name
-            and any(
-                char.isalpha()
-                for char in customer_name
-            )
             and all(
-                char.isalpha()
+                char.isalnum()
                 or char.isspace()
                 or char in [
                     ".",
@@ -989,12 +2275,11 @@ if customer_type == "1":
                 for char in customer_name
             )
         ):
-
             break
 
         print(
             "Invalid customer name. "
-            "Please enter a valid name using letters."
+            "Letters and numbers are allowed."
         )
 
 else:
@@ -1004,11 +2289,26 @@ else:
     )
 
 
+if customer_type == "1":
+    customer_relation = input(
+        "C/O / S/O Details (Optional - press Enter to skip): "
+    ).strip()
+elif customer_type == "2":
+    customer_relation = (
+        selected_customer[56]
+        if len(selected_customer) > 56
+        else ""
+    )
+else:
+    customer_relation = ""
 # --------------------------------------------------
 # GENDER
 # --------------------------------------------------
 
-if customer_type == "1":
+if customer_type == "1" or (
+    customer_type == "5"
+    and old_customer_type == "1"
+):
 
     print(
         "\n--- Gender ---"
@@ -1056,7 +2356,10 @@ else:
 # AGE
 # --------------------------------------------------
 
-if customer_type == "1":
+if customer_type == "1" or (
+    customer_type == "5"
+    and old_customer_type == "1"
+):
 
     while True:
 
@@ -1111,7 +2414,10 @@ else:
 # PHONE NUMBER
 # --------------------------------------------------
 
-if customer_type == "1":
+if customer_type == "1" or (
+    customer_type == "5"
+    and old_customer_type == "1"
+):
 
     while True:
 
@@ -1164,7 +2470,10 @@ else:
 # TOWN / VILLAGE
 # --------------------------------------------------
 
-if customer_type == "1":
+if customer_type == "1" or (
+    customer_type == "5"
+    and old_customer_type == "1"
+):
 
     while True:
 
@@ -1245,41 +2554,962 @@ previous_left_add = ""
 
 
 
+if customer_type == "5":
+    (
+        old_prescription_date,
+        old_right_sph,
+        old_right_cyl,
+        old_right_axis,
+        old_right_add,
+        old_left_sph,
+        old_left_cyl,
+        old_left_axis,
+        old_left_add,
+    ) = get_old_prescription_details()
+    previous_prescription_date = old_prescription_date
 
+    previous_right_sph = old_right_sph
+    previous_right_cyl = old_right_cyl
+    previous_right_axis = old_right_axis
+    previous_right_add = old_right_add
+
+    previous_left_sph = old_left_sph
+    previous_left_cyl = old_left_cyl
+    previous_left_axis = old_left_axis
+    previous_left_add = old_left_add
+
+    spectacle_history = "Historical"
+
+    if old_prescription_source == "1":
+        prescription_source = "In-Store Refraction"
+    else:
+        prescription_source = "External Prescription"
+
+    prescription_from = old_prescription_from
+    print("\n--- Old Prescription Summary ---")
+    print(f"Customer Name: {customer_name}")
+    print(f"Old Prescription Date: {previous_prescription_date}")
+    print(f"Prescription Source: {prescription_source}")
+
+    if prescription_from:
+        print(f"Prescription From: {prescription_from}")
+
+    print(
+        "OD:",
+        previous_right_sph,
+        previous_right_cyl,
+        previous_right_axis,
+        previous_right_add if previous_right_add else "ADD Not Required"
+    )
+
+    print(
+        "OS:",
+        previous_left_sph,
+        previous_left_cyl,
+        previous_left_axis,
+        previous_left_add if previous_left_add else "ADD Not Required"
+    )
+    frame_details = ""
+    frame_brand = ""
+    frame_offer = ""
+    frame_price = 0.0
+
+    lens_type = ""
+    lens_brand = ""
+    lens_offer = ""
+    lens_price = 0.0
+
+    right_sph = ""
+    right_cyl = ""
+    right_axis = ""
+    right_add = ""
+
+    left_sph = ""
+    left_cyl = ""
+    left_axis = ""
+    left_add = ""
+    distance_pd = ""
+    near_pd = ""
+
+    right_va = ""
+    left_va = ""
+    right_pinhole = ""
+    left_pinhole = ""
+
+    lens_features = ""
+
+    order_total = 0.0
+    less_amount = 0.0
+    total_amount = 0.0
+    advance_amount = 0.0
+    balance = 0.0
+    eye_surgery = ""
+    surgery_eye = ""
+    right_iol = ""
+    left_iol = ""
+
+    delivery_status = ""
+    delivered_to = ""
+    receiver_name = ""
+    old_prescription_row = build_old_prescription_row(
+        customer_name,
+        gender,
+        age,
+        phone,
+        address,
+        spectacle_history,
+        years_using_glasses,
+        previous_right_sph,
+        previous_right_cyl,
+        previous_right_axis,
+        previous_right_add,
+        previous_left_sph,
+        previous_left_cyl,
+        previous_left_axis,
+        previous_left_add,
+        full_address,
+        previous_prescription_date,
+        prescription_source,
+        prescription_from,
+        customer_relation,
+    )
+    print("Old Prescription Row Columns:", len(old_prescription_row))
+    print("\n--- Old Prescription Order Details ---")
+    print("1. Prescription Only")
+    print("2. Frame Only")
+    print("3. Lenses Only")
+    print("4. Frame + Lenses")
+
+    while True:
+        old_order_type = input(
+            "Select Old Order Type (1/2/3/4): "
+        ).strip()
+
+        if old_order_type in ("1", "2", "3", "4"):
+            break
+
+        print("Please select 1, 2, 3 or 4.")
+    if old_order_type == "1":
+        with open(
+            CUSTOMER_DATA_FILE,
+            "a",
+            newline="",
+            encoding="utf-8"
+        ) as file:
+            writer = csv.writer(file)
+            writer.writerow(old_prescription_row)
+
+        print(
+            "\nOld Prescription saved successfully."
+        )
+        print("\n--- Send Old Prescription ---")
+        print("1. SMS Text / Copy")
+        print("2. WhatsApp Prescription")
+        print("3. Save Only / Skip Sending")
+        while True:
+            old_message_choice = input(
+                "Select Message Option (1/2/3): "
+            ).strip()
+
+            if old_message_choice in ("1", "2", "3"):
+                break
+
+            print("Please select 1, 2 or 3.")
+        old_prescription_message = f"""
+{store_name}
+{store_city}
+
+PRESCRIPTION DETAILS
+
+Customer Name: {customer_name}
+Prescription Date: {previous_prescription_date}
+Prescription Source: {"Ravi Opticals Eye Testing" if prescription_source == "In-Store Refraction" else prescription_source}
+{f"Prescription From: {prescription_from}" if prescription_from else ""}
+
+Right Eye (OD):
+SPH: {previous_right_sph}
+CYL: {previous_right_cyl if previous_right_cyl else "0"}
+AXIS: {previous_right_axis if previous_right_axis else "Not Required"}
+ADD: {previous_right_add if previous_right_add else "Not Required"}
+
+Left Eye (OS):
+SPH: {previous_left_sph}
+CYL: {previous_left_cyl if previous_left_cyl else "0"}
+AXIS: {previous_left_axis if previous_left_axis else "Not Required"}
+ADD: {previous_left_add if previous_left_add else "Not Required"}
+
+Please keep this prescription for your reference.
+"""
+
+        if old_message_choice == "1":
+            if not phone:
+                print(
+                    "SMS Text cannot be prepared - "
+                    "Customer phone number is not available."
+                )
+            else:
+                print("\n--- SMS TEXT / COPY ---")
+                print(old_prescription_message)
+        if old_message_choice == "2":
+            if not phone:
+                print(
+                    "WhatsApp Prescription cannot be sent - "
+                    "Customer phone number is not available."
+                )
+            else:
+                import urllib.parse
+                import webbrowser
+
+                whatsapp_message = urllib.parse.quote(
+                    old_prescription_message
+                )
+                whatsapp_url = (
+                    f"https://wa.me/91{phone}"
+                    f"?text={whatsapp_message}"
+                )
+
+                webbrowser.open(whatsapp_url)
+                print("Opening WhatsApp Old Prescription...")
+        print("\nOld Prescription Entry completed.")
+        raise SystemExit
 # ==================================================
 # 6. FRAME DETAILS
 # ==================================================
 
-print("\n--- Frame Details ---")
+if customer_type == "5":
+    order_type = "7"
 
-print("\n--- Order Type ---")
-print("1. Frame Only")
-print("2. Lenses Only")
-print("3. Frame + Lenses")
+if customer_type != "5":
 
-if customer_type == "2":
-    print("4. Previous Prescription")
-    print("5. Old Order History")
-    print("6. Payment / Delivery Update")
+    print("\n--- Order Type ---")
+    print("1. Frame Only")
+    print("2. Lenses Only")
+    print("3. Frame + Lenses")
 
-
-while True:
     if customer_type == "2":
-        order_type = input(
-            "Select Order Type (1/2/3/4/5/6): "
+        print("4. Previous Prescription")
+        print("5. Old Order History")
+        print("6. Payment / Delivery Update")
+        print("7. Add Old Prescription")
+if customer_type != "5":
+    while True:
+        if customer_type == "2":
+            order_type = input(
+                "Select Order Type (1/2/3/4/5/6/7): "
+            ).strip()
+            valid_options = ["1", "2", "3", "4", "5", "6", "7"]
+        else:
+            order_type = input(
+                "Select Order Type (1/2/3): "
+            ).strip()
+            valid_options = ["1", "2", "3"]
+
+        if order_type in valid_options:
+            break
+
+        print("Please select a valid Order Type.")
+if customer_type == "2" and order_type == "7":
+    print("\n--- Old Prescription Entry ---")
+
+    print("\n--- Old Prescription Source ---")
+    print("1. Our Shop Testing")
+    print("2. External Doctor / Hospital Prescription")
+
+    while True:
+        old_prescription_source = input(
+            "Select Prescription Source (1/2): "
         ).strip()
-        valid_options = ["1", "2", "3", "4", "5", "6"]
+
+        if old_prescription_source in ("1", "2"):
+            break
+
+        print("Please select 1 or 2.")
+
+    if old_prescription_source == "2":
+        old_prescription_from = input(
+            "Prescription From "
+            "(Optional - Hospital / Doctor / Optical Shop): "
+        ).strip()
     else:
-        order_type = input(
-            "Select Order Type (1/2/3): "
+        old_prescription_from = ""
+    (
+        old_prescription_date,
+        old_right_sph,
+        old_right_cyl,
+        old_right_axis,
+        old_right_add,
+        old_left_sph,
+        old_left_cyl,
+        old_left_axis,
+        old_left_add,
+    ) = get_old_prescription_details()
+    previous_prescription_date = old_prescription_date
+
+    previous_right_sph = old_right_sph
+    previous_right_cyl = old_right_cyl
+    previous_right_axis = old_right_axis
+    previous_right_add = old_right_add
+
+    previous_left_sph = old_left_sph
+    previous_left_cyl = old_left_cyl
+    previous_left_axis = old_left_axis
+    previous_left_add = old_left_add
+
+    spectacle_history = "Historical"
+
+    if old_prescription_source == "1":
+        prescription_source = "In-Store Refraction"
+    else:
+        prescription_source = "External Prescription"
+
+    prescription_from = old_prescription_from
+    old_prescription_row = build_old_prescription_row(
+        customer_name,
+        gender,
+        age,
+        phone,
+        address,
+        spectacle_history,
+        years_using_glasses,
+        previous_right_sph,
+        previous_right_cyl,
+        previous_right_axis,
+        previous_right_add,
+        previous_left_sph,
+        previous_left_cyl,
+        previous_left_axis,
+        previous_left_add,
+        full_address,
+        previous_prescription_date,
+        prescription_source,
+        prescription_from,
+        customer_relation,
+    )
+    print("\n--- Old Prescription Order Details ---")
+    print("1. Prescription Only")
+    print("2. Frame Only")
+    print("3. Lenses Only")
+    print("4. Frame + Lenses")
+
+    while True:
+        old_order_type = input(
+            "Select Old Order Type (1/2/3/4): "
         ).strip()
-        valid_options = ["1", "2", "3"]
-    if order_type in valid_options:
+
+        if old_order_type in ("1", "2", "3", "4"):
+            break
+
+        print("Please select 1, 2, 3 or 4.")
+    if old_order_type == "1":
+        with open(
+            CUSTOMER_DATA_FILE,
+            "a",
+            newline="",
+            encoding="utf-8"
+        ) as file:
+            writer = csv.writer(file)
+            writer.writerow(old_prescription_row)
+
+        print(
+            "\nOld Prescription saved successfully."
+        )
+        print("\n--- Old Prescription Actions ---")
+        print("1. SMS Text / Copy")
+        print("2. WhatsApp Prescription")
+        print("3. Save Only / Skip Sending")
+
+        while True:
+            old_message_choice = input(
+                "Select Action (1/2/3): "
+            ).strip()
+
+            if old_message_choice in ("1", "2", "3"):
+                break
+
+            print("Please select 1, 2 or 3.")
+
+        old_prescription_message = f"""
+{store_name}
+{store_city}
+
+PRESCRIPTION DETAILS
+
+Customer Name: {customer_name}
+Prescription Date: {previous_prescription_date}
+Prescription Source: {"Ravi Opticals Eye Testing" if prescription_source == "In-Store Refraction" else prescription_source}
+{f"Prescription From: {prescription_from}" if prescription_from else ""}
+
+Right Eye (OD):
+SPH: {previous_right_sph}
+CYL: {previous_right_cyl if previous_right_cyl else "0"}
+AXIS: {previous_right_axis if previous_right_axis else "Not Required"}
+ADD: {previous_right_add if previous_right_add else "Not Required"}
+
+Left Eye (OS):
+SPH: {previous_left_sph}
+CYL: {previous_left_cyl if previous_left_cyl else "0"}
+AXIS: {previous_left_axis if previous_left_axis else "Not Required"}
+ADD: {previous_left_add if previous_left_add else "Not Required"}
+
+Please keep this prescription for your reference.
+"""
+
+        if old_message_choice == "1":
+            if not phone:
+                print(
+                    "SMS Text cannot be prepared - "
+                    "Customer phone number is not available."
+                )
+            else:
+                print("\n--- SMS TEXT / COPY ---")
+                print(old_prescription_message)
+
+        elif old_message_choice == "2":
+            if not phone:
+                print(
+                    "WhatsApp Prescription cannot be sent - "
+                    "Customer phone number is not available."
+                )
+            else:
+                whatsapp_message = urllib.parse.quote(
+                    old_prescription_message
+                )
+
+                whatsapp_url = (
+                    f"https://wa.me/91{phone}"
+                    f"?text={whatsapp_message}"
+                )
+
+                webbrowser.open(whatsapp_url)
+
+                print(
+                    "Opening WhatsApp Old Prescription..."
+                )
+
+        else:
+            print(
+                "Old Prescription saved. "
+                "Sending skipped."
+            )
+
+        print(
+            "\nOld Prescription Entry completed."
+        )
+
+        raise SystemExit
+if "old_order_type" in globals() and old_order_type == "2":
+    print("\n--- Historical Frame Details ---")
+
+    frame_details = input(
+        "Enter Frame Details: "
+    ).strip()
+
+    print("\n--- Frame Category ---")
+    print("1. Brand")
+    print("2. Non-Brand")
+
+    while True:
+        frame_category = input(
+            "Select Frame Category (1/2): "
+        ).strip()
+
+        if frame_category in ["1", "2"]:
+            break
+
+        print("Please enter 1 or 2 only.")
+    if frame_category == "1":
+        frame_brand = input(
+            "Enter Frame Brand: "
+        ).strip()
+    else:
+        frame_brand = "Non-Brand"
+    frame_offer = normalize_offer(
+        input("Enter Frame Offer (Example: 10 or 10%): ")
+    )
+    while True:
+        try:
+            frame_price = float(
+                input("Enter Frame Price: ").strip()
+            )
+
+            if frame_price < 0:
+                print(
+                    "Frame Price cannot be negative."
+                )
+                continue
+
+            break
+
+        except ValueError:
+            print(
+                "Please enter Frame Price using numbers only."
+            )
+    old_prescription_row[20] = frame_details
+    old_prescription_row[21] = frame_brand
+    old_prescription_row[22] = frame_offer
+    old_prescription_row[23] = frame_price
+    with open(
+        CUSTOMER_DATA_FILE,
+        "a",
+        newline="",
+        encoding="utf-8"
+    ) as file:
+        writer = csv.writer(file)
+        writer.writerow(old_prescription_row)
+
+    print(
+        "\nHistorical Frame Only record saved successfully."
+    )
+    raise SystemExit
+if "old_order_type" in globals() and old_order_type == "3":
+    print("\n--- Historical Lens Details ---")
+
+    print("\n--- Lens Type ---")
+    print("1. Single Vision")
+    print("2. Bifocal")
+
+    while True:
+        lens_type_choice = input(
+            "Select Lens Type (1/2): "
+        ).strip()
+
+        if lens_type_choice == "1":
+            lens_type = "Single Vision"
+            break
+
+        elif lens_type_choice == "2":
+            print("\n--- Bifocal Type ---")
+            print("1. Kryptok Bifocal")
+            print("2. D Bifocal")
+            print("3. Progressive Bifocal")
+            print("4. Other")
+
+            while True:
+                bifocal_choice = input(
+                    "Select Bifocal Type (1/2/3/4): "
+                ).strip()
+
+                if bifocal_choice == "1":
+                    lens_type = "Kryptok Bifocal"
+                    break
+
+                elif bifocal_choice == "2":
+                    lens_type = "D Bifocal"
+                    break
+
+                elif bifocal_choice == "3":
+                    lens_type = "Progressive Bifocal"
+                    break
+
+                elif bifocal_choice == "4":
+                    lens_type = "Other"
+                    break
+
+                else:
+                    print(
+                        "Invalid option. "
+                        "Please select 1, 2, 3 or 4."
+                    )
+
+            break
+
+        else:
+            print(
+                "Invalid option. Please select 1 or 2."
+            )
+    while True:
+        lens_features = input(
+            "Enter Lens Features / Coating (Optional): "
+        ).strip().title()
+
+        normalized_features = (
+            lens_features.lower()
+            .replace(".", " ")
+            .replace("-", " ")
+            .replace("/", " ")
+            .replace(",", " ")
+            .replace("_", " ")
+        )
+
+        feature_words = normalized_features.split()
+
+        has_kt = (
+            "kt" in feature_words
+            or "kryptok" in feature_words
+        )
+
+        has_progressive = (
+            "progressive" in feature_words
+        )
+
+        has_d_bifocal = (
+            "d bifocal" in normalized_features
+            or "dbifocal" in normalized_features
+        )
+
+        # Single Vision cannot contain Bifocal design names
+        if lens_type == "Single Vision":
+            if has_kt:
+                print(
+                    "KT / Kryptok is a Bifocal type and "
+                    "cannot be used with Single Vision."
+                )
+                continue
+
+            if has_progressive:
+                print(
+                    "Progressive cannot be used with "
+                    "Single Vision."
+                )
+                continue
+
+            if has_d_bifocal:
+                print(
+                    "D Bifocal cannot be used with "
+                    "Single Vision."
+                )
+                continue
+
+        # Kryptok cannot conflict with other Bifocal designs
+        elif lens_type == "Kryptok Bifocal":
+            if has_progressive:
+                print(
+                    "Progressive cannot be used with "
+                    "Kryptok Bifocal."
+                )
+                continue
+
+            if has_d_bifocal:
+                print(
+                    "D Bifocal cannot be used with "
+                    "Kryptok Bifocal."
+                )
+                continue
+
+        # D Bifocal cannot conflict with Kryptok or Progressive
+        elif lens_type == "D Bifocal":
+            if has_kt:
+                print(
+                    "KT / Kryptok cannot be used with "
+                    "D Bifocal."
+                )
+                continue
+
+            if has_progressive:
+                print(
+                    "Progressive cannot be used with "
+                    "D Bifocal."
+                )
+                continue
+
+        # Progressive cannot contain Kryptok or D Bifocal
+        elif lens_type == "Progressive Bifocal":
+            if has_kt:
+                print(
+                    "KT / Kryptok cannot be used with "
+                    "Progressive Bifocal."
+                )
+                continue
+
+            if has_d_bifocal:
+                print(
+                    "D Bifocal cannot be used with "
+                    "Progressive Bifocal."
+                )
+                continue
+
+        break
+    lens_brand = input(
+        "Enter Lens Brand (Optional): "
+    ).strip().title()
+    lens_offer = normalize_offer(
+        input("Enter Lens Offer (Example: 10 or 10%): ")
+    )
+    while True:
+        lens_price_input = input(
+            "Enter Lens Price: "
+        ).strip()
+
+        try:
+            lens_price = float(lens_price_input)
+
+            if lens_price < 0:
+                print("Lens Price cannot be negative.")
+                continue
+
+            break
+
+        except ValueError:
+            print(
+                "Please enter Lens Price using numbers only."
+            )
+    old_prescription_row[24] = lens_type
+    old_prescription_row[25] = lens_brand
+    old_prescription_row[26] = lens_offer
+    old_prescription_row[27] = lens_price
+    old_prescription_row[45] = lens_features
+    with open(
+        CUSTOMER_DATA_FILE,
+        "a",
+        newline="",
+        encoding="utf-8"
+    ) as file:
+        writer = csv.writer(file)
+        writer.writerow(old_prescription_row)
+
+    print(
+        "\nHistorical Lenses Only record saved successfully."
+    )
+    raise SystemExit
+
+    print("\n--- Historical Frame Details ---")
+
+    frame_details = input(
+        "Enter Frame Details: "
+    ).strip()
+    print("\n--- Frame Category ---")
+    print("1. Brand")
+    print("2. Non-Brand")
+
+    while True:
+        frame_category = input(
+            "Select Frame Category (1/2): "
+        ).strip()
+
+        if frame_category in ["1", "2"]:
+            break
+
+        print("Please enter 1 or 2 only.")
+    if frame_category == "1":
+        frame_brand = input(
+            "Enter Frame Brand: "
+        ).strip()
+    else:
+        frame_brand = "Non-Brand"
+    frame_offer = normalize_offer(
+        input("Enter Frame Offer (Example: 10 or 10%): ")
+    )
+    while True:
+        try:
+            frame_price = float(
+                input("Enter Frame Price: ").strip()
+            )
+
+            if frame_price < 0:
+                print(
+                    "Frame Price cannot be negative."
+                )
+                continue
+
+            break
+
+        except ValueError:
+            print(
+                "Please enter Frame Price using numbers only."
+            )
+
+    old_prescription_row[20] = frame_details
+    old_prescription_row[21] = frame_brand
+    old_prescription_row[22] = frame_offer
+    old_prescription_row[23] = frame_price
+    print("\n--- Historical Lens Details ---")
+
+    print("\n--- Lens Type ---")
+    print("1. Single Vision")
+    print("2. Bifocal")
+
+    while True:
+        lens_type_choice = input(
+            "Select Lens Type (1/2): "
+        ).strip()
+
+        if lens_type_choice == "1":
+            lens_type = "Single Vision"
+            break
+
+        elif lens_type_choice == "2":
+            print("\n--- Bifocal Type ---")
+            print("1. Kryptok Bifocal")
+            print("2. D Bifocal")
+            print("3. Progressive Bifocal")
+            print("4. Other")
+
+            while True:
+                bifocal_choice = input(
+                    "Select Bifocal Type (1/2/3/4): "
+                ).strip()
+
+                if bifocal_choice == "1":
+                    lens_type = "Kryptok Bifocal"
+                    break
+
+                elif bifocal_choice == "2":
+                    lens_type = "D Bifocal"
+                    break
+
+                elif bifocal_choice == "3":
+                    lens_type = "Progressive Bifocal"
+                    break
+
+                elif bifocal_choice == "4":
+                    lens_type = "Other"
+                    break
+
+                else:
+                    print(
+                        "Invalid option. "
+                        "Please select 1, 2, 3 or 4."
+                    )
+
+            break
+
+        else:
+            print(
+                "Invalid option. Please select 1 or 2."
+            )
+    while True:
+        lens_features = input(
+            "Enter Lens Features / Coating (Optional): "
+        ).strip().title()
+
+        normalized_features = (
+            lens_features.lower()
+            .replace(".", " ")
+            .replace("-", " ")
+            .replace("/", " ")
+            .replace(",", " ")
+            .replace("_", " ")
+        )
+
+        feature_words = normalized_features.split()
+
+        has_kt = (
+            "kt" in feature_words
+            or "kryptok" in feature_words
+        )
+
+        has_progressive = (
+            "progressive" in feature_words
+        )
+
+        has_d_bifocal = (
+            "d bifocal" in normalized_features
+            or "dbifocal" in normalized_features
+        )
+
+        if lens_type == "Single Vision":
+            if has_kt:
+                print(
+                    "KT / Kryptok is a Bifocal type and "
+                    "cannot be used with Single Vision."
+                )
+                continue
+
+            if has_progressive:
+                print(
+                    "Progressive cannot be used with "
+                    "Single Vision."
+                )
+                continue
+
+            if has_d_bifocal:
+                print(
+                    "D Bifocal cannot be used with "
+                    "Single Vision."
+                )
+                continue
+
+        elif lens_type == "Kryptok Bifocal":
+            if has_progressive:
+                print(
+                    "Progressive cannot be used with "
+                    "Kryptok Bifocal."
+                )
+                continue
+
+            if has_d_bifocal:
+                print(
+                    "D Bifocal cannot be used with "
+                    "Kryptok Bifocal."
+                )
+                continue
+
+        elif lens_type == "D Bifocal":
+            if has_kt:
+                print(
+                    "KT / Kryptok cannot be used with "
+                    "D Bifocal."
+                )
+                continue
+
+            if has_progressive:
+                print(
+                    "Progressive cannot be used with "
+                    "D Bifocal."
+                )
+                continue
+
+        elif lens_type == "Progressive Bifocal":
+            if has_kt:
+                print(
+                    "KT / Kryptok cannot be used with "
+                    "Progressive Bifocal."
+                )
+                continue
+
+            if has_d_bifocal:
+                print(
+                    "D Bifocal cannot be used with "
+                    "Progressive Bifocal."
+                )
+                continue
+
         break
 
-    print("Please select a valid Order Type.")
+    lens_brand = input(
+        "Enter Lens Brand (Optional): "
+    ).strip().title()
 
+    lens_offer = normalize_offer(
+        input("Enter Lens Offer (Example: 10 or 10%): ")
+    )
+    while True:
+        lens_price_input = input(
+            "Enter Lens Price: "
+        ).strip()
 
+        try:
+            lens_price = float(lens_price_input)
+
+            if lens_price < 0:
+                print("Lens Price cannot be negative.")
+                continue
+
+            break
+
+        except ValueError:
+            print(
+                "Please enter Lens Price using numbers only."
+            )
+
+    old_prescription_row[24] = lens_type
+    old_prescription_row[25] = lens_brand
+    old_prescription_row[26] = lens_offer
+    old_prescription_row[27] = lens_price
+    old_prescription_row[45] = lens_features
+    with open(
+        CUSTOMER_DATA_FILE,
+        "a",
+        newline="",
+        encoding="utf-8"
+    ) as file:
+        writer = csv.writer(file)
+        writer.writerow(old_prescription_row)
+
+    print(
+        "\nHistorical Frame + Lenses record saved successfully."
+    )
+    raise SystemExit
 # ==================================================
 # PREVIOUS PRESCRIPTION
 # ==================================================
@@ -1327,8 +3557,10 @@ if customer_type == "2" and order_type == "4":
             has_prescription = any(
                 value.strip()
                 for value in customer[28:36]
+            ) or any(
+                value.strip()
+                for value in customer[12:20]
             )
-
             if same_customer and has_prescription:
                 if (
                     latest_prescription is None
@@ -1396,23 +3628,141 @@ if customer_type == "2" and order_type == "4":
         print("OD:")
         print(
             f"SPH: {right_sph} | "
-            f"CYL: {right_cyl} | "
-            f"AXIS: {right_axis} | "
+            f"CYL: {right_cyl if right_cyl else '0'} | "
+            f"AXIS: {right_axis if right_axis else 'Not Required'} | "
             f"ADD: {right_add}"
         )
 
         print("OS:")
         print(
             f"SPH: {left_sph} | "
-            f"CYL: {left_cyl} | "
-            f"AXIS: {left_axis} | "
-            f"ADD: {left_add}"
-        )
+            f"CYL: {left_cyl if left_cyl else '0'} | "
+            f"AXIS: {left_axis if left_axis else 'Not Required'} | "
+            f"ADD: {left_add}"        )
     else:
         print("No previous prescription found.")
-    input("\nPress Enter to close...")
+    previous_prescription_action = ""
 
-    raise SystemExit
+    if latest_prescription is not None:
+
+        previous_prescription_text = f"""{store_name}
+Customer Name: {customer_name}
+Phone: {phone if phone else "Not Provided"}
+Town / Village: {address}
+Previous Prescription Date: {display_prescription_date}
+
+Spectacle Prescription
+
+Right Eye (OD):
+SPH: {right_sph}
+CYL: {right_cyl}
+AXIS: {right_axis}
+ADD: {right_add if right_add else "Not Required"}
+
+Left Eye (OS):
+SPH: {left_sph}
+CYL: {left_cyl}
+AXIS: {left_axis}
+ADD: {left_add if left_add else "Not Required"}
+
+Please keep this prescription for your reference.
+"""
+
+        while True:
+            print("\n--- What would you like to do? ---")
+            print("1. Use Same Prescription")
+            print("2. New In-Store Refraction")
+            print("3. Send Previous Prescription on WhatsApp")
+            print("4. Print Previous Prescription")
+            print("5. View Only / Close")
+
+            previous_action_choice = input(
+                "Select Option (1/2/3/4/5): "
+            ).strip()
+
+            if previous_action_choice == "1":
+                previous_prescription_action = "use_same"
+
+                print("\n--- New Order ---")
+                print("1. Lenses Only")
+                print("2. Frame + Lenses")
+
+                while True:
+                    new_order_choice = input(
+                        "Select New Order (1/2): "
+                    ).strip()
+
+                    if new_order_choice == "1":
+                        order_type = "2"
+                        break
+
+                    elif new_order_choice == "2":
+                        order_type = "3"
+                        break
+
+                    else:
+                        print("Please select 1 or 2.")
+
+                break
+
+            elif previous_action_choice == "2":
+                previous_prescription_action = "new_refraction"
+
+                print("\n--- New Order ---")
+                print("1. Lenses Only")
+                print("2. Frame + Lenses")
+
+                while True:
+                    new_order_choice = input(
+                        "Select New Order (1/2): "
+                    ).strip()
+
+                    if new_order_choice == "1":
+                        order_type = "2"
+                        break
+
+                    elif new_order_choice == "2":
+                        order_type = "3"
+                        break
+
+                    else:
+                        print("Please select 1 or 2.")
+
+                break
+
+            elif previous_action_choice == "3":
+                if not phone:
+                    print(
+                        "WhatsApp Prescription cannot be sent - "
+                        "Customer phone number is not available."
+                    )
+                else:
+                    whatsapp_message = urllib.parse.quote(
+                        previous_prescription_text
+                    )
+                    whatsapp_url = (
+                        f"https://wa.me/91{phone}"
+                        f"?text={whatsapp_message}"
+                    )
+                    webbrowser.open(whatsapp_url)
+                    print(
+                        "Opening WhatsApp Previous Prescription..."
+                    )
+
+            elif previous_action_choice == "4":
+                print_text_document(
+                    previous_prescription_text
+                )
+
+            elif previous_action_choice == "5":
+                raise SystemExit
+
+            else:
+                print("Please select 1, 2, 3, 4, or 5.")
+
+    else:
+        input("\nPress Enter to close...")
+        raise SystemExit
 # ==================================================
 # OLD ORDER HISTORY
 # ==================================================
@@ -1528,26 +3878,117 @@ if customer_type == "2" and order_type == "5":
             if len(selected_order) > 52 and selected_order[52].strip():
                 print("Left Eye IOL  :", selected_order[52])
 
-    if len(selected_order) > 44:
-        print("--- Payment Details ---")
+    latest_payment_update = None
+
+    if os.path.exists(PAYMENT_DATA_FILE):
+        with open(
+            PAYMENT_DATA_FILE,
+            "r",
+            encoding="utf-8"
+        ) as payment_file:
+
+            payment_reader = csv.reader(payment_file)
+            next(payment_reader, None)
+
+            for payment_row in payment_reader:
+                if len(payment_row) < 14:
+                    continue
+
+                same_order = (
+                    payment_row[4].strip()
+                    == selected_order[0].strip()
+                )
+
+                same_customer = (
+                    payment_row[1].strip().lower()
+                    == selected_order[5].strip().lower()
+                )
+
+                if same_order and same_customer:
+                    latest_payment_update = payment_row
+    print("--- Payment / Delivery Details ---")
+
     if len(selected_order) > 47 and selected_order[47].strip():
-        print("Order Total   : ₹", selected_order[47])
+        print("Order Total      : ₹", selected_order[47])
 
     if (
         len(selected_order) > 48
         and selected_order[48].strip()
         and selected_order[48].strip() not in ["0", "0.0"]
     ):
-        print("Less Amount   : ₹", selected_order[48])
+        print("Less Amount      : ₹", selected_order[48])
 
     if selected_order[42].strip():
-        print("Final Total   : ₹", selected_order[42])
+        print("Final Total      : ₹", selected_order[42])
 
-    if selected_order[43].strip():
-        print("Advance Amount: ₹", selected_order[43])
+    if latest_payment_update is not None:
+        try:
+            latest_total = float(latest_payment_update[6])
+            latest_balance = float(latest_payment_update[9])
+            total_paid = latest_total - latest_balance
+        except ValueError:
+            latest_total = 0.0
+            latest_balance = 0.0
+            total_paid = 0.0
 
-    if selected_order[44].strip():
-        print("Balance Amount: ₹", selected_order[44])
+        latest_payment_status = (
+            latest_payment_update[11].strip()
+            if len(latest_payment_update) > 11
+            else ""
+        )
+
+        latest_delivery_status = (
+            latest_payment_update[12].strip()
+            if len(latest_payment_update) > 12
+            else ""
+        )
+
+        print(f"Total Paid       : ₹{total_paid:.2f}")
+        print(f"Balance Due      : ₹{latest_balance:.2f}")
+        print(
+            "Payment Status   :",
+            latest_payment_status
+            if latest_payment_status
+            else "Not Recorded"
+        )
+        print(
+            "Delivery Status  :",
+            latest_delivery_status
+            if latest_delivery_status
+            else "Not Recorded"
+        )
+
+        if latest_delivery_status == "Delivered":
+            if latest_balance == 0:
+                print(
+                    "Delivery Condition: "
+                    "Delivered / Fully Paid"
+                )
+            else:
+                print(
+                    "Delivery Condition: "
+                    f"Delivered with Due Balance ₹{latest_balance:.2f}"
+                )
+
+        elif latest_delivery_status == "Pending":
+            print("Delivery Condition: Pending Delivery")
+
+    else:
+        if selected_order[43].strip():
+            print("Advance Amount   : ₹", selected_order[43])
+
+        if selected_order[44].strip():
+            print("Balance Due      : ₹", selected_order[44])
+
+        print("Payment Status   : Not Updated")
+
+        if len(selected_order) > 57 and selected_order[57].strip():
+            print(
+                "Delivery Status  :",
+                selected_order[57]
+            )
+        else:
+            print("Delivery Status  : Not Recorded")
     # --------------------------------------------------
     # SEND OLD PRESCRIPTION ON WHATSAPP
     # --------------------------------------------------
@@ -1616,6 +4057,8 @@ if customer_type == "2" and order_type == "5":
                 old_prescription_message = f"""
 {store_name}
 Customer Name: {customer_name}
+Phone: {phone if phone else "Not Provided"}
+Town / Village: {address}
 Old Prescription Date: {old_prescription_date}
 
 Spectacle Prescription
@@ -2009,18 +4452,28 @@ if customer_type == "2" and order_type == "6":
             new_balance,
             payment_type,
             payment_status,
-delivery_status,
-(
-    selected_payment[13]
-    if len(selected_payment) > 13
-    and selected_payment[13].strip()
-    else (
-        payment_datetime
-        if delivery_status == "Delivered"
-        else ""
-    )
-)
-])
+            delivery_status,
+            (
+                selected_payment[13]
+                if len(selected_payment) > 13
+                and selected_payment[13].strip()
+                else (
+                    payment_datetime
+                    if delivery_status == "Delivered"
+                    else ""
+                )
+            ),
+            (
+                selected_payment[14]
+                if len(selected_payment) > 14
+                else ""
+            ),
+            (
+                selected_payment[15]
+                if len(selected_payment) > 15
+                else ""
+            )
+        ])
     print("\n--- Payment Update Completed ---")
 
     print(
@@ -2139,6 +4592,8 @@ Thank you for choosing {store_name}.
 # ==================================================
 
 if order_type in ["1", "3"]:
+    print("\n--- Frame Details ---")
+
     frame_details = input(
         "Enter Frame Details: "
     ).strip()
@@ -2164,10 +4619,9 @@ if order_type in ["1", "3"]:
     else:
         frame_brand = "Non-Brand"
 
-    frame_offer = input(
-        "Enter Frame Offer: "
-    ).strip()
-
+    frame_offer = normalize_offer(
+        input("Enter Frame Offer (Example: 10 or 10%): ")
+    )
     while True:
         try:
             frame_price = float(
@@ -2194,10 +4648,157 @@ else:
     frame_price = 0.0
 
 # ==================================================
+# 4. PRESCRIPTION SOURCE
+# ==================================================
+
+if customer_type == "5":
+    if old_prescription_source == "1":
+        prescription_source = "In-Store Refraction"
+    else:
+        prescription_source = "External Prescription"
+
+        prescription_from = old_prescription_from
+else:
+    prescription_source = "Not Applicable"
+    prescription_from = ""
+if (
+    order_type in ["2", "3"]
+    and "previous_prescription_action" in globals()
+    and previous_prescription_action == "use_same"
+):
+    prescription_source = "Existing Prescription on Record"
+
+elif (
+    order_type in ["2", "3"]
+    and "previous_prescription_action" in globals()
+    and previous_prescription_action == "new_refraction"
+):
+    prescription_source = "In-Store Refraction"
+
+elif order_type in ["2", "3"]:
+
+    print("\n--- Prescription Source ---")
+    print("1. In-Store Refraction")
+    print("2. External Prescription")
+
+    if customer_type == "2":
+        print("3. Existing Prescription on Record")
+
+    while True:
+        if customer_type == "2":
+            prescription_source_choice = input(
+                "Select Prescription Source (1/2/3): "
+            ).strip()
+        else:
+            prescription_source_choice = input(
+                "Select Prescription Source (1/2): "
+            ).strip()
+            if prescription_source_choice == "1":
+                prescription_source = "In-Store Refraction"
+                break
+
+            elif prescription_source_choice == "2":
+                prescription_source = "External Prescription"
+
+                prescription_from = input(
+                    "Prescription From "
+                    "(Optional - Hospital / Doctor / Optical Shop): "
+                ).strip()
+
+                break
+
+            elif prescription_source_choice == "3":
+
+                if customer_type == "2":
+                    prescription_source = (
+                        "Existing Prescription on Record"
+                    )
+                    break
+
+                else:
+                    print(
+                        "Existing Prescription on Record is "
+                        "available only for Existing Customers."
+                    )
+
+            else:
+                print("Please select 1, 2, or 3.")
+
+order_purpose = "Not Applicable"
+
+if prescription_source == "Existing Prescription on Record":
+
+    print("\n--- Order Purpose ---")
+    print("1. Regular / New Order")
+    print("2. Replacement - Lost / Broken / Damaged")
+    print("3. Additional / Spare Pair")
+
+    while True:
+        order_purpose_choice = input(
+            "Select Order Purpose (1/2/3): "
+        ).strip()
+
+        if order_purpose_choice == "1":
+            order_purpose = "Regular / New Order"
+            break
+
+        elif order_purpose_choice == "2":
+            order_purpose = (
+                "Replacement - Lost / Broken / Damaged"
+            )
+            break
+
+        elif order_purpose_choice == "3":
+            order_purpose = "Additional / Spare Pair"
+            break
+
+        else:
+            print("Please select 1, 2, or 3.")
+prescription_choice = "Not Applicable"
+
+if "previous_prescription_action" in globals():
+    if previous_prescription_action == "use_same":
+        prescription_choice = "Use Previous Prescription"
+
+    elif previous_prescription_action == "new_refraction":
+        prescription_choice = "New In-Store Refraction"
+
+if (
+    prescription_source == "Existing Prescription on Record"
+    and prescription_choice == "Not Applicable"
+):
+    print("\n--- Prescription Choice ---")
+    print("1. Use Previous Prescription")
+    print("2. New In-Store Refraction")
+
+    while True:
+        prescription_choice_input = input(
+            "Select Prescription Choice (1/2): "
+        ).strip()
+
+        if prescription_choice_input == "1":
+            prescription_choice = "Use Previous Prescription"
+            previous_prescription_action = "use_same"
+            break
+
+        elif prescription_choice_input == "2":
+            prescription_choice = "New In-Store Refraction"
+            prescription_source = "In-Store Refraction"
+            break
+
+        else:
+            print("Please select 1 or 2.")
+# ==================================================
 # 7. LENS TYPE
 # ==================================================
 
-if order_type in ["2", "3"]:
+if (
+    order_type in ["2", "3"]
+    and not (
+        "previous_prescription_action" in globals()
+        and previous_prescription_action == "use_same"
+    )
+):
     print("\n--- Lens Details ---")
 
     print("\n--- Lens Type ---")
@@ -2270,135 +4871,30 @@ if order_type in ["2", "3"]:
                 "Invalid option. Please select 1 or 2."
             )
 
-    # ==================================================
-    # LENS FEATURES / COATING VALIDATION
-    # ==================================================
+elif (
+    order_type in ["2", "3"]
+    and "previous_prescription_action" in globals()
+    and previous_prescription_action == "use_same"
+):
+    if (
+        "latest_prescription" in globals()
+        and latest_prescription is not None
+        and len(latest_prescription) > 24
+    ):
+        lens_type = latest_prescription[24]
 
-    while True:
-        lens_features = input(
-            "Enter Lens Features / Coating (Optional): "
-        ).strip().title()
+    elif customer_type == "2" and len(selected_customer) > 24:
+        lens_type = selected_customer[24]
 
-        normalized_features = (
-            lens_features.lower()
-            .replace(".", " ")
-            .replace("-", " ")
-            .replace("/", " ")
-            .replace(",", " ")
-            .replace("_", " ")
-        )
+    else:
+        lens_type = ""
+    add_requirement = ""
 
-        feature_words = normalized_features.split()
+    print(
+        "Previous Lens Type loaded:",
+        lens_type if lens_type else "Not Recorded"
+    )
 
-        has_kt = (
-            "kt" in feature_words
-            or "kryptok" in feature_words
-        )
-
-        has_progressive = (
-            "progressive" in feature_words
-        )
-
-        has_d_bifocal = (
-            "d bifocal" in normalized_features
-            or "dbifocal" in normalized_features
-        )
-
-        # Single Vision cannot contain Bifocal design names
-        if lens_type == "Single Vision":
-            if has_kt:
-                print(
-                    "KT / Kryptok is a Bifocal type and "
-                    "cannot be used with Single Vision."
-                )
-                continue
-
-            if has_progressive:
-                print(
-                    "Progressive cannot be used with "
-                    "Single Vision."
-                )
-                continue
-
-            if has_d_bifocal:
-                print(
-                    "D Bifocal cannot be used with "
-                    "Single Vision."
-                )
-                continue
-
-        # Kryptok cannot conflict with other Bifocal designs
-        elif lens_type == "Kryptok Bifocal":
-            if has_progressive:
-                print(
-                    "Progressive cannot be used with "
-                    "Kryptok Bifocal."
-                )
-                continue
-
-            if has_d_bifocal:
-                print(
-                    "D Bifocal cannot be used with "
-                    "Kryptok Bifocal."
-                )
-                continue
-
-        # D Bifocal cannot conflict with Kryptok or Progressive
-        elif lens_type == "D Bifocal":
-            if has_kt:
-                print(
-                    "KT / Kryptok cannot be used with "
-                    "D Bifocal."
-                )
-                continue
-
-            if has_progressive:
-                print(
-                    "Progressive cannot be used with "
-                    "D Bifocal."
-                )
-                continue
-
-        # Progressive cannot contain Kryptok or D Bifocal
-        elif lens_type == "Progressive Bifocal":
-            if has_kt:
-                print(
-                    "KT / Kryptok cannot be used with "
-                    "Progressive Bifocal."
-                )
-                continue
-
-            if has_d_bifocal:
-                print(
-                    "D Bifocal cannot be used with "
-                    "Progressive Bifocal."
-                )
-                continue
-
-        break
-
-    lens_brand = input(
-        "Enter Lens Brand (Optional): "
-    ).strip().title()
-
-    lens_offer = input(
-        "Enter Lens Offer: "
-    ).strip()
-
-    while True:
-        lens_price_input = input("Enter Lens Price: ").strip()
-
-        try:
-            lens_price = float(lens_price_input)
-
-            if lens_price < 0:
-                print("Lens Price cannot be negative.")
-                continue
-
-            break
-
-        except ValueError:
-            print("Please enter Lens Price using numbers only.")
 else:
     lens_type = ""
     add_requirement = ""
@@ -2410,9 +4906,8 @@ else:
 # 3. SPECTACLE HISTORY
 # ==================================================
 
-print("\n--- Spectacle History ---")
 
-if customer_type == "2":
+if customer_type == "2" and order_type in ["2", "3"]:
     spectacle_history = "Existing"
 
     years_using_glasses = selected_customer[11]
@@ -2464,32 +4959,26 @@ if customer_type == "2":
 
 elif order_type in ["2", "3"]:
 
-    while True:
-        spectacle_history = input(
-            "Enter Spectacle History "
-            "(First-time / Existing): "
-        ).strip().lower()
+    print("\n--- Spectacle History ---")
 
-        if spectacle_history in [
-            "first-time",
-            "first time",
-            "first"
-        ]:
+    print("1. First-time Spectacle User")
+    print("2. Existing Spectacle User")
+
+    while True:
+        spectacle_history_choice = input(
+            "Select Spectacle History (1/2): "
+        ).strip()
+
+        if spectacle_history_choice == "1":
             spectacle_history = "First-time"
             break
 
-        elif spectacle_history in [
-            "existing",
-            "old"
-        ]:
+        elif spectacle_history_choice == "2":
             spectacle_history = "Existing"
             break
 
         else:
-            print(
-                "Please type First-time or Existing."
-            )
-
+            print("Please select 1 or 2.")
     if spectacle_history == "Existing":
 
         years_using_glasses = input(
@@ -2598,7 +5087,7 @@ elif order_type in ["2", "3"]:
 
 else:
     spectacle_history = "Not Applicable"
-    # ==================================================
+# ==================================================
 # 7. EYE SURGERY / IOL HISTORY
 # ==================================================
 
@@ -2607,7 +5096,13 @@ surgery_eye = ""
 right_iol = "No"
 left_iol = "No"
 
-if order_type in ["2", "3"]:
+if (
+    order_type in ["2", "3"]
+    and not (
+        "previous_prescription_action" in globals()
+        and previous_prescription_action == "use_same"
+    )
+):
 
     print("\n--- Eye Surgery / IOL History ---")
     print("1. No Eye Surgery")
@@ -2721,9 +5216,28 @@ if order_type in ["2", "3"]:
 # 8. CURRENT PRESCRIPTION
 # ==================================================
 
-if order_type in ["2", "3"]:
-    print("\n--- Current Prescription ---")
+if (
+    order_type in ["2", "3"]
+    and prescription_source == "Existing Prescription on Record"
+):
+    right_sph = previous_right_sph
+    right_cyl = previous_right_cyl
+    right_axis = previous_right_axis
+    right_add = previous_right_add
 
+    left_sph = previous_left_sph
+    left_cyl = previous_left_cyl
+    left_axis = previous_left_axis
+    left_add = previous_left_add
+
+    print("\n--- Current Prescription ---")
+    print(
+        "Existing prescription on record "
+        "loaded automatically."
+    )
+
+elif order_type in ["2", "3"]:
+    print("\n--- Current Prescription ---")
     print(
         "Enter power with + or - sign "
         "(Example: -2.00 or +1.50)"
@@ -2949,34 +5463,171 @@ else:
     left_va = ""
     right_pinhole = ""
     left_pinhole = ""
-
+distance_pd = ""
+near_pd = ""
+right_va = ""
+left_va = ""
+right_pinhole = ""
+left_pinhole = ""
 if order_type in ["2", "3"]:
-    print("\n--- Pupillary Distance (PD) (Optional) ---")
-    distance_pd = input(
-        "Enter Distance PD in mm (Example: 62): "
-    ).strip()
+    if not (
+        "previous_prescription_action" in globals()
+        and previous_prescription_action == "use_same"
+    ):
+        print("\n--- Pupillary Distance (PD) (Optional) ---")
+        distance_pd = input(
+            "Enter Distance PD in mm (Example: 62): "
+        ).strip()
 
-    near_pd = input(
-        "Enter Near PD in mm (Example: 59): "
-    ).strip()
+        near_pd = input(
+            "Enter Near PD in mm (Example: 59): "
+        ).strip()
 
-    print("\n--- Visual Acuity Test (Optional) ---")
+        print("\n--- Visual Acuity Test (Optional) ---")
 
-    right_va = input(
-        "Right Eye Visual Acuity (Example: 6/6): "
-    ).strip()
+        right_va = input(
+            "Right Eye Visual Acuity (Example: 6/6): "
+        ).strip()
 
-    left_va = input(
-        "Left Eye Visual Acuity (Example: 6/6): "
-    ).strip()
+        left_va = input(
+            "Left Eye Visual Acuity (Example: 6/6): "
+        ).strip()
 
-    right_pinhole = input(
-        "Right Eye Pinhole (Example: 6/6): "
-    ).strip()
+        right_pinhole = input(
+            "Right Eye Pinhole (Example: 6/6): "
+        ).strip()
 
-    left_pinhole = input(
-        "Left Eye Pinhole (Example: 6/6): "
-    ).strip()
+        left_pinhole = input(
+            "Left Eye Pinhole (Example: 6/6): "
+        ).strip()
+    # ==================================================
+    # LENS FEATURES / COATING VALIDATION
+    # ==================================================
+
+    while True:
+        lens_features = input(
+            "Enter Lens Features / Coating (Optional): "
+        ).strip().title()
+
+        normalized_features = (
+            lens_features.lower()
+            .replace(".", " ")
+            .replace("-", " ")
+            .replace("/", " ")
+            .replace(",", " ")
+            .replace("_", " ")
+        )
+
+        feature_words = normalized_features.split()
+
+        has_kt = (
+            "kt" in feature_words
+            or "kryptok" in feature_words
+        )
+
+        has_progressive = (
+            "progressive" in feature_words
+        )
+
+        has_d_bifocal = (
+            "d bifocal" in normalized_features
+            or "dbifocal" in normalized_features
+        )
+
+        # Single Vision cannot contain Bifocal design names
+        if lens_type == "Single Vision":
+            if has_kt:
+                print(
+                    "KT / Kryptok is a Bifocal type and "
+                    "cannot be used with Single Vision."
+                )
+                continue
+
+            if has_progressive:
+                print(
+                    "Progressive cannot be used with "
+                    "Single Vision."
+                )
+                continue
+
+            if has_d_bifocal:
+                print(
+                    "D Bifocal cannot be used with "
+                    "Single Vision."
+                )
+                continue
+
+        # Kryptok cannot conflict with other Bifocal designs
+        elif lens_type == "Kryptok Bifocal":
+            if has_progressive:
+                print(
+                    "Progressive cannot be used with "
+                    "Kryptok Bifocal."
+                )
+                continue
+
+            if has_d_bifocal:
+                print(
+                    "D Bifocal cannot be used with "
+                    "Kryptok Bifocal."
+                )
+                continue
+
+        # D Bifocal cannot conflict with Kryptok or Progressive
+        elif lens_type == "D Bifocal":
+            if has_kt:
+                print(
+                    "KT / Kryptok cannot be used with "
+                    "D Bifocal."
+                )
+                continue
+
+            if has_progressive:
+                print(
+                    "Progressive cannot be used with "
+                    "D Bifocal."
+                )
+                continue
+
+        # Progressive cannot contain Kryptok or D Bifocal
+        elif lens_type == "Progressive Bifocal":
+            if has_kt:
+                print(
+                    "KT / Kryptok cannot be used with "
+                    "Progressive Bifocal."
+                )
+                continue
+
+            if has_d_bifocal:
+                print(
+                    "D Bifocal cannot be used with "
+                    "Progressive Bifocal."
+                )
+                continue
+
+        break
+
+    lens_brand = input(
+        "Enter Lens Brand (Optional): "
+    ).strip().title()
+
+    lens_offer = normalize_offer(
+        input("Enter Lens Offer (Example: 10 or 10%): ")
+    )
+    while True:
+        lens_price_input = input("Enter Lens Price: ").strip()
+
+        try:
+            lens_price = float(lens_price_input)
+
+            if lens_price < 0:
+                print("Lens Price cannot be negative.")
+                continue
+
+            break
+
+        except ValueError:
+            print("Please enter Lens Price using numbers only.")
 # ==================================================
 # 11. PAYMENT DETAILS
 # ==================================================
@@ -3053,970 +5704,5418 @@ while True:
 
 # Automatic Balance Calculation
 balance = total_amount - advance_amount
-# ==================================================
-# REVIEW / EDIT BEFORE SAVE
-# ==================================================
+delivery_status = ""
+delivered_to = ""
+receiver_name = ""
+
+print("\n--- Delivery Status ---")
+print("1. Delivered")
+print("2. Pending")
 
 while True:
-
-    print("\n--- Review / Edit Before Save ---")
-    print("1. Edit Customer Name")
-    print("2. Edit Phone Number")
-    print("3. Edit Patient Age")
-    print("4. Edit Gender")
-    print("5. Edit Address")
-    print("6. Edit Frame Details")
-    print("7. Edit Lens Details")
-    print("8. Edit Eye Surgery / IOL")
-    print("9. Confirm & Save")
-
-
-    edit_choice = input(
-        "Select Option (1/2/3/4/5/6/7/8/9): "
+    delivery_choice = input(
+        "Select Delivery Status (1/2): "
     ).strip()
 
-    # ---------------- EDIT CUSTOMER NAME ----------------
-    if edit_choice == "1":
+    if delivery_choice == "1":
+        delivery_status = "Delivered"
+
+        print("\n--- Delivered To / Received By ---")
+        print("1. Customer / Same Person")
+        print("2. Other Person")
 
         while True:
-
-            new_customer_name = input(
-                "Enter Customer Name: "
-            ).strip().title()
-
-            if (
-                new_customer_name
-                and any(
-                    char.isalpha()
-                    for char in new_customer_name
-                )
-                and all(
-                    char.isalpha()
-                    or char.isspace()
-                    or char in [".", "'", "-"]
-                    for char in new_customer_name
-                )
-            ):
-                customer_name = new_customer_name
-                print("Customer Name updated.")
-                break
-
-            print(
-                "Invalid customer name. "
-                "Please enter a valid name using letters."
-            )
-
-    # ---------------- EDIT PHONE NUMBER ----------------
-    elif edit_choice == "2":
-
-        while True:
-
-            raw_phone = input(
-                "Enter Customer Phone Number "
-                "(Optional - press Enter if unavailable): "
+            delivered_to_choice = input(
+                "Select Delivered To (1/2): "
             ).strip()
 
-            if raw_phone == "":
-                phone = ""
-                print("Phone Number updated.")
+            if delivered_to_choice == "1":
+                delivered_to = "Customer / Same Person"
+                receiver_name = ""
                 break
 
-            clean_phone = normalize_indian_phone(
-                raw_phone
-            )
-
-            if (
-                clean_phone.isdigit()
-                and len(clean_phone) == 10
-                and clean_phone[0]
-                in ["6", "7", "8", "9"]
-            ):
-                phone = clean_phone
-                print("Phone Number updated.")
-                break
-
-            print(
-                "Invalid phone number. "
-                "Enter a valid Indian 10-digit mobile "
-                "number, optionally with +91, "
-                "or leave blank."
-            )
-
-    # ---------------- EDIT PATIENT AGE ----------------
-    elif edit_choice == "3":
-
-        while True:
-
-            age_input = input(
-                "Enter Patient Age "
-                "(Optional - press Enter if unknown): "
-            ).strip()
-
-            if age_input == "":
-                age = ""
-                print("Patient Age updated.")
-                break
-
-            if age_input.isdigit() and int(age_input) > 0:
-                age = int(age_input)
-                print("Patient Age updated.")
-                break
-
-            print(
-                "Please enter age using numbers only "
-                "or leave blank."
-            )
-    # ---------------- EDIT GENDER ----------------
-    elif edit_choice == "4":
-
-        print("\n--- Gender ---")
-        print("1. Male")
-        print("2. Female")
-
-        while True:
-
-            gender_choice = input(
-                "Select Gender (1/2): "
-            ).strip()
-
-            if gender_choice == "1":
-                gender = "Male"
-                print("Gender updated.")
-                break
-
-            elif gender_choice == "2":
-                gender = "Female"
-                print("Gender updated.")
+            elif delivered_to_choice == "2":
+                delivered_to = "Other Person"
+                receiver_name = input(
+                    "Enter Receiver Name "
+                    "(Optional - press Enter to skip): "
+                ).strip()
                 break
 
             else:
+                print("Please select 1 or 2.")
+
+        break
+
+    elif delivery_choice == "2":
+        delivery_status = "Pending"
+        delivered_to = ""
+        receiver_name = ""
+        break
+
+    else:
+        print("Please select 1 or 2.")
+# ==================================================
+# FINAL REVIEW BEFORE SAVE
+# ==================================================
+if customer_type in ["1", "2"] and order_type == "1":
+
+    while True:
+
+        # Always recalculate payment values
+        order_total = frame_price + lens_price
+        total_amount = order_total - less_amount
+        balance = total_amount - advance_amount
+
+        print("\n")
+        print("==================================================")
+        print("              FINAL REVIEW BEFORE SAVE")
+        print("==================================================")
+
+        print("\n--- ORDER ---")
+        print("Order Type : Frame Only")
+
+        print("\n1. Customer Details")
+        print(
+            f"   Name         : {customer_name}"
+        )
+        print(
+            f"   C/O / S/O    : "
+            f"{customer_relation if customer_relation else 'Not Provided'}"
+        )
+        print(
+            f"   Gender       : {gender}"
+        )
+        print(
+            f"   Age          : "
+            f"{age if age != '' else 'Not Provided'}"
+        )
+        print(
+            f"   Phone        : "
+            f"{phone if phone else 'Not Provided'}"
+        )
+        print(
+            f"   Town/Village : {address}"
+        )
+        print(
+            f"   Full Address : "
+            f"{full_address if full_address else 'Not Provided'}"
+        )
+
+        print("\n2. Frame Details")
+        print(
+            f"   Frame Details : "
+            f"{frame_details if frame_details else 'Not Provided'}"
+        )
+        print(
+            f"   Category      : "
+            f"{'Brand' if frame_category == '1' else 'Non-Brand'}"
+        )
+        print(
+            f"   Frame Brand   : {frame_brand}"
+        )
+        print(
+            f"   Frame Offer   : "
+            f"{frame_offer if frame_offer else 'None'}"
+        )
+        print(
+            f"   Frame Price   : ₹{frame_price:.2f}"
+        )
+
+        print("\n3. Payment Details")
+        print(
+            f"   Order Total    : ₹{order_total:.2f}"
+        )
+        print(
+            f"   Less Amount    : ₹{less_amount:.2f}"
+        )
+        print(
+            f"   Final Total    : ₹{total_amount:.2f}"
+        )
+        print(
+            f"   Advance Amount : ₹{advance_amount:.2f}"
+        )
+        print(
+            f"   Balance        : ₹{balance:.2f}"
+        )
+
+        print("\n4. Delivery Details")
+        print(
+            f"   Delivery Status : {delivery_status}"
+        )
+
+        if delivery_status == "Delivered":
+            print(
+                f"   Delivered To    : {delivered_to}"
+            )
+
+            if (
+                delivered_to == "Other Person"
+                and receiver_name
+            ):
                 print(
-                    "Please select 1 for Male or 2 for Female."
+                    f"   Receiver Name   : {receiver_name}"
                 )
-    # ---------------- EDIT ADDRESS ----------------
-    elif edit_choice == "5":
 
-        while True:
+        print("\n--------------------------------------------------")
+        print("--- Review / Edit Options ---")
+        print("1. Customer Details")
+        print("2. Frame Details")
+        print("3. Payment Details")
+        print("4. Delivery Details")
+        print("5. Confirm & Save")
+        print("6. Cancel / Exit Without Saving")
+        print("--------------------------------------------------")
+        review_choice = input(
+            "Select Section / Action (1/2/3/4/5/6): "
+        ).strip()
 
-            new_address = input(
-                "Enter Town / Village (Required): "
-            ).strip().title()
+        if review_choice == "5":
+            break
 
-            if (
-                new_address
-                and any(
-                    char.isalpha()
-                    for char in new_address
-                )
-                and all(
-                    char.isalpha()
-                    or char.isdigit()
-                    or char.isspace()
-                    or char in [".", ",", "-", "'"]
-                    for char in new_address
-                )
-            ):
-                address = new_address
-                break
-
+        if review_choice == "6":
             print(
-                "Please enter a valid Town / Village name."
+                "\nOrder cancelled. "
+                "No customer/order data was saved."
             )
+            raise SystemExit
 
-        full_address = input(
-            "Enter Full Address "
-            "(Optional - press Enter to skip): "
-        ).strip().title()
-
-        print("Address updated.")
-    # ---------------- EDIT FRAME DETAILS ----------------
-    elif edit_choice == "6":
-
-        if order_type not in ["1", "3"]:
-            print(
-                "Frame Details are not applicable "
-                "for this order."
-            )
-
-        else:
-
-            frame_details = input(
-                "Enter Frame Details: "
-            ).strip()
-
-            print("\n--- Frame Category ---")
-            print("1. Brand")
-            print("2. Non-Brand")
+        if review_choice == "1":
 
             while True:
 
-                frame_category = input(
-                    "Select Frame Category (1/2): "
+                print("\n--- Edit Customer Details ---")
+                print("1. Customer Name")
+                print("2. C/O / S/O Details")
+                print("3. Gender")
+                print("4. Age")
+                print("5. Phone")
+                print("6. Town / Village")
+                print("7. Full Address")
+                print("8. Back")
+
+                customer_edit_choice = input(
+                    "Select Field (1/2/3/4/5/6/7/8): "
                 ).strip()
 
-                if frame_category in ["1", "2"]:
+                if customer_edit_choice == "8":
                     break
 
-                print("Please enter 1 or 2 only.")
-
-            if frame_category == "1":
-                frame_brand = input(
-                    "Enter Frame Brand: "
-                ).strip()
-            else:
-                frame_brand = "Non-Brand"
-
-            frame_offer = input(
-                "Enter Frame Offer: "
-            ).strip()
-
-            while True:
-
-                try:
-                    frame_price = float(
-                        input(
-                            "Enter Frame Price: "
-                        ).strip()
-                    )
-
-                    if frame_price < 0:
-                        print(
-                            "Frame Price cannot be negative."
-                        )
-                        continue
-
-                    break
-
-                except ValueError:
+                if customer_edit_choice not in [
+                    "1", "2", "3", "4",
+                    "5", "6", "7"
+                ]:
                     print(
-                        "Please enter Frame Price "
-                        "using numbers only."
+                        "Please select a number from 1 to 8."
                     )
+                    continue
 
-            order_total = frame_price + lens_price
-
-            if less_amount > order_total:
-                less_amount = 0.0
-
-            total_amount = order_total - less_amount
-
-            if advance_amount > total_amount:
-                advance_amount = total_amount
-
-            balance = total_amount - advance_amount
-
-            print("Frame Details updated.")
-            print(
-                f"Updated Order Total: ₹{order_total:.2f}"
-            )
-            print(
-                f"Updated Final Total: ₹{total_amount:.2f}"
-            )
-            print(
-                f"Updated Balance: ₹{balance:.2f}"
-            )
-    # ---------------- EDIT LENS DETAILS ----------------
-    elif edit_choice == "7":
-
-        if order_type not in ["2", "3"]:
-            print(
-                "Lens Details are not applicable "
-                "for this order."
-            )
-
-        else:
-            print("\n--- Edit Lens Details ---")
-
-            print("\n--- Lens Type ---")
-            print("1. Single Vision")
-            print("2. Bifocal")
-
-            add_requirement = ""
-
-            while True:
-
-                lens_type_choice = input(
-                    "Select Lens Type (1/2): "
-                ).strip()
-
-                if lens_type_choice == "1":
-                    lens_type = "Single Vision"
-                    right_add = ""
-                    left_add = ""
-                    break
-
-                elif lens_type_choice == "2":
-
-                    print("\n--- Bifocal Type ---")
-                    print("1. Kryptok Bifocal")
-                    print("2. D Bifocal")
-                    print("3. Progressive Bifocal")
-                    print("4. Other")
+                if customer_edit_choice == "1":
 
                     while True:
 
-                        bifocal_choice = input(
-                            "Select Bifocal Type (1/2/3/4): "
+                        new_customer_name = input(
+                            "Enter Customer Name: "
+                        ).strip().title()
+
+                        if (
+                            new_customer_name
+                            and all(
+                                char.isalnum()
+                                or char.isspace()
+                                or char in [".", "'", "-"]
+                                for char in new_customer_name
+                            )
+                        ):
+                            customer_name = new_customer_name
+                            print(
+                                "Customer Name updated successfully."
+                            )
+                            break
+
+                        print(
+                            "Invalid customer name. "
+                            "Letters and numbers are allowed."
+                        )
+
+                    continue
+
+                if customer_edit_choice == "2":
+
+                    customer_relation = input(
+                        "Enter C/O / S/O Details "
+                        "(Optional - press Enter to clear): "
+                    ).strip()
+
+                    print(
+                        "C/O / S/O Details updated successfully."
+                    )
+
+                    continue
+
+                if customer_edit_choice == "3":
+
+                    print("\n--- Gender ---")
+                    print("1. Male")
+                    print("2. Female")
+
+                    while True:
+
+                        new_gender_choice = input(
+                            "Select Gender (1/2): "
                         ).strip()
 
-                        if bifocal_choice == "1":
-                            lens_type = "Kryptok Bifocal"
+                        if new_gender_choice == "1":
+                            gender = "Male"
                             break
 
-                        elif bifocal_choice == "2":
-                            lens_type = "D Bifocal"
+                        if new_gender_choice == "2":
+                            gender = "Female"
                             break
 
-                        elif bifocal_choice == "3":
-                            lens_type = "Progressive Bifocal"
+                        print(
+                            "Please select 1 for Male "
+                            "or 2 for Female."
+                        )
+
+                    print(
+                        "Gender updated successfully."
+                    )
+
+                    continue
+
+                if customer_edit_choice == "4":
+
+                    while True:
+
+                        new_age_input = input(
+                            "Enter Patient Age "
+                            "(Optional - press Enter if unknown): "
+                        ).strip()
+
+                        if new_age_input == "":
+                            age = ""
                             break
 
-                        elif bifocal_choice == "4":
-                            lens_type = "Other"
+                        if (
+                            new_age_input.isdigit()
+                            and int(new_age_input) > 0
+                        ):
+                            age = int(new_age_input)
                             break
 
-                        else:
-                            print(
-                                "Invalid option. "
-                                "Please select 1, 2, 3 or 4."
+                        print(
+                            "Please enter age using "
+                            "numbers only."
+                        )
+
+                    print(
+                        "Age updated successfully."
+                    )
+
+                    continue
+
+                if customer_edit_choice == "5":
+
+                    while True:
+
+                        raw_phone = input(
+                            "Enter Customer Phone Number "
+                            "(Optional - press Enter if unavailable): "
+                        ).strip()
+
+                        if raw_phone == "":
+                            phone = ""
+                            break
+
+                        normalized_phone = normalize_indian_phone(
+                            raw_phone
+                        )
+
+                        if (
+                            len(normalized_phone) == 10
+                            and normalized_phone.isdigit()
+                            and normalized_phone[0] in "6789"
+                        ):
+                            phone = normalized_phone
+                            break
+
+                        print(
+                            "Invalid phone number. "
+                            "Enter a valid Indian mobile number."
+                        )
+
+                    print(
+                        "Phone updated successfully."
+                    )
+
+                    continue
+
+                if customer_edit_choice == "6":
+
+                    while True:
+
+                        new_address = input(
+                            "Enter Town / Village (Required): "
+                        ).strip().title()
+
+                        if (
+                            new_address
+                            and any(
+                                char.isalpha()
+                                for char in new_address
+                            )
+                            and all(
+                                char.isalnum()
+                                or char.isspace()
+                                or char in [".", ",", "-", "'"]
+                                for char in new_address
+                            )
+                        ):
+                            address = new_address
+                            break
+
+                        print(
+                            "Invalid Town / Village. "
+                            "Letters and numbers are allowed."
+                        )
+
+                    print(
+                        "Town / Village updated successfully."
+                    )
+
+                    continue
+
+                if customer_edit_choice == "7":
+
+                    full_address = input(
+                        "Enter Full Address "
+                        "(Optional - press Enter to clear): "
+                    ).strip().title()
+
+                    print(
+                        "Full Address updated successfully."
+                    )
+
+                    continue
+
+                print(
+                    "Please select a number from 1 to 8."
+                )
+            continue
+
+        if review_choice == "2":
+            while True:
+
+                print("\n--- Edit Frame Details ---")
+                print("1. Frame Details")
+                print("2. Frame Category")
+
+                if frame_category == "1":
+                    print("3. Frame Brand")
+                    print("4. Frame Offer")
+                    print("5. Frame Price")
+                    print("6. Back")
+                else:
+                    print("3. Frame Offer")
+                    print("4. Frame Price")
+                    print("5. Back")
+
+                frame_edit_choice = input(
+                    "Select Field / Back: "
+                ).strip()
+
+                if (
+                    frame_category == "1"
+                    and frame_edit_choice == "6"
+                ):
+                    break
+
+                if (
+                    frame_category == "2"
+                    and frame_edit_choice == "5"
+                ):
+                    break
+
+                if frame_edit_choice == "1":
+
+                    frame_details = input(
+                        "Enter Frame Details: "
+                    ).strip()
+
+                    print(
+                        "Frame Details updated successfully."
+                    )
+
+                    continue
+
+                if frame_edit_choice == "2":
+
+                    print("\n--- Frame Category ---")
+                    print("1. Brand")
+                    print("2. Non-Brand")
+
+                    while True:
+
+                        new_frame_category = input(
+                            "Select Frame Category (1/2): "
+                        ).strip()
+
+                        if new_frame_category == "1":
+                            frame_category = "1"
+
+                            frame_brand = input(
+                                "Enter Frame Brand: "
+                            ).strip()
+
+                            break
+
+                        if new_frame_category == "2":
+                            frame_category = "2"
+                            frame_brand = "Non-Brand"
+                            break
+
+                        print(
+                            "Please enter 1 or 2 only."
+                        )
+
+                    print(
+                        "Frame Category updated successfully."
+                    )
+
+                    continue
+
+                if (
+                    frame_category == "1"
+                    and frame_edit_choice == "3"
+                ):
+
+                    frame_brand = input(
+                        "Enter Frame Brand: "
+                    ).strip()
+
+                    print(
+                        "Frame Brand updated successfully."
+                    )
+
+                    continue
+
+                if (
+                    (
+                        frame_category == "1"
+                        and frame_edit_choice == "4"
+                    )
+                    or (
+                        frame_category == "2"
+                        and frame_edit_choice == "3"
+                    )
+                ):
+
+                    frame_offer = normalize_offer(
+                        input("Enter Frame Offer (Example: 10 or 10%): ")
+                    )
+                    print(
+                        "Frame Offer updated successfully."
+                    )
+
+                    continue
+
+                if (
+                    (
+                        frame_category == "1"
+                        and frame_edit_choice == "5"
+                    )
+                    or (
+                        frame_category == "2"
+                        and frame_edit_choice == "4"
+                    )
+                ):
+
+                    while True:
+
+                        try:
+                            new_frame_price = float(
+                                input(
+                                    "Enter Frame Price: "
+                                ).strip()
                             )
 
-                    print("\n--- ADD Requirement ---")
+                            if new_frame_price < 0:
+                                print(
+                                    "Frame Price cannot be negative."
+                                )
+                                continue
+
+                            new_order_total = (
+                                new_frame_price + lens_price
+                            )
+
+                            if less_amount > new_order_total:
+                                print(
+                                    "Frame Price cannot be reduced "
+                                    "to this amount because the current "
+                                    "Less Amount would be greater than "
+                                    "Order Total."
+                                )
+                                continue
+
+                            new_total_amount = (
+                                new_order_total - less_amount
+                            )
+
+                            if advance_amount > new_total_amount:
+                                print(
+                                    "Frame Price cannot be reduced "
+                                    "to this amount because the current "
+                                    "Advance Amount would be greater than "
+                                    "Final Total Amount."
+                                )
+                                continue
+
+                            frame_price = new_frame_price
+                            break
+
+                        except ValueError:
+                            print(
+                                "Please enter Frame Price "
+                                "using numbers only."
+                            )
+
+                    print(
+                        "Frame Price updated successfully."
+                    )
+
+                    continue
+
+                print(
+                    "Please select a valid Frame Details option."
+                )
+            continue
+
+        if review_choice in ["3", "4"]:
+          if review_choice == "3":
+
+            while True:
+
+                print("\n--- Edit Payment Details ---")
+                print(f"Order Total    : ₹{order_total:.2f}")
+                print(f"Less Amount    : ₹{less_amount:.2f}")
+                print(f"Final Total    : ₹{total_amount:.2f}")
+                print(f"Advance Amount : ₹{advance_amount:.2f}")
+                print(f"Balance        : ₹{balance:.2f}")
+
+                print("\n1. Less Amount")
+                print("2. Advance Amount")
+                print("3. Back")
+
+                payment_edit_choice = input(
+                    "Select Field / Back (1/2/3): "
+                ).strip()
+
+                if payment_edit_choice == "3":
+                    break
+
+                if payment_edit_choice == "1":
+
+                    while True:
+
+                        new_less_input = input(
+                            "Enter Less Amount "
+                            "(Optional - press Enter for 0): "
+                        ).strip()
+
+                        if new_less_input == "":
+                            new_less_amount = 0.0
+                        else:
+                            try:
+                                new_less_amount = float(
+                                    new_less_input
+                                )
+                            except ValueError:
+                                print(
+                                    "Please enter Less Amount "
+                                    "using numbers only."
+                                )
+                                continue
+
+                        if new_less_amount < 0:
+                            print(
+                                "Less Amount cannot be negative."
+                            )
+                            continue
+
+                        if new_less_amount > order_total:
+                            print(
+                                "Less Amount cannot be greater "
+                                "than Order Total."
+                            )
+                            continue
+
+                        new_total_amount = (
+                            order_total - new_less_amount
+                        )
+
+                        if advance_amount > new_total_amount:
+                            print(
+                                "This Less Amount cannot be used "
+                                "because the current Advance Amount "
+                                "would be greater than "
+                                "Final Total Amount."
+                            )
+                            continue
+
+                        less_amount = new_less_amount
+                        total_amount = new_total_amount
+                        balance = (
+                            total_amount - advance_amount
+                        )
+                        break
+
+                    print(
+                        "Less Amount updated successfully."
+                    )
+
+                    continue
+
+                if payment_edit_choice == "2":
+
+                    while True:
+
+                        new_advance_input = input(
+                            "Enter Advance Amount: "
+                        ).strip()
+
+                        try:
+                            new_advance_amount = float(
+                                new_advance_input
+                            )
+
+                            if new_advance_amount < 0:
+                                print(
+                                    "Advance amount cannot be negative."
+                                )
+                                continue
+
+                            if new_advance_amount > total_amount:
+                                print(
+                                    "Advance amount cannot be greater "
+                                    "than Final Total Amount."
+                                )
+                                continue
+
+                            advance_amount = new_advance_amount
+                            balance = (
+                                total_amount - advance_amount
+                            )
+                            break
+
+                        except ValueError:
+                            print(
+                                "Please enter amount "
+                                "using numbers only."
+                            )
+
+                    print(
+                        "Advance Amount updated successfully."
+                    )
+
+                    continue
+
+                print(
+                    "Please select 1, 2 or 3."
+                )
+            continue
+
+        if review_choice == "4":
+
+            while True:
+
+                print("\n--- Edit Delivery Details ---")
+                print("1. Delivery Status")
+
+                if delivery_status == "Pending":
+                    print("2. Back")
+
+                elif (
+                    delivery_status == "Delivered"
+                    and delivered_to == "Customer / Same Person"
+                ):
+                    print("2. Delivered To")
+                    print("3. Back")
+
+                else:
+                    print("2. Delivered To")
+                    print("3. Receiver Name")
+                    print("4. Back")
+
+                delivery_edit_choice = input(
+                    "Select Field / Back: "
+                ).strip()
+
+                if (
+                    delivery_status == "Pending"
+                    and delivery_edit_choice == "2"
+                ):
+                    break
+
+                if (
+                    delivery_status == "Delivered"
+                    and delivered_to == "Customer / Same Person"
+                    and delivery_edit_choice == "3"
+                ):
+                    break
+
+                if (
+                    delivery_status == "Delivered"
+                    and delivered_to == "Other Person"
+                    and delivery_edit_choice == "4"
+                ):
+                    break
+
+                if delivery_edit_choice == "1":
+
+                    while True:
+
+                        print("\n--- Delivery Status ---")
+                        print("1. Delivered")
+                        print("2. Pending")
+
+                        new_delivery_choice = input(
+                            "Select Delivery Status (1/2): "
+                        ).strip()
+
+                        if new_delivery_choice == "1":
+                            delivery_status = "Delivered"
+                            delivered_to = "Customer / Same Person"
+                            receiver_name = ""
+                            break
+
+                        if new_delivery_choice == "2":
+                            delivery_status = "Pending"
+                            delivered_to = ""
+                            receiver_name = ""
+                            break
+
+                        print("Please select 1 or 2.")
+
+                    print(
+                        "Delivery Status updated successfully."
+                    )
+
+                    continue
+
+                if (
+                    delivery_status == "Delivered"
+                    and delivery_edit_choice == "2"
+                ):
+
+                    while True:
+
+                        print("\n--- Delivered To ---")
+                        print("1. Customer / Same Person")
+                        print("2. Other Person")
+
+                        new_delivered_to_choice = input(
+                            "Select Delivered To (1/2): "
+                        ).strip()
+
+                        if new_delivered_to_choice == "1":
+                            delivered_to = (
+                                "Customer / Same Person"
+                            )
+                            receiver_name = ""
+                            break
+
+                        if new_delivered_to_choice == "2":
+                            delivered_to = "Other Person"
+                            receiver_name = ""
+                            break
+
+                        print("Please select 1 or 2.")
+
+                    print(
+                        "Delivered To updated successfully."
+                    )
+
+                    continue
+
+                if (
+                    delivery_status == "Delivered"
+                    and delivered_to == "Other Person"
+                    and delivery_edit_choice == "3"
+                ):
+                    receiver_name = input(
+                        "Enter Receiver Name "
+                        "(Optional - press Enter to skip): "
+                    ).strip().title()
+
+                    print(
+                        "Receiver Name updated successfully."
+                    )
+
+                    continue
+
+                print(
+                    "Please select a valid "
+                    "Delivery Details option."
+                )
+            continue
+        print("Please select 1, 2, 3, 4, 5 or 6.")
+# ==================================================
+# NEW CUSTOMER - LENSES ONLY FINAL REVIEW
+# ==================================================
+
+if customer_type in ["1", "2"] and order_type == "2":
+    while True:
+
+        # Always recalculate payment values
+        order_total = frame_price + lens_price
+        total_amount = order_total - less_amount
+        balance = total_amount - advance_amount
+
+        print("\n")
+        print("==================================================")
+        print("              FINAL REVIEW BEFORE SAVE")
+        print("==================================================")
+
+        print("\n--- ORDER ---")
+        print("Order Type : Lenses Only")
+
+        print("\n1. Customer Details")
+        print(f"   Name         : {customer_name}")
+        print(
+            f"   C/O / S/O    : "
+            f"{customer_relation if customer_relation else 'Not Provided'}"
+        )
+        print(f"   Gender       : {gender}")
+        print(
+            f"   Age          : "
+            f"{age if age else 'Not Provided'}"
+        )
+        print(
+            f"   Phone        : "
+            f"{phone if phone else 'Not Provided'}"
+        )
+        print(f"   Town/Village : {address}")
+        print(
+            f"   Full Address : "
+            f"{full_address if full_address else 'Not Provided'}"
+        )
+
+        print("\n2. Prescription & Eye Details")
+        print(f"   Source       : {prescription_source}")
+
+        if (
+            prescription_source == "External Prescription"
+            and prescription_from
+        ):
+            print(f"   From         : {prescription_from}")
+
+        print(f"   History      : {spectacle_history}")
+
+        if spectacle_history == "Existing":
+            print(
+                f"   Using Glasses: "
+                f"{years_using_glasses if years_using_glasses else 'Not Recorded'}"
+            )
+
+        print(
+            f"   Eye Surgery  : "
+            f"{eye_surgery}"
+        )
+
+        if eye_surgery == "Yes":
+            print(f"   Surgery Eye  : {surgery_eye}")
+
+            if surgery_eye in ["Right Eye (OD)", "Both Eyes"]:
+                print(f"   Right IOL    : {right_iol}")
+
+            if surgery_eye in ["Left Eye (OS)", "Both Eyes"]:
+                print(f"   Left IOL     : {left_iol}")
+
+        print("\n   Current Prescription")
+        print(
+            f"   OD: SPH {right_sph} | "
+            f"CYL {right_cyl if right_cyl else '0'} | "
+            f"AXIS {right_axis if right_axis else 'Not Required'} | "
+            f"ADD {right_add if right_add else 'Not Required'}"
+        )
+        print(
+            f"   OS: SPH {left_sph} | "
+            f"CYL {left_cyl if left_cyl else '0'} | "
+            f"AXIS {left_axis if left_axis else 'Not Required'} | "
+            f"ADD {left_add if left_add else 'Not Required'}"
+        )
+
+        print("\n3. Lens Details")
+        print(f"   Lens Type    : {lens_type}")
+
+        if lens_type != "Single Vision":
+            if add_requirement == "1":
+                add_display = "Both Eyes"
+            elif add_requirement == "2":
+                add_display = "Right Eye (OD) Only"
+            elif add_requirement == "3":
+                add_display = "Left Eye (OS) Only"
+            else:
+                add_display = "Not Recorded"
+
+            print(f"   ADD Required : {add_display}")
+
+        print(
+            f"   Features     : "
+            f"{lens_features if lens_features else 'Not Provided'}"
+        )
+        print(
+            f"   Brand        : "
+            f"{lens_brand if lens_brand else 'Not Provided'}"
+        )
+        print(
+            f"   Offer        : "
+            f"{lens_offer if lens_offer else 'Not Provided'}"
+        )
+        print(f"   Lens Price   : ₹{lens_price:.2f}")
+
+        print("\n4. Payment Details")
+        print(f"   Order Total  : ₹{order_total:.2f}")
+        print(f"   Less Amount  : ₹{less_amount:.2f}")
+        print(f"   Final Total  : ₹{total_amount:.2f}")
+        print(f"   Advance      : ₹{advance_amount:.2f}")
+        print(f"   Balance      : ₹{balance:.2f}")
+
+        print("\n5. Delivery Details")
+        print(f"   Status       : {delivery_status}")
+
+        if delivery_status == "Delivered":
+            print(f"   Delivered To : {delivered_to}")
+
+            if delivered_to == "Other Person":
+                print(
+                    f"   Receiver     : "
+                    f"{receiver_name if receiver_name else 'Not Provided'}"
+                )
+
+        print("\n--------------------------------------------------")
+        print("--- Review / Edit Options ---")
+        print("1. Customer Details")
+        print("2. Prescription & Eye Details")
+        print("3. Lens Details")
+        print("4. Payment Details")
+        print("5. Delivery Details")
+        print("6. Confirm & Save")
+        print("7. Cancel / Exit Without Saving")
+        print("--------------------------------------------------")
+
+        review_choice = input(
+            "Select Review / Edit Option (1/2/3/4/5/6/7): "
+        ).strip()
+
+        if review_choice == "6":
+            add_missing = False
+
+            if lens_type_choice == "2":
+                if (
+                    add_requirement in ["1", "2"]
+                    and right_add in ["", "0"]
+                ):
+                    print(
+                        "\nRight Eye (OD) ADD is required "
+                        "for this Bifocal order."
+                    )
+                    add_missing = True
+
+                if (
+                    add_requirement in ["1", "3"]
+                    and left_add in ["", "0"]
+                ):
+                    print(
+                        "\nLeft Eye (OS) ADD is required "
+                        "for this Bifocal order."
+                    )
+                    add_missing = True
+
+            if add_missing:
+                print(
+                    "Please edit Current Prescription "
+                    "and enter the required ADD power."
+                )
+                continue
+
+            print(
+                "\nFinal review confirmed. "
+                "Saving customer/order record..."
+            )
+            break
+        if review_choice == "7":
+            print(
+                "\nOrder cancelled. "
+                "No customer/order data was saved."
+            )
+            raise SystemExit
+
+        if review_choice == "1":
+
+            while True:
+
+                print("\n--- Edit Customer Details ---")
+                print("1. Customer Name")
+                print("2. C/O / S/O Details")
+                print("3. Gender")
+                print("4. Age")
+                print("5. Phone")
+                print("6. Town / Village")
+                print("7. Full Address")
+                print("8. Back")
+
+                customer_edit_choice = input(
+                    "Select Field (1/2/3/4/5/6/7/8): "
+                ).strip()
+
+                if customer_edit_choice == "8":
+                    break
+
+                if customer_edit_choice not in [
+                    "1", "2", "3", "4",
+                    "5", "6", "7"
+                ]:
+                    print(
+                        "Please select a number from 1 to 8."
+                    )
+                    continue
+
+                if customer_edit_choice == "1":
+
+                    while True:
+
+                        new_customer_name = input(
+                            "Enter Customer Name: "
+                        ).strip().title()
+
+                        if (
+                            new_customer_name
+                            and all(
+                                char.isalnum()
+                                or char.isspace()
+                                or char in [".", "'", "-"]
+                                for char in new_customer_name
+                            )
+                        ):
+                            customer_name = new_customer_name
+                            print(
+                                "Customer Name updated successfully."
+                            )
+                            break
+
+                        print(
+                            "Invalid customer name. "
+                            "Letters and numbers are allowed."
+                        )
+
+                    continue
+
+                if customer_edit_choice == "2":
+
+                    customer_relation = input(
+                        "Enter C/O / S/O Details "
+                        "(Optional - press Enter to clear): "
+                    ).strip()
+
+                    print(
+                        "C/O / S/O Details updated successfully."
+                    )
+
+                    continue
+
+                if customer_edit_choice == "3":
+
+                    print("\n--- Gender ---")
+                    print("1. Male")
+                    print("2. Female")
+
+                    while True:
+
+                        new_gender_choice = input(
+                            "Select Gender (1/2): "
+                        ).strip()
+
+                        if new_gender_choice == "1":
+                            gender = "Male"
+                            break
+
+                        if new_gender_choice == "2":
+                            gender = "Female"
+                            break
+
+                        print(
+                            "Please select 1 for Male "
+                            "or 2 for Female."
+                        )
+
+                    print("Gender updated successfully.")
+                    continue
+
+                if customer_edit_choice == "4":
+
+                    while True:
+
+                        new_age_input = input(
+                            "Enter Patient Age "
+                            "(Optional - press Enter if unknown): "
+                        ).strip()
+
+                        if new_age_input == "":
+                            age = ""
+                            break
+
+                        if (
+                            new_age_input.isdigit()
+                            and int(new_age_input) > 0
+                        ):
+                            age = int(new_age_input)
+                            break
+
+                        print(
+                            "Please enter age using "
+                            "numbers only."
+                        )
+
+                    print("Age updated successfully.")
+                    continue
+
+                if customer_edit_choice == "5":
+
+                    while True:
+
+                        raw_phone = input(
+                            "Enter Customer Phone Number "
+                            "(Optional - press Enter if unavailable): "
+                        ).strip()
+
+                        if raw_phone == "":
+                            phone = ""
+                            break
+
+                        normalized_phone = normalize_indian_phone(
+                            raw_phone
+                        )
+
+                        if (
+                            len(normalized_phone) == 10
+                            and normalized_phone.isdigit()
+                            and normalized_phone[0] in "6789"
+                        ):
+                            phone = normalized_phone
+                            break
+
+                        print(
+                            "Invalid phone number. "
+                            "Enter a valid Indian mobile number."
+                        )
+
+                    print("Phone updated successfully.")
+                    continue
+
+                if customer_edit_choice == "6":
+
+                    while True:
+
+                        new_address = input(
+                            "Enter Town / Village (Required): "
+                        ).strip().title()
+
+                        if (
+                            new_address
+                            and any(
+                                char.isalpha()
+                                for char in new_address
+                            )
+                            and all(
+                                char.isalnum()
+                                or char.isspace()
+                                or char in [".", ",", "-", "'"]
+                                for char in new_address
+                            )
+                        ):
+                            address = new_address
+                            break
+
+                        print(
+                            "Invalid Town / Village. "
+                            "Letters and numbers are allowed."
+                        )
+
+                    print(
+                        "Town / Village updated successfully."
+                    )
+                    continue
+
+                if customer_edit_choice == "7":
+
+                    full_address = input(
+                        "Enter Full Address "
+                        "(Optional - press Enter to clear): "
+                    ).strip().title()
+
+                    print(
+                        "Full Address updated successfully."
+                    )
+                    continue
+
+            continue
+
+        if review_choice == "2":
+
+            while True:
+
+                has_previous_rx = (
+                    spectacle_history == "Existing"
+                    and "has_previous_prescription" in globals()
+                    and has_previous_prescription == "y"
+                )
+
+                print("\n--- Prescription & Eye Details ---")
+                print("1. Prescription Source")
+                print("2. Spectacle History")
+
+                if has_previous_rx:
+                    print("3. Previous Prescription")
+                    print("4. Eye Surgery / IOL History")
+                    print("5. Current Prescription")
+                    print("6. PD / Vision Details")
+                    print("7. Back")
+                else:
+                    print("3. Eye Surgery / IOL History")
+                    print("4. Current Prescription")
+                    print("5. PD / Vision Details")
+                    print("6. Back")
+
+                prescription_edit_choice = input(
+                    "Select Field / Section: "
+                ).strip()
+
+                if (
+                    has_previous_rx
+                    and prescription_edit_choice == "7"
+                ):
+                    break
+
+                if (
+                    not has_previous_rx
+                    and prescription_edit_choice == "6"
+                ):
+                    break
+
+                # ------------------------------------------
+                # 1. PRESCRIPTION SOURCE
+                # ------------------------------------------
+                if prescription_edit_choice == "1":
+
+                    print("\n--- Edit Prescription Source ---")
+                    print("1. In-Store Refraction")
+                    print("2. External Prescription")
+
+                    while True:
+
+                        new_source_choice = input(
+                            "Select Prescription Source (1/2): "
+                        ).strip()
+
+                        if new_source_choice == "1":
+                            prescription_source = (
+                                "In-Store Refraction"
+                            )
+                            prescription_from = ""
+                            break
+
+                        if new_source_choice == "2":
+                            prescription_source = (
+                                "External Prescription"
+                            )
+
+                            prescription_from = input(
+                                "Prescription From "
+                                "(Optional - Hospital / Doctor / "
+                                "Optical Shop): "
+                            ).strip()
+
+                            break
+
+                        print("Please select 1 or 2.")
+
+                    print(
+                        "Prescription Source updated successfully."
+                    )
+                    continue
+
+                # ------------------------------------------
+                # 2. SPECTACLE HISTORY
+                # ------------------------------------------
+                if prescription_edit_choice == "2":
+
+                    print("\n--- Edit Spectacle History ---")
+                    print("1. First-time Spectacle User")
+                    print("2. Existing Spectacle User")
+
+                    while True:
+
+                        new_history_choice = input(
+                            "Select Spectacle History (1/2): "
+                        ).strip()
+
+                        if new_history_choice == "1":
+
+                            spectacle_history = "First-time"
+                            years_using_glasses = ""
+                            has_previous_prescription = "n"
+
+                            previous_prescription_date = ""
+
+                            previous_right_sph = ""
+                            previous_right_cyl = ""
+                            previous_right_axis = ""
+                            previous_right_add = ""
+
+                            previous_left_sph = ""
+                            previous_left_cyl = ""
+                            previous_left_axis = ""
+                            previous_left_add = ""
+
+                            print(
+                                "Spectacle History updated to "
+                                "First-time."
+                            )
+                            break
+
+                        if new_history_choice == "2":
+
+                            spectacle_history = "Existing"
+
+                            years_using_glasses = input(
+                                "How long have you been "
+                                "using glasses?: "
+                            ).strip()
+
+                            print(
+                                "\nDo you have previous "
+                                "prescription details?"
+                            )
+                            print("1. Yes")
+                            print("2. No")
+
+                            while True:
+
+                                previous_rx_choice = input(
+                                    "Select (1/2): "
+                                ).strip()
+
+                                if previous_rx_choice == "1":
+                                    has_previous_prescription = "y"
+                                    break
+
+                                if previous_rx_choice == "2":
+                                    has_previous_prescription = "n"
+
+                                    previous_prescription_date = ""
+
+                                    previous_right_sph = ""
+                                    previous_right_cyl = ""
+                                    previous_right_axis = ""
+                                    previous_right_add = ""
+
+                                    previous_left_sph = ""
+                                    previous_left_cyl = ""
+                                    previous_left_axis = ""
+                                    previous_left_add = ""
+
+                                    break
+
+                                print(
+                                    "Please select 1 for Yes "
+                                    "or 2 for No."
+                                )
+
+                            print(
+                                "Spectacle History updated "
+                                "successfully."
+                            )
+                            break
+
+                        print("Please select 1 or 2.")
+
+                    continue
+
+                # ------------------------------------------
+                # 3. PREVIOUS PRESCRIPTION
+                # Only shown when previous Rx is available
+                # ------------------------------------------
+                if (
+                    has_previous_rx
+                    and prescription_edit_choice == "3"
+                ):
+
+                    while True:
+
+                        print("\n--- Edit Previous Prescription ---")
+                        print(
+                            "1. Previous Prescription Date"
+                        )
+                        print("2. Right Eye (OD) SPH")
+                        print("3. Right Eye (OD) CYL")
+                        print("4. Right Eye (OD) AXIS")
+                        print("5. Right Eye (OD) ADD")
+                        print("6. Left Eye (OS) SPH")
+                        print("7. Left Eye (OS) CYL")
+                        print("8. Left Eye (OS) AXIS")
+                        print("9. Left Eye (OS) ADD")
+                        print("10. Back")
+
+                        previous_edit_choice = input(
+                            "Select Field (1-10): "
+                        ).strip()
+
+                        if previous_edit_choice == "10":
+                            break
+
+                        if previous_edit_choice == "1":
+
+                            while True:
+
+                                new_previous_date = input(
+                                    "Enter Previous Prescription Date "
+                                    "(DD-MM-YYYY, Optional - "
+                                    "press Enter if unknown): "
+                                ).strip()
+
+                                if new_previous_date == "":
+                                    previous_prescription_date = ""
+                                    break
+
+                                try:
+                                    parsed_previous_date = (
+                                        datetime.strptime(
+                                            new_previous_date,
+                                            "%d-%m-%Y"
+                                        )
+                                    )
+
+                                    previous_prescription_date = (
+                                        parsed_previous_date.strftime(
+                                            "%d-%m-%Y"
+                                        )
+                                    )
+                                    break
+
+                                except ValueError:
+                                    print(
+                                        "Invalid date. Please enter "
+                                        "date as DD-MM-YYYY "
+                                        "or leave blank."
+                                    )
+
+                            print(
+                                "Previous Prescription Date "
+                                "updated successfully."
+                            )
+                            continue
+
+                        if previous_edit_choice == "2":
+                            previous_right_sph = get_old_sph(
+                                "Right Eye"
+                            )
+                            print(
+                                "Right Eye SPH updated successfully."
+                            )
+                            continue
+
+                        if previous_edit_choice == "3":
+                            previous_right_cyl = get_old_cyl(
+                                "Right Eye"
+                            )
+                            print(
+                                "Right Eye CYL updated successfully."
+                            )
+                            continue
+
+                        if previous_edit_choice == "4":
+                            previous_right_axis = get_old_axis(
+                                "Right Eye"
+                            )
+                            print(
+                                "Right Eye AXIS updated successfully."
+                            )
+                            continue
+
+                        if previous_edit_choice == "5":
+
+                            while True:
+
+                                new_right_add = input(
+                                    "Enter Right Eye ADD / "
+                                    "Near Power "
+                                    "(Optional - press Enter "
+                                    "if not required): "
+                                ).strip()
+
+                                if new_right_add in ("", "0"):
+                                    previous_right_add = ""
+                                    break
+
+                                if new_right_add.startswith("+"):
+                                    number_part = new_right_add[1:]
+                                    parts = number_part.split(".")
+
+                                    if (
+                                        len(parts) == 2
+                                        and parts[0].isdigit()
+                                        and len(parts[1]) == 2
+                                        and parts[1] in [
+                                            "00", "25", "50", "75"
+                                        ]
+                                        and float(number_part) <= 5
+                                    ):
+                                        previous_right_add = (
+                                            new_right_add
+                                        )
+                                        break
+
+                                print(
+                                    "Invalid ADD. Enter like "
+                                    "+1.00, +1.25, +1.50, "
+                                    "+2.00 or leave blank."
+                                )
+
+                            print(
+                                "Right Eye ADD updated successfully."
+                            )
+                            continue
+
+                        if previous_edit_choice == "6":
+                            previous_left_sph = get_old_sph(
+                                "Left Eye"
+                            )
+                            print(
+                                "Left Eye SPH updated successfully."
+                            )
+                            continue
+
+                        if previous_edit_choice == "7":
+                            previous_left_cyl = get_old_cyl(
+                                "Left Eye"
+                            )
+                            print(
+                                "Left Eye CYL updated successfully."
+                            )
+                            continue
+
+                        if previous_edit_choice == "8":
+                            previous_left_axis = get_old_axis(
+                                "Left Eye"
+                            )
+                            print(
+                                "Left Eye AXIS updated successfully."
+                            )
+                            continue
+
+                        if previous_edit_choice == "9":
+
+                            while True:
+
+                                new_left_add = input(
+                                    "Enter Left Eye ADD / "
+                                    "Near Power "
+                                    "(Optional - press Enter "
+                                    "if not required): "
+                                ).strip()
+
+                                if new_left_add in ("", "0"):
+                                    previous_left_add = ""
+                                    break
+
+                                if new_left_add.startswith("+"):
+                                    number_part = new_left_add[1:]
+                                    parts = number_part.split(".")
+
+                                    if (
+                                        len(parts) == 2
+                                        and parts[0].isdigit()
+                                        and len(parts[1]) == 2
+                                        and parts[1] in [
+                                            "00", "25", "50", "75"
+                                        ]
+                                        and float(number_part) <= 5
+                                    ):
+                                        previous_left_add = (
+                                            new_left_add
+                                        )
+                                        break
+
+                                print(
+                                    "Invalid ADD. Enter like "
+                                    "+1.00, +1.25, +1.50, "
+                                    "+2.00 or leave blank."
+                                )
+
+                            print(
+                                "Left Eye ADD updated successfully."
+                            )
+                            continue
+
+                        print(
+                            "Please select a number from 1 to 10."
+                        )
+
+                    continue
+
+                # ------------------------------------------
+                # EYE SURGERY / IOL HISTORY
+                # Previous Rx available  -> Option 4
+                # Previous Rx unavailable -> Option 3
+                # ------------------------------------------
+                eye_surgery_selected = (
+                    (
+                        has_previous_rx
+                        and prescription_edit_choice == "4"
+                    )
+                    or (
+                        not has_previous_rx
+                        and prescription_edit_choice == "3"
+                    )
+                )
+
+                if eye_surgery_selected:
+
+                    print("\n--- Edit Eye Surgery / IOL History ---")
+                    print("1. No Eye Surgery")
+                    print("2. Right Eye (OD)")
+                    print("3. Left Eye (OS)")
+                    print("4. Both Eyes")
+
+                    while True:
+
+                        new_surgery_choice = input(
+                            "Select Eye Surgery Status "
+                            "(1/2/3/4): "
+                        ).strip()
+
+                        if new_surgery_choice == "1":
+
+                            eye_surgery = "No"
+                            surgery_eye = ""
+                            right_iol = "No"
+                            left_iol = "No"
+
+                            break
+
+                        if new_surgery_choice == "2":
+
+                            eye_surgery = "Yes"
+                            surgery_eye = "Right Eye (OD)"
+                            left_iol = "No"
+
+                            print(
+                                "\nRight Eye IOL implanted?"
+                            )
+                            print("1. Yes")
+                            print("2. No")
+
+                            while True:
+
+                                new_right_iol_choice = input(
+                                    "Select (1/2): "
+                                ).strip()
+
+                                if new_right_iol_choice == "1":
+                                    right_iol = "Yes"
+                                    break
+
+                                if new_right_iol_choice == "2":
+                                    right_iol = "No"
+                                    break
+
+                                print(
+                                    "Please select 1 for Yes "
+                                    "or 2 for No."
+                                )
+
+                            break
+
+                        if new_surgery_choice == "3":
+
+                            eye_surgery = "Yes"
+                            surgery_eye = "Left Eye (OS)"
+                            right_iol = "No"
+
+                            print(
+                                "\nLeft Eye IOL implanted?"
+                            )
+                            print("1. Yes")
+                            print("2. No")
+
+                            while True:
+
+                                new_left_iol_choice = input(
+                                    "Select (1/2): "
+                                ).strip()
+
+                                if new_left_iol_choice == "1":
+                                    left_iol = "Yes"
+                                    break
+
+                                if new_left_iol_choice == "2":
+                                    left_iol = "No"
+                                    break
+
+                                print(
+                                    "Please select 1 for Yes "
+                                    "or 2 for No."
+                                )
+
+                            break
+
+                        if new_surgery_choice == "4":
+
+                            eye_surgery = "Yes"
+                            surgery_eye = "Both Eyes"
+
+                            print(
+                                "\nRight Eye IOL implanted?"
+                            )
+                            print("1. Yes")
+                            print("2. No")
+
+                            while True:
+
+                                new_right_iol_choice = input(
+                                    "Select (1/2): "
+                                ).strip()
+
+                                if new_right_iol_choice == "1":
+                                    right_iol = "Yes"
+                                    break
+
+                                if new_right_iol_choice == "2":
+                                    right_iol = "No"
+                                    break
+
+                                print(
+                                    "Please select 1 for Yes "
+                                    "or 2 for No."
+                                )
+
+                            print(
+                                "\nLeft Eye IOL implanted?"
+                            )
+                            print("1. Yes")
+                            print("2. No")
+
+                            while True:
+
+                                new_left_iol_choice = input(
+                                    "Select (1/2): "
+                                ).strip()
+
+                                if new_left_iol_choice == "1":
+                                    left_iol = "Yes"
+                                    break
+
+                                if new_left_iol_choice == "2":
+                                    left_iol = "No"
+                                    break
+
+                                print(
+                                    "Please select 1 for Yes "
+                                    "or 2 for No."
+                                )
+
+                            break
+
+                        print(
+                            "Please select 1, 2, 3 or 4."
+                        )
+
+                    print(
+                        "Eye Surgery / IOL History "
+                        "updated successfully."
+                    )
+                    continue
+
+                # ------------------------------------------
+                # CURRENT PRESCRIPTION
+                # Previous Rx available  -> Option 5
+                # Previous Rx unavailable -> Option 4
+                # ------------------------------------------
+                current_rx_selected = (
+                    (
+                        has_previous_rx
+                        and prescription_edit_choice == "5"
+                    )
+                    or (
+                        not has_previous_rx
+                        and prescription_edit_choice == "4"
+                    )
+                )
+
+                if current_rx_selected:
+
+                    while True:
+
+                        print("\n--- Edit Current Prescription ---")
+                        print("1. Right Eye (OD) SPH")
+                        print("2. Right Eye (OD) CYL")
+                        print("3. Right Eye (OD) AXIS")
+
+                        if (
+                            lens_type_choice != "1"
+                            and add_requirement != "3"
+                        ):
+                            print("4. Right Eye (OD) ADD")
+                        else:
+                            print("4. Right Eye (OD) ADD - Not Required")
+
+                        print("5. Left Eye (OS) SPH")
+                        print("6. Left Eye (OS) CYL")
+                        print("7. Left Eye (OS) AXIS")
+
+                        if (
+                            lens_type_choice != "1"
+                            and add_requirement != "2"
+                        ):
+                            print("8. Left Eye (OS) ADD")
+                        else:
+                            print("8. Left Eye (OS) ADD - Not Required")
+
+                        print("9. Back")
+
+                        current_rx_edit_choice = input(
+                            "Select Field (1-9): "
+                        ).strip()
+
+                        if current_rx_edit_choice == "9":
+                            break
+
+                        # ----------------------------------
+                        # 1. RIGHT EYE (OD) SPH
+                        # ----------------------------------
+                        if current_rx_edit_choice == "1":
+
+                            while True:
+
+                                new_right_sph = input(
+                                    "Enter Right Eye SPH (+/-): "
+                                ).strip()
+
+                                if new_right_sph.lower() == "plano":
+                                    right_sph = "Plano"
+                                    break
+
+                                if new_right_sph == "0":
+                                    right_sph = "0"
+                                    break
+
+                                if new_right_sph.startswith(("+", "-")):
+                                    number_part = new_right_sph[1:]
+                                    parts = number_part.split(".")
+
+                                    if (
+                                        len(parts) == 2
+                                        and parts[0].isdigit()
+                                        and len(parts[1]) == 2
+                                        and parts[1]
+                                        in ["00", "25", "50", "75"]
+                                        and float(number_part) <= 30
+                                    ):
+                                        right_sph = new_right_sph
+                                        break
+
+                                print(
+                                    "Invalid SPH. Enter like "
+                                    "-1.00, +1.25, 0 or Plano."
+                                )
+
+                            print(
+                                "Right Eye SPH updated successfully."
+                            )
+                            continue
+
+                        # ----------------------------------
+                        # 2. RIGHT EYE (OD) CYL
+                        # ----------------------------------
+                        if current_rx_edit_choice == "2":
+
+                            while True:
+
+                                new_right_cyl = input(
+                                    "Enter Right Eye CYL (+/-): "
+                                ).strip()
+
+                                if new_right_cyl == "":
+                                    right_cyl = ""
+                                    break
+
+                                if new_right_cyl == "0":
+                                    right_cyl = "0"
+                                    break
+
+                                if new_right_cyl.startswith(("+", "-")):
+                                    number_part = new_right_cyl[1:]
+                                    parts = number_part.split(".")
+
+                                    if (
+                                        len(parts) == 2
+                                        and parts[0].isdigit()
+                                        and len(parts[1]) == 2
+                                        and parts[1]
+                                        in ["00", "25", "50", "75"]
+                                        and float(number_part) <= 10
+                                    ):
+                                        right_cyl = new_right_cyl
+                                        break
+
+                                print(
+                                    "Invalid CYL. Enter like "
+                                    "-0.50, +1.25, 0 or leave blank."
+                                )
+
+                            print(
+                                "Right Eye CYL updated successfully."
+                            )
+                            continue
+
+                        # ----------------------------------
+                        # 3. RIGHT EYE (OD) AXIS
+                        # ----------------------------------
+                        if current_rx_edit_choice == "3":
+
+                            while True:
+
+                                new_right_axis = input(
+                                    "Enter Right Eye AXIS (0-180): "
+                                ).strip()
+
+                                if new_right_axis == "":
+                                    right_axis = ""
+                                    break
+
+                                if new_right_axis.isdigit():
+                                    axis_value = int(new_right_axis)
+
+                                    if 0 <= axis_value <= 180:
+                                        right_axis = new_right_axis
+                                        break
+
+                                print(
+                                    "Invalid AXIS. Enter a number "
+                                    "from 0 to 180 or leave blank."
+                                )
+
+                            print(
+                                "Right Eye AXIS updated successfully."
+                            )
+                            continue
+
+                        # ----------------------------------
+                        # 4. RIGHT EYE (OD) ADD
+                        # ----------------------------------
+                        if current_rx_edit_choice == "4":
+
+                            if (
+                                lens_type_choice == "1"
+                                or add_requirement == "3"
+                            ):
+                                right_add = ""
+                                print(
+                                    "Right Eye ADD is Not Required."
+                                )
+                                continue
+
+                            while True:
+
+                                new_right_add = input(
+                                    "Enter Right Eye ADD / "
+                                    "Near Power (+): "
+                                ).strip()
+
+                                if new_right_add in ["", "0"]:
+                                    print(
+                                        "ADD is required for Right Eye."
+                                    )
+                                    continue
+
+                                if new_right_add.startswith("+"):
+                                    number_part = new_right_add[1:]
+                                    parts = number_part.split(".")
+
+                                    if (
+                                        len(parts) == 2
+                                        and parts[0].isdigit()
+                                        and len(parts[1]) == 2
+                                        and parts[1]
+                                        in ["00", "25", "50", "75"]
+                                        and float(number_part) <= 5
+                                    ):
+                                        right_add = new_right_add
+                                        break
+
+                                print(
+                                    "Invalid ADD. Enter like "
+                                    "+1.00, +1.25, +1.50 or +2.00."
+                                )
+
+                            print(
+                                "Right Eye ADD updated successfully."
+                            )
+                            continue
+
+                        # ----------------------------------
+                        # 5. LEFT EYE (OS) SPH
+                        # ----------------------------------
+                        if current_rx_edit_choice == "5":
+
+                            while True:
+
+                                new_left_sph = input(
+                                    "Enter Left Eye SPH (+/-): "
+                                ).strip()
+
+                                if new_left_sph.lower() == "plano":
+                                    left_sph = "Plano"
+                                    break
+
+                                if new_left_sph == "0":
+                                    left_sph = "0"
+                                    break
+
+                                if new_left_sph.startswith(("+", "-")):
+                                    number_part = new_left_sph[1:]
+                                    parts = number_part.split(".")
+
+                                    if (
+                                        len(parts) == 2
+                                        and parts[0].isdigit()
+                                        and len(parts[1]) == 2
+                                        and parts[1]
+                                        in ["00", "25", "50", "75"]
+                                        and float(number_part) <= 30
+                                    ):
+                                        left_sph = new_left_sph
+                                        break
+
+                                print(
+                                    "Invalid SPH. Enter like "
+                                    "-1.00, +1.25, 0 or Plano."
+                                )
+
+                            print(
+                                "Left Eye SPH updated successfully."
+                            )
+                            continue
+
+                        # ----------------------------------
+                        # 6. LEFT EYE (OS) CYL
+                        # ----------------------------------
+                        if current_rx_edit_choice == "6":
+
+                            while True:
+
+                                new_left_cyl = input(
+                                    "Enter Left Eye CYL (+/-): "
+                                ).strip()
+
+                                if new_left_cyl == "":
+                                    left_cyl = ""
+                                    break
+
+                                if new_left_cyl == "0":
+                                    left_cyl = "0"
+                                    break
+
+                                if new_left_cyl.startswith(("+", "-")):
+                                    number_part = new_left_cyl[1:]
+                                    parts = number_part.split(".")
+
+                                    if (
+                                        len(parts) == 2
+                                        and parts[0].isdigit()
+                                        and len(parts[1]) == 2
+                                        and parts[1]
+                                        in ["00", "25", "50", "75"]
+                                        and float(number_part) <= 10
+                                    ):
+                                        left_cyl = new_left_cyl
+                                        break
+
+                                print(
+                                    "Invalid CYL. Enter like "
+                                    "-1.00, +0.50, 0 or leave blank."
+                                )
+
+                            print(
+                                "Left Eye CYL updated successfully."
+                            )
+                            continue
+
+                        # ----------------------------------
+                        # 7. LEFT EYE (OS) AXIS
+                        # ----------------------------------
+                        if current_rx_edit_choice == "7":
+
+                            while True:
+
+                                new_left_axis = input(
+                                    "Enter Left Eye AXIS (0-180): "
+                                ).strip()
+
+                                if new_left_axis == "":
+                                    left_axis = ""
+                                    break
+
+                                if new_left_axis.isdigit():
+                                    axis_value = int(new_left_axis)
+
+                                    if 0 <= axis_value <= 180:
+                                        left_axis = new_left_axis
+                                        break
+
+                                print(
+                                    "Invalid AXIS. Enter a number "
+                                    "from 0 to 180 or leave blank."
+                                )
+
+                            print(
+                                "Left Eye AXIS updated successfully."
+                            )
+                            continue
+
+                        # ----------------------------------
+                        # 8. LEFT EYE (OS) ADD
+                        # ----------------------------------
+                        if current_rx_edit_choice == "8":
+
+                            if (
+                                lens_type_choice == "1"
+                                or add_requirement == "2"
+                            ):
+                                left_add = ""
+                                print(
+                                    "Left Eye ADD is Not Required."
+                                )
+                                continue
+
+                            while True:
+
+                                new_left_add = input(
+                                    "Enter Left Eye ADD / "
+                                    "Near Power (+): "
+                                ).strip()
+
+                                if new_left_add in ["", "0"]:
+                                    print(
+                                        "ADD is required for Left Eye."
+                                    )
+                                    continue
+
+                                if new_left_add.startswith("+"):
+                                    number_part = new_left_add[1:]
+                                    parts = number_part.split(".")
+
+                                    if (
+                                        len(parts) == 2
+                                        and parts[0].isdigit()
+                                        and len(parts[1]) == 2
+                                        and parts[1]
+                                        in ["00", "25", "50", "75"]
+                                        and float(number_part) <= 5
+                                    ):
+                                        left_add = new_left_add
+                                        break
+
+                                print(
+                                    "Invalid ADD. Enter like "
+                                    "+1.00, +1.25, +1.50 or +2.00."
+                                )
+
+                            print(
+                                "Left Eye ADD updated successfully."
+                            )
+                            continue
+
+                        print(
+                            "Please select a number from 1 to 9."
+                        )
+                    continue
+
+                # ------------------------------------------
+                # PD / VISION DETAILS
+                # Previous Rx available  -> Option 6
+                # Previous Rx unavailable -> Option 5
+                # ------------------------------------------
+                pd_vision_selected = (
+                    (
+                        has_previous_rx
+                        and prescription_edit_choice == "6"
+                    )
+                    or (
+                        not has_previous_rx
+                        and prescription_edit_choice == "5"
+                    )
+                )
+
+                if pd_vision_selected:
+
+                    while True:
+
+                        print("\n--- Edit PD / Vision Details ---")
+                        print("1. Distance PD")
+                        print("2. Near PD")
+                        print("3. Right Eye Visual Acuity")
+                        print("4. Left Eye Visual Acuity")
+                        print("5. Right Eye Pinhole")
+                        print("6. Left Eye Pinhole")
+                        print("7. Back")
+
+                        pd_vision_edit_choice = input(
+                            "Select Field (1-7): "
+                        ).strip()
+
+                        if pd_vision_edit_choice == "1":
+                            distance_pd = input(
+                                "Enter Distance PD in mm "
+                                "(Example: 62, press Enter "
+                                "if not measured): "
+                            ).strip()
+
+                            print(
+                                "Distance PD updated successfully."
+                            )
+                            continue
+
+                        if pd_vision_edit_choice == "2":
+                            near_pd = input(
+                                "Enter Near PD in mm "
+                                "(Example: 59, press Enter "
+                                "if not measured): "
+                            ).strip()
+
+                            print(
+                                "Near PD updated successfully."
+                            )
+                            continue
+
+                        if pd_vision_edit_choice == "3":
+                            right_va = input(
+                                "Right Eye Visual Acuity "
+                                "(Example: 6/6, press Enter "
+                                "if not measured): "
+                            ).strip()
+
+                            print(
+                                "Right Eye Visual Acuity "
+                                "updated successfully."
+                            )
+                            continue
+
+                        if pd_vision_edit_choice == "4":
+                            left_va = input(
+                                "Left Eye Visual Acuity "
+                                "(Example: 6/6, press Enter "
+                                "if not measured): "
+                            ).strip()
+
+                            print(
+                                "Left Eye Visual Acuity "
+                                "updated successfully."
+                            )
+                            continue
+
+                        if pd_vision_edit_choice == "5":
+                            right_pinhole = input(
+                                "Right Eye Pinhole "
+                                "(Example: 6/6, press Enter "
+                                "if not measured): "
+                            ).strip()
+
+                            print(
+                                "Right Eye Pinhole "
+                                "updated successfully."
+                            )
+                            continue
+
+                        if pd_vision_edit_choice == "6":
+                            left_pinhole = input(
+                                "Left Eye Pinhole "
+                                "(Example: 6/6, press Enter "
+                                "if not measured): "
+                            ).strip()
+
+                            print(
+                                "Left Eye Pinhole "
+                                "updated successfully."
+                            )
+                            continue
+
+                        if pd_vision_edit_choice == "7":
+                            break
+
+                        print(
+                            "Please select a number from 1 to 7."
+                        )
+
+                    continue
+
+                print(
+                    "Please select a valid "
+                    "Prescription / Eye Details option."
+                )
+            continue
+
+        # ==================================================
+        # 3. LENS DETAILS
+        # ==================================================
+        if review_choice == "3":
+
+            while True:
+
+                print("\n--- Edit Lens Details ---")
+                print("1. Lens Type")
+
+                if lens_type != "Single Vision":
+                    print("2. ADD Requirement")
+                else:
+                    print("2. ADD Requirement - Not Required")
+
+                print("3. Lens Features / Coating")
+                print("4. Lens Brand")
+                print("5. Lens Offer")
+                print("6. Lens Price")
+                print("7. Back")
+
+                lens_edit_choice = input(
+                    "Select Field (1-7): "
+                ).strip()
+
+                # ------------------------------------------
+                # 1. LENS TYPE
+                # ------------------------------------------
+                if lens_edit_choice == "1":
+
+                    print("\n--- Edit Lens Type ---")
+                    print("1. Single Vision")
+                    print("2. Bifocal")
+
+                    while True:
+
+                        new_lens_type_choice = input(
+                            "Select Lens Type (1/2): "
+                        ).strip()
+
+                        if new_lens_type_choice == "1":
+
+                            lens_type_choice = "1"
+                            lens_type = "Single Vision"
+                            add_requirement = ""
+
+                            right_add = ""
+                            left_add = ""
+
+                            break
+
+                        if new_lens_type_choice == "2":
+
+                            lens_type_choice = "2"
+
+                            print("\n--- Bifocal Type ---")
+                            print("1. Kryptok Bifocal")
+                            print("2. D Bifocal")
+                            print("3. Progressive Bifocal")
+                            print("4. Other")
+
+                            while True:
+
+                                new_bifocal_choice = input(
+                                    "Select Bifocal Type "
+                                    "(1/2/3/4): "
+                                ).strip()
+
+                                if new_bifocal_choice == "1":
+                                    lens_type = "Kryptok Bifocal"
+                                    break
+
+                                if new_bifocal_choice == "2":
+                                    lens_type = "D Bifocal"
+                                    break
+
+                                if new_bifocal_choice == "3":
+                                    lens_type = (
+                                        "Progressive Bifocal"
+                                    )
+                                    break
+
+                                if new_bifocal_choice == "4":
+                                    lens_type = "Other"
+                                    break
+
+                                print(
+                                    "Invalid option. Please select "
+                                    "1, 2, 3 or 4."
+                                )
+
+                            print("\n--- ADD Requirement ---")
+                            print("1. Both Eyes")
+                            print("2. Right Eye (OD) Only")
+                            print("3. Left Eye (OS) Only")
+
+                            while True:
+
+                                add_requirement = input(
+                                    "Select ADD Requirement "
+                                    "(1/2/3): "
+                                ).strip()
+
+                                if add_requirement in [
+                                    "1", "2", "3"
+                                ]:
+                                    break
+
+                                print(
+                                    "Invalid option. Please select "
+                                    "1, 2 or 3."
+                                )
+
+                            if add_requirement == "2":
+                                left_add = ""
+
+                            elif add_requirement == "3":
+                                right_add = ""
+
+                            break
+
+                        print(
+                            "Invalid option. Please select 1 or 2."
+                        )
+
+                    print(
+                        "Lens Type updated successfully."
+                    )
+                    continue
+
+                # ------------------------------------------
+                # 2. ADD REQUIREMENT
+                # ------------------------------------------
+                if lens_edit_choice == "2":
+
+                    if lens_type == "Single Vision":
+                        add_requirement = ""
+                        right_add = ""
+                        left_add = ""
+
+                        print(
+                            "ADD Requirement is Not Required "
+                            "for Single Vision."
+                        )
+                        continue
+
+                    print("\n--- Edit ADD Requirement ---")
                     print("1. Both Eyes")
                     print("2. Right Eye (OD) Only")
                     print("3. Left Eye (OS) Only")
 
                     while True:
 
-                        add_requirement = input(
-                            "Select ADD Requirement (1/2/3): "
+                        new_add_requirement = input(
+                            "Select ADD Requirement "
+                            "(1/2/3): "
                         ).strip()
 
-                        if add_requirement in ["1", "2", "3"]:
+                        if new_add_requirement in [
+                            "1", "2", "3"
+                        ]:
+                            add_requirement = (
+                                new_add_requirement
+                            )
                             break
 
                         print(
-                            "Invalid option. "
-                            "Please select 1, 2 or 3."
+                            "Invalid option. Please select "
+                            "1, 2 or 3."
                         )
 
-                    if add_requirement == "3":
-                        right_add = ""
-
-                    else:
-                        current_right_add = right_add
-
-                        while True:
-
-                            print(
-                                "Current Right Eye ADD:",
-                                current_right_add
-                                if current_right_add
-                                else "Not Available"
-                            )
-
-                            new_right_add = input(
-                                "New Right Eye ADD "
-                                "(press Enter to keep current): "
-                            ).strip()
-
-                            if new_right_add == "":
-
-                                if current_right_add:
-                                    right_add = current_right_add
-                                    break
-
-                                print(
-                                    "ADD is required for Right Eye."
-                                )
-                                continue
-
-                            if new_right_add == "0":
-                                print(
-                                    "ADD is required for Right Eye."
-                                )
-                                continue
-
-                            if new_right_add.startswith("+"):
-                                number_part = new_right_add[1:]
-                                parts = number_part.split(".")
-
-                                if (
-                                    len(parts) == 2
-                                    and parts[0].isdigit()
-                                    and len(parts[1]) == 2
-                                    and parts[1]
-                                    in ["00", "25", "50", "75"]
-                                    and float(number_part) <= 5
-                                ):
-                                    right_add = new_right_add
-                                    break
-
-                            print(
-                                "Invalid ADD. Enter like "
-                                "+1.00, +1.25, +1.50 or +2.00, "
-                                "or press Enter to keep current."
-                            )
                     if add_requirement == "2":
                         left_add = ""
 
-                    else:
-                        current_left_add = left_add
+                    elif add_requirement == "3":
+                        right_add = ""
 
-                        while True:
+                    print(
+                        "ADD Requirement updated successfully."
+                    )
+                    continue
 
-                            print(
-                                "Current Left Eye ADD:",
-                                current_left_add
-                                if current_left_add
-                                else "Not Available"
+                # ------------------------------------------
+                # 3. LENS FEATURES / COATING
+                # ------------------------------------------
+                if lens_edit_choice == "3":
+
+                    while True:
+
+                        new_lens_features = input(
+                            "Enter Lens Features / Coating "
+                            "(Optional): "
+                        ).strip().title()
+
+                        normalized_features = (
+                            new_lens_features.lower()
+                            .replace(".", " ")
+                            .replace("-", " ")
+                            .replace("/", " ")
+                            .replace(",", " ")
+                            .replace("_", " ")
+                        )
+
+                        feature_words = (
+                            normalized_features.split()
+                        )
+
+                        has_kt = (
+                            "kt" in feature_words
+                            or "kryptok" in feature_words
+                        )
+
+                        has_progressive = (
+                            "progressive" in feature_words
+                        )
+
+                        has_d_bifocal = (
+                            "d bifocal"
+                            in normalized_features
+                            or "dbifocal"
+                            in normalized_features
+                        )
+
+                        if lens_type == "Single Vision":
+
+                            if has_kt:
+                                print(
+                                    "KT / Kryptok is a Bifocal "
+                                    "type and cannot be used "
+                                    "with Single Vision."
+                                )
+                                continue
+
+                            if has_progressive:
+                                print(
+                                    "Progressive cannot be used "
+                                    "with Single Vision."
+                                )
+                                continue
+
+                            if has_d_bifocal:
+                                print(
+                                    "D Bifocal cannot be used "
+                                    "with Single Vision."
+                                )
+                                continue
+
+                        elif lens_type == "Kryptok Bifocal":
+
+                            if has_progressive:
+                                print(
+                                    "Progressive cannot be used "
+                                    "with Kryptok Bifocal."
+                                )
+                                continue
+
+                            if has_d_bifocal:
+                                print(
+                                    "D Bifocal cannot be used "
+                                    "with Kryptok Bifocal."
+                                )
+                                continue
+
+                        elif lens_type == "D Bifocal":
+
+                            if has_kt:
+                                print(
+                                    "KT / Kryptok cannot be used "
+                                    "with D Bifocal."
+                                )
+                                continue
+
+                            if has_progressive:
+                                print(
+                                    "Progressive cannot be used "
+                                    "with D Bifocal."
+                                )
+                                continue
+
+                        elif lens_type == "Progressive Bifocal":
+
+                            if has_kt:
+                                print(
+                                    "KT / Kryptok cannot be used "
+                                    "with Progressive Bifocal."
+                                )
+                                continue
+
+                            if has_d_bifocal:
+                                print(
+                                    "D Bifocal cannot be used "
+                                    "with Progressive Bifocal."
+                                )
+                                continue
+
+                        lens_features = new_lens_features
+                        break
+
+                    print(
+                        "Lens Features / Coating "
+                        "updated successfully."
+                    )
+                    continue
+
+                # ------------------------------------------
+                # 4. LENS BRAND
+                # ------------------------------------------
+                if lens_edit_choice == "4":
+
+                    lens_brand = input(
+                        "Enter Lens Brand (Optional): "
+                    ).strip().title()
+
+                    print(
+                        "Lens Brand updated successfully."
+                    )
+                    continue
+
+                # ------------------------------------------
+                # 5. LENS OFFER
+                # ------------------------------------------
+                if lens_edit_choice == "5":
+
+                    lens_offer = normalize_offer(
+                        input("Enter Lens Offer (Example: 10 or 10%): ")
+                    )
+                    print(
+                        "Lens Offer updated successfully."
+                    )
+                    continue
+
+                # ------------------------------------------
+                # 6. LENS PRICE
+                # ------------------------------------------
+                if lens_edit_choice == "6":
+
+                    while True:
+
+                        new_lens_price_input = input(
+                            "Enter Lens Price: "
+                        ).strip()
+
+                        try:
+                            new_lens_price = float(
+                                new_lens_price_input
                             )
 
-                            new_left_add = input(
-                                "New Left Eye ADD "
-                                "(press Enter to keep current): "
+                            if new_lens_price < 0:
+                                print(
+                                    "Lens Price cannot be negative."
+                                )
+                                continue
+
+                            lens_price = new_lens_price
+                            break
+
+                        except ValueError:
+                            print(
+                                "Please enter Lens Price "
+                                "using numbers only."
+                            )
+
+                    # Recalculate all dependent payment values
+                    order_total = frame_price + lens_price
+
+                    if less_amount > order_total:
+                        less_amount = order_total
+
+                    total_amount = (
+                        order_total - less_amount
+                    )
+
+                    if advance_amount > total_amount:
+                        advance_amount = total_amount
+
+                    balance = (
+                        total_amount - advance_amount
+                    )
+
+                    print(
+                        "Lens Price updated successfully."
+                    )
+                    continue
+
+                # ------------------------------------------
+                # 7. BACK
+                # ------------------------------------------
+                if lens_edit_choice == "7":
+                    break
+
+                print(
+                    "Please select a number from 1 to 7."
+                )
+
+            continue
+
+        # ==================================================
+        # 4. PAYMENT DETAILS
+        # ==================================================
+        if review_choice == "4":
+
+            while True:
+
+                print("\n--- Edit Payment Details ---")
+                print(f"Order Total    : ₹{order_total:.2f}")
+                print(f"Less Amount    : ₹{less_amount:.2f}")
+                print(f"Final Total    : ₹{total_amount:.2f}")
+                print(f"Advance Amount : ₹{advance_amount:.2f}")
+                print(f"Balance        : ₹{balance:.2f}")
+
+                print("\n1. Less Amount")
+                print("2. Advance Amount")
+                print("3. Back")
+
+                payment_edit_choice = input(
+                    "Select Field / Back (1/2/3): "
+                ).strip()
+
+                if payment_edit_choice == "3":
+                    break
+
+                if payment_edit_choice == "1":
+
+                    while True:
+
+                        new_less_input = input(
+                            "Enter Less Amount "
+                            "(Optional - press Enter for 0): "
+                        ).strip()
+
+                        if new_less_input == "":
+                            new_less_amount = 0.0
+                        else:
+                            try:
+                                new_less_amount = float(
+                                    new_less_input
+                                )
+                            except ValueError:
+                                print(
+                                    "Please enter Less Amount "
+                                    "using numbers only."
+                                )
+                                continue
+
+                        if new_less_amount < 0:
+                            print(
+                                "Less Amount cannot be negative."
+                            )
+                            continue
+
+                        if new_less_amount > order_total:
+                            print(
+                                "Less Amount cannot be greater "
+                                "than Order Total."
+                            )
+                            continue
+
+                        new_total_amount = (
+                            order_total - new_less_amount
+                        )
+
+                        if advance_amount > new_total_amount:
+                            print(
+                                "This Less Amount cannot be used "
+                                "because the current Advance Amount "
+                                "would be greater than "
+                                "Final Total Amount."
+                            )
+                            continue
+
+                        less_amount = new_less_amount
+                        total_amount = new_total_amount
+                        balance = (
+                            total_amount - advance_amount
+                        )
+                        break
+
+                    print(
+                        "Less Amount updated successfully."
+                    )
+                    continue
+
+                if payment_edit_choice == "2":
+
+                    while True:
+
+                        new_advance_input = input(
+                            "Enter Advance Amount: "
+                        ).strip()
+
+                        try:
+                            new_advance_amount = float(
+                                new_advance_input
+                            )
+
+                            if new_advance_amount < 0:
+                                print(
+                                    "Advance amount cannot be negative."
+                                )
+                                continue
+
+                            if new_advance_amount > total_amount:
+                                print(
+                                    "Advance amount cannot be greater "
+                                    "than Final Total Amount."
+                                )
+                                continue
+
+                            advance_amount = new_advance_amount
+                            balance = (
+                                total_amount - advance_amount
+                            )
+                            break
+
+                        except ValueError:
+                            print(
+                                "Please enter amount "
+                                "using numbers only."
+                            )
+
+                    print(
+                        "Advance Amount updated successfully."
+                    )
+                    continue
+
+                print(
+                    "Please select 1, 2 or 3."
+                )
+
+            continue
+
+        # ==================================================
+        # 5. DELIVERY DETAILS
+        # ==================================================
+        if review_choice == "5":
+
+            while True:
+
+                print("\n--- Edit Delivery Details ---")
+                print("1. Delivery Status")
+
+                if delivery_status == "Pending":
+                    print("2. Back")
+
+                elif (
+                    delivery_status == "Delivered"
+                    and delivered_to == "Customer / Same Person"
+                ):
+                    print("2. Delivered To")
+                    print("3. Back")
+
+                else:
+                    print("2. Delivered To")
+                    print("3. Receiver Name")
+                    print("4. Back")
+
+                delivery_edit_choice = input(
+                    "Select Field / Back: "
+                ).strip()
+
+                if (
+                    delivery_status == "Pending"
+                    and delivery_edit_choice == "2"
+                ):
+                    break
+
+                if (
+                    delivery_status == "Delivered"
+                    and delivered_to == "Customer / Same Person"
+                    and delivery_edit_choice == "3"
+                ):
+                    break
+
+                if (
+                    delivery_status == "Delivered"
+                    and delivered_to == "Other Person"
+                    and delivery_edit_choice == "4"
+                ):
+                    break
+
+                if delivery_edit_choice == "1":
+
+                    while True:
+
+                        print("\n--- Delivery Status ---")
+                        print("1. Delivered")
+                        print("2. Pending")
+
+                        new_delivery_choice = input(
+                            "Select Delivery Status (1/2): "
+                        ).strip()
+
+                        if new_delivery_choice == "1":
+                            delivery_status = "Delivered"
+                            delivered_to = (
+                                "Customer / Same Person"
+                            )
+                            receiver_name = ""
+                            break
+
+                        if new_delivery_choice == "2":
+                            delivery_status = "Pending"
+                            delivered_to = ""
+                            receiver_name = ""
+                            break
+
+                        print("Please select 1 or 2.")
+
+                    print(
+                        "Delivery Status updated successfully."
+                    )
+                    continue
+
+                if (
+                    delivery_status == "Delivered"
+                    and delivery_edit_choice == "2"
+                ):
+
+                    while True:
+
+                        print("\n--- Delivered To ---")
+                        print("1. Customer / Same Person")
+                        print("2. Other Person")
+
+                        new_delivered_to_choice = input(
+                            "Select Delivered To (1/2): "
+                        ).strip()
+
+                        if new_delivered_to_choice == "1":
+                            delivered_to = (
+                                "Customer / Same Person"
+                            )
+                            receiver_name = ""
+                            break
+
+                        if new_delivered_to_choice == "2":
+                            delivered_to = "Other Person"
+                            receiver_name = ""
+                            break
+
+                        print("Please select 1 or 2.")
+
+                    print(
+                        "Delivered To updated successfully."
+                    )
+                    continue
+
+                if (
+                    delivery_status == "Delivered"
+                    and delivered_to == "Other Person"
+                    and delivery_edit_choice == "3"
+                ):
+
+                    receiver_name = input(
+                        "Enter Receiver Name "
+                        "(Optional - press Enter to skip): "
+                    ).strip().title()
+
+                    print(
+                        "Receiver Name updated successfully."
+                    )
+                    continue
+
+                print(
+                    "Please select a valid "
+                    "Delivery Details option."
+                )
+
+            continue
+
+        print(
+            "Please select 1, 2, 3, 4, 5, 6 or 7."
+        )
+# ==================================================
+# NEW CUSTOMER - FRAME + LENSES FINAL REVIEW
+# ==================================================
+
+if customer_type in ["1", "2"] and order_type == "3":
+    while True:
+
+        # Always recalculate payment values
+        order_total = frame_price + lens_price
+        total_amount = order_total - less_amount
+        balance = total_amount - advance_amount
+
+        print("\n")
+        print("==================================================")
+        print("              FINAL REVIEW BEFORE SAVE")
+        print("==================================================")
+
+        print("\n--- ORDER ---")
+        print("Order Type : Frame + Lenses")
+
+        print("\n1. Customer Details")
+        print(f"   Name         : {customer_name}")
+        print(
+            f"   C/O / S/O    : "
+            f"{customer_relation if customer_relation else 'Not Provided'}"
+        )
+        print(f"   Gender       : {gender}")
+        print(
+            f"   Age          : "
+            f"{age if age else 'Not Provided'}"
+        )
+        print(
+            f"   Phone        : "
+            f"{phone if phone else 'Not Provided'}"
+        )
+        print(f"   Town/Village : {address}")
+        print(
+            f"   Full Address : "
+            f"{full_address if full_address else 'Not Provided'}"
+        )
+
+        print("\n2. Frame Details")
+        print(
+            f"   Frame Details : "
+            f"{frame_details if frame_details else 'Not Provided'}"
+        )
+        print(
+            f"   Category      : "
+            f"{'Brand' if frame_category == '1' else 'Non-Brand'}"
+        )
+
+        if frame_category == "1":
+            print(
+                f"   Frame Brand   : "
+                f"{frame_brand if frame_brand else 'Not Provided'}"
+            )
+
+        print(
+            f"   Frame Offer   : "
+            f"{frame_offer if frame_offer else 'None'}"
+        )
+        print(f"   Frame Price   : ₹{frame_price:.2f}")
+
+        print("\n3. Prescription & Eye Details")
+        print(f"   Source       : {prescription_source}")
+
+        if (
+            prescription_source == "External Prescription"
+            and prescription_from
+        ):
+            print(f"   From         : {prescription_from}")
+
+        print(f"   History      : {spectacle_history}")
+
+        if spectacle_history == "Existing":
+            print(
+                f"   Using Glasses: "
+                f"{years_using_glasses if years_using_glasses else 'Not Recorded'}"
+            )
+
+        print(
+            f"   Eye Surgery  : "
+            f"{eye_surgery}"
+        )
+
+        if eye_surgery == "Yes":
+            print(f"   Surgery Eye  : {surgery_eye}")
+
+            if surgery_eye in ["Right Eye (OD)", "Both Eyes"]:
+                print(f"   Right IOL    : {right_iol}")
+
+            if surgery_eye in ["Left Eye (OS)", "Both Eyes"]:
+                print(f"   Left IOL     : {left_iol}")
+
+        print("\n   Current Prescription")
+        print(
+            f"   OD: SPH {right_sph} | "
+            f"CYL {right_cyl if right_cyl else '0'} | "
+            f"AXIS {right_axis if right_axis else 'Not Required'} | "
+            f"ADD {right_add if right_add else 'Not Required'}"
+        )
+        print(
+            f"   OS: SPH {left_sph} | "
+            f"CYL {left_cyl if left_cyl else '0'} | "
+            f"AXIS {left_axis if left_axis else 'Not Required'} | "
+            f"ADD {left_add if left_add else 'Not Required'}"
+        )
+
+        print("\n4. Lens Details")
+        print(f"   Lens Type    : {lens_type}")
+
+        if lens_type != "Single Vision":
+            if add_requirement == "1":
+                add_display = "Both Eyes"
+            elif add_requirement == "2":
+                add_display = "Right Eye (OD) Only"
+            elif add_requirement == "3":
+                add_display = "Left Eye (OS) Only"
+            else:
+                add_display = "Not Recorded"
+
+            print(f"   ADD Required : {add_display}")
+
+        print(
+            f"   Features     : "
+            f"{lens_features if lens_features else 'Not Provided'}"
+        )
+        print(
+            f"   Brand        : "
+            f"{lens_brand if lens_brand else 'Not Provided'}"
+        )
+        print(
+            f"   Offer        : "
+            f"{lens_offer if lens_offer else 'Not Provided'}"
+        )
+        print(f"   Lens Price   : ₹{lens_price:.2f}")
+
+        print("\n5. Payment Details")
+        print(f"   Order Total  : ₹{order_total:.2f}")
+        print(f"   Less Amount  : ₹{less_amount:.2f}")
+        print(f"   Final Total  : ₹{total_amount:.2f}")
+        print(f"   Advance      : ₹{advance_amount:.2f}")
+        print(f"   Balance      : ₹{balance:.2f}")
+
+        print("\n6. Delivery Details")
+        print(f"   Status       : {delivery_status}")
+
+        if delivery_status == "Delivered":
+            print(f"   Delivered To : {delivered_to}")
+
+            if delivered_to == "Other Person":
+                print(
+                    f"   Receiver     : "
+                    f"{receiver_name if receiver_name else 'Not Provided'}"
+                )
+
+        print("\n--------------------------------------------------")
+        print("--- Review / Edit Options ---")
+        print("1. Customer Details")
+        print("2. Frame Details")
+        print("3. Prescription & Eye Details")
+        print("4. Lens Details")
+        print("5. Payment Details")
+        print("6. Delivery Details")
+        print("7. Confirm & Save")
+        print("8. Cancel / Exit Without Saving")
+        print("--------------------------------------------------")
+
+        review_choice = input(
+            "Select Review / Edit Option "
+            "(1/2/3/4/5/6/7/8): "
+        ).strip()
+
+        if review_choice == "7":
+            add_missing = False
+
+            if lens_type_choice == "2":
+                if (
+                    add_requirement in ["1", "2"]
+                    and right_add in ["", "0"]
+                ):
+                    print(
+                        "\nRight Eye (OD) ADD is required "
+                        "for this Bifocal order."
+                    )
+                    add_missing = True
+
+                if (
+                    add_requirement in ["1", "3"]
+                    and left_add in ["", "0"]
+                ):
+                    print(
+                        "\nLeft Eye (OS) ADD is required "
+                        "for this Bifocal order."
+                    )
+                    add_missing = True
+
+            if add_missing:
+                print(
+                    "Please edit Current Prescription "
+                    "and enter the required ADD power."
+                )
+                continue
+
+            print(
+                "\nFinal review confirmed. "
+                "Saving customer/order record..."
+            )
+            break
+        if review_choice == "8":
+            print(
+                "\nOrder cancelled. "
+                "No customer/order data was saved."
+            )
+            raise SystemExit
+
+        if review_choice == "1":
+
+            while True:
+
+                print("\n--- Edit Customer Details ---")
+                print("1. Customer Name")
+                print("2. C/O / S/O Details")
+                print("3. Gender")
+                print("4. Age")
+                print("5. Phone")
+                print("6. Town / Village")
+                print("7. Full Address")
+                print("8. Back")
+
+                customer_edit_choice = input(
+                    "Select Field (1/2/3/4/5/6/7/8): "
+                ).strip()
+
+                if customer_edit_choice == "8":
+                    break
+
+                if customer_edit_choice not in [
+                    "1", "2", "3", "4",
+                    "5", "6", "7"
+                ]:
+                    print(
+                        "Please select a number from 1 to 8."
+                    )
+                    continue
+
+                if customer_edit_choice == "1":
+
+                    while True:
+
+                        new_customer_name = input(
+                            "Enter Customer Name: "
+                        ).strip().title()
+
+                        if (
+                            new_customer_name
+                            and all(
+                                char.isalnum()
+                                or char.isspace()
+                                or char in [".", "'", "-"]
+                                for char in new_customer_name
+                            )
+                        ):
+                            customer_name = new_customer_name
+                            print(
+                                "Customer Name updated successfully."
+                            )
+                            break
+
+                        print(
+                            "Invalid customer name. "
+                            "Letters and numbers are allowed."
+                        )
+
+                    continue
+
+                if customer_edit_choice == "2":
+
+                    customer_relation = input(
+                        "Enter C/O / S/O Details "
+                        "(Optional - press Enter to clear): "
+                    ).strip()
+
+                    print(
+                        "C/O / S/O Details updated successfully."
+                    )
+
+                    continue
+
+                if customer_edit_choice == "3":
+
+                    print("\n--- Gender ---")
+                    print("1. Male")
+                    print("2. Female")
+
+                    while True:
+
+                        new_gender_choice = input(
+                            "Select Gender (1/2): "
+                        ).strip()
+
+                        if new_gender_choice == "1":
+                            gender = "Male"
+                            break
+
+                        if new_gender_choice == "2":
+                            gender = "Female"
+                            break
+
+                        print(
+                            "Please select 1 for Male "
+                            "or 2 for Female."
+                        )
+
+                    print("Gender updated successfully.")
+                    continue
+
+                if customer_edit_choice == "4":
+
+                    while True:
+
+                        new_age_input = input(
+                            "Enter Patient Age "
+                            "(Optional - press Enter if unknown): "
+                        ).strip()
+
+                        if new_age_input == "":
+                            age = ""
+                            break
+
+                        if (
+                            new_age_input.isdigit()
+                            and int(new_age_input) > 0
+                        ):
+                            age = int(new_age_input)
+                            break
+
+                        print(
+                            "Please enter age using "
+                            "numbers only."
+                        )
+
+                    print("Age updated successfully.")
+                    continue
+
+                if customer_edit_choice == "5":
+
+                    while True:
+
+                        raw_phone = input(
+                            "Enter Customer Phone Number "
+                            "(Optional - press Enter if unavailable): "
+                        ).strip()
+
+                        if raw_phone == "":
+                            phone = ""
+                            break
+
+                        normalized_phone = normalize_indian_phone(
+                            raw_phone
+                        )
+
+                        if (
+                            len(normalized_phone) == 10
+                            and normalized_phone.isdigit()
+                            and normalized_phone[0] in "6789"
+                        ):
+                            phone = normalized_phone
+                            break
+
+                        print(
+                            "Invalid phone number. "
+                            "Enter a valid Indian mobile number."
+                        )
+
+                    print("Phone updated successfully.")
+                    continue
+
+                if customer_edit_choice == "6":
+
+                    while True:
+
+                        new_address = input(
+                            "Enter Town / Village (Required): "
+                        ).strip().title()
+
+                        if (
+                            new_address
+                            and any(
+                                char.isalpha()
+                                for char in new_address
+                            )
+                            and all(
+                                char.isalnum()
+                                or char.isspace()
+                                or char in [".", ",", "-", "'"]
+                                for char in new_address
+                            )
+                        ):
+                            address = new_address
+                            break
+
+                        print(
+                            "Invalid Town / Village. "
+                            "Letters and numbers are allowed."
+                        )
+
+                    print(
+                        "Town / Village updated successfully."
+                    )
+                    continue
+
+                if customer_edit_choice == "7":
+
+                    full_address = input(
+                        "Enter Full Address "
+                        "(Optional - press Enter to clear): "
+                    ).strip().title()
+
+                    print(
+                        "Full Address updated successfully."
+                    )
+                    continue
+
+            continue
+        if review_choice == "2":
+            while True:
+
+                print("\n--- Edit Frame Details ---")
+                print("1. Frame Details")
+                print("2. Frame Category")
+
+                if frame_category == "1":
+                    print("3. Frame Brand")
+                    print("4. Frame Offer")
+                    print("5. Frame Price")
+                    print("6. Back")
+                else:
+                    print("3. Frame Offer")
+                    print("4. Frame Price")
+                    print("5. Back")
+
+                frame_edit_choice = input(
+                    "Select Field / Back: "
+                ).strip()
+
+                if (
+                    frame_category == "1"
+                    and frame_edit_choice == "6"
+                ):
+                    break
+
+                if (
+                    frame_category == "2"
+                    and frame_edit_choice == "5"
+                ):
+                    break
+
+                if frame_edit_choice == "1":
+
+                    frame_details = input(
+                        "Enter Frame Details: "
+                    ).strip()
+
+                    print(
+                        "Frame Details updated successfully."
+                    )
+
+                    continue
+
+                if frame_edit_choice == "2":
+
+                    print("\n--- Frame Category ---")
+                    print("1. Brand")
+                    print("2. Non-Brand")
+
+                    while True:
+
+                        new_frame_category = input(
+                            "Select Frame Category (1/2): "
+                        ).strip()
+
+                        if new_frame_category == "1":
+                            frame_category = "1"
+
+                            frame_brand = input(
+                                "Enter Frame Brand: "
                             ).strip()
 
-                            if new_left_add == "":
+                            break
 
-                                if current_left_add:
-                                    left_add = current_left_add
-                                    break
+                        if new_frame_category == "2":
+                            frame_category = "2"
+                            frame_brand = "Non-Brand"
+                            break
 
+                        print(
+                            "Please enter 1 or 2 only."
+                        )
+
+                    print(
+                        "Frame Category updated successfully."
+                    )
+
+                    continue
+
+                if (
+                    frame_category == "1"
+                    and frame_edit_choice == "3"
+                ):
+
+                    frame_brand = input(
+                        "Enter Frame Brand: "
+                    ).strip()
+
+                    print(
+                        "Frame Brand updated successfully."
+                    )
+
+                    continue
+
+                if (
+                    (
+                        frame_category == "1"
+                        and frame_edit_choice == "4"
+                    )
+                    or (
+                        frame_category == "2"
+                        and frame_edit_choice == "3"
+                    )
+                ):
+
+                    frame_offer = normalize_offer(
+                        input("Enter Frame Offer (Example: 10 or 10%): ")
+                    )
+                    print(
+                        "Frame Offer updated successfully."
+                    )
+
+                    continue
+
+                if (
+                    (
+                        frame_category == "1"
+                        and frame_edit_choice == "5"
+                    )
+                    or (
+                        frame_category == "2"
+                        and frame_edit_choice == "4"
+                    )
+                ):
+
+                    while True:
+
+                        try:
+                            new_frame_price = float(
+                                input(
+                                    "Enter Frame Price: "
+                                ).strip()
+                            )
+
+                            if new_frame_price < 0:
                                 print(
-                                    "ADD is required for Left Eye."
+                                    "Frame Price cannot be negative."
                                 )
                                 continue
 
-                            if new_left_add == "0":
+                            new_order_total = (
+                                new_frame_price + lens_price
+                            )
+
+                            if less_amount > new_order_total:
                                 print(
-                                    "ADD is required for Left Eye."
+                                    "Frame Price cannot be reduced "
+                                    "to this amount because the current "
+                                    "Less Amount would be greater than "
+                                    "Order Total."
                                 )
                                 continue
 
-                            if new_left_add.startswith("+"):
-                                number_part = new_left_add[1:]
-                                parts = number_part.split(".")
+                            new_total_amount = (
+                                new_order_total - less_amount
+                            )
 
-                                if (
-                                    len(parts) == 2
-                                    and parts[0].isdigit()
-                                    and len(parts[1]) == 2
-                                    and parts[1]
-                                    in ["00", "25", "50", "75"]
-                                    and float(number_part) <= 5
-                                ):
-                                    left_add = new_left_add
+                            if advance_amount > new_total_amount:
+                                print(
+                                    "Frame Price cannot be reduced "
+                                    "to this amount because the current "
+                                    "Advance Amount would be greater than "
+                                    "Final Total Amount."
+                                )
+                                continue
+
+                            frame_price = new_frame_price
+                            break
+
+                        except ValueError:
+                            print(
+                                "Please enter Frame Price "
+                                "using numbers only."
+                            )
+
+                    print(
+                        "Frame Price updated successfully."
+                    )
+
+                    continue
+
+                print(
+                    "Please select a valid Frame Details option."
+                )
+            continue
+        if review_choice == "3":
+
+            while True:
+
+                has_previous_rx = (
+                    spectacle_history == "Existing"
+                    and "has_previous_prescription" in globals()
+                    and has_previous_prescription == "y"
+                )
+
+                print("\n--- Prescription & Eye Details ---")
+                print("1. Prescription Source")
+                print("2. Spectacle History")
+
+                if has_previous_rx:
+                    print("3. Previous Prescription")
+                    print("4. Eye Surgery / IOL History")
+                    print("5. Current Prescription")
+                    print("6. PD / Vision Details")
+                    print("7. Back")
+                else:
+                    print("3. Eye Surgery / IOL History")
+                    print("4. Current Prescription")
+                    print("5. PD / Vision Details")
+                    print("6. Back")
+
+                prescription_edit_choice = input(
+                    "Select Field / Section: "
+                ).strip()
+
+                if (
+                    has_previous_rx
+                    and prescription_edit_choice == "7"
+                ):
+                    break
+
+                if (
+                    not has_previous_rx
+                    and prescription_edit_choice == "6"
+                ):
+                    break
+
+                # ------------------------------------------
+                # 1. PRESCRIPTION SOURCE
+                # ------------------------------------------
+                if prescription_edit_choice == "1":
+
+                    print("\n--- Edit Prescription Source ---")
+                    print("1. In-Store Refraction")
+                    print("2. External Prescription")
+
+                    while True:
+
+                        new_source_choice = input(
+                            "Select Prescription Source (1/2): "
+                        ).strip()
+
+                        if new_source_choice == "1":
+                            prescription_source = (
+                                "In-Store Refraction"
+                            )
+                            prescription_from = ""
+                            break
+
+                        if new_source_choice == "2":
+                            prescription_source = (
+                                "External Prescription"
+                            )
+
+                            prescription_from = input(
+                                "Prescription From "
+                                "(Optional - Hospital / Doctor / "
+                                "Optical Shop): "
+                            ).strip()
+
+                            break
+
+                        print("Please select 1 or 2.")
+
+                    print(
+                        "Prescription Source updated successfully."
+                    )
+                    continue
+
+                # ------------------------------------------
+                # 2. SPECTACLE HISTORY
+                # ------------------------------------------
+                if prescription_edit_choice == "2":
+
+                    print("\n--- Edit Spectacle History ---")
+                    print("1. First-time Spectacle User")
+                    print("2. Existing Spectacle User")
+
+                    while True:
+
+                        new_history_choice = input(
+                            "Select Spectacle History (1/2): "
+                        ).strip()
+
+                        if new_history_choice == "1":
+
+                            spectacle_history = "First-time"
+                            years_using_glasses = ""
+                            has_previous_prescription = "n"
+
+                            previous_prescription_date = ""
+
+                            previous_right_sph = ""
+                            previous_right_cyl = ""
+                            previous_right_axis = ""
+                            previous_right_add = ""
+
+                            previous_left_sph = ""
+                            previous_left_cyl = ""
+                            previous_left_axis = ""
+                            previous_left_add = ""
+
+                            print(
+                                "Spectacle History updated to "
+                                "First-time."
+                            )
+                            break
+
+                        if new_history_choice == "2":
+
+                            spectacle_history = "Existing"
+
+                            years_using_glasses = input(
+                                "How long have you been "
+                                "using glasses?: "
+                            ).strip()
+
+                            print(
+                                "\nDo you have previous "
+                                "prescription details?"
+                            )
+                            print("1. Yes")
+                            print("2. No")
+
+                            while True:
+
+                                previous_rx_choice = input(
+                                    "Select (1/2): "
+                                ).strip()
+
+                                if previous_rx_choice == "1":
+                                    has_previous_prescription = "y"
                                     break
 
+                                if previous_rx_choice == "2":
+                                    has_previous_prescription = "n"
+
+                                    previous_prescription_date = ""
+
+                                    previous_right_sph = ""
+                                    previous_right_cyl = ""
+                                    previous_right_axis = ""
+                                    previous_right_add = ""
+
+                                    previous_left_sph = ""
+                                    previous_left_cyl = ""
+                                    previous_left_axis = ""
+                                    previous_left_add = ""
+
+                                    break
+
+                                print(
+                                    "Please select 1 for Yes "
+                                    "or 2 for No."
+                                )
+
                             print(
-                                "Invalid ADD. Enter like "
-                                "+1.00, +1.25, +1.50 or +2.00, "
-                                "or press Enter to keep current."
+                                "Spectacle History updated "
+                                "successfully."
                             )
+                            break
+
+                        print("Please select 1 or 2.")
+
+                    continue
+
+                # ------------------------------------------
+                # 3. PREVIOUS PRESCRIPTION
+                # Only shown when previous Rx is available
+                # ------------------------------------------
+                if (
+                    has_previous_rx
+                    and prescription_edit_choice == "3"
+                ):
+
+                    while True:
+
+                        print("\n--- Edit Previous Prescription ---")
+                        print(
+                            "1. Previous Prescription Date"
+                        )
+                        print("2. Right Eye (OD) SPH")
+                        print("3. Right Eye (OD) CYL")
+                        print("4. Right Eye (OD) AXIS")
+                        print("5. Right Eye (OD) ADD")
+                        print("6. Left Eye (OS) SPH")
+                        print("7. Left Eye (OS) CYL")
+                        print("8. Left Eye (OS) AXIS")
+                        print("9. Left Eye (OS) ADD")
+                        print("10. Back")
+
+                        previous_edit_choice = input(
+                            "Select Field (1-10): "
+                        ).strip()
+
+                        if previous_edit_choice == "10":
+                            break
+
+                        if previous_edit_choice == "1":
+
+                            while True:
+
+                                new_previous_date = input(
+                                    "Enter Previous Prescription Date "
+                                    "(DD-MM-YYYY, Optional - "
+                                    "press Enter if unknown): "
+                                ).strip()
+
+                                if new_previous_date == "":
+                                    previous_prescription_date = ""
+                                    break
+
+                                try:
+                                    parsed_previous_date = (
+                                        datetime.strptime(
+                                            new_previous_date,
+                                            "%d-%m-%Y"
+                                        )
+                                    )
+
+                                    previous_prescription_date = (
+                                        parsed_previous_date.strftime(
+                                            "%d-%m-%Y"
+                                        )
+                                    )
+                                    break
+
+                                except ValueError:
+                                    print(
+                                        "Invalid date. Please enter "
+                                        "date as DD-MM-YYYY "
+                                        "or leave blank."
+                                    )
+
+                            print(
+                                "Previous Prescription Date "
+                                "updated successfully."
+                            )
+                            continue
+
+                        if previous_edit_choice == "2":
+                            previous_right_sph = get_old_sph(
+                                "Right Eye"
+                            )
+                            print(
+                                "Right Eye SPH updated successfully."
+                            )
+                            continue
+
+                        if previous_edit_choice == "3":
+                            previous_right_cyl = get_old_cyl(
+                                "Right Eye"
+                            )
+                            print(
+                                "Right Eye CYL updated successfully."
+                            )
+                            continue
+
+                        if previous_edit_choice == "4":
+                            previous_right_axis = get_old_axis(
+                                "Right Eye"
+                            )
+                            print(
+                                "Right Eye AXIS updated successfully."
+                            )
+                            continue
+
+                        if previous_edit_choice == "5":
+
+                            while True:
+
+                                new_right_add = input(
+                                    "Enter Right Eye ADD / "
+                                    "Near Power "
+                                    "(Optional - press Enter "
+                                    "if not required): "
+                                ).strip()
+
+                                if new_right_add in ("", "0"):
+                                    previous_right_add = ""
+                                    break
+
+                                if new_right_add.startswith("+"):
+                                    number_part = new_right_add[1:]
+                                    parts = number_part.split(".")
+
+                                    if (
+                                        len(parts) == 2
+                                        and parts[0].isdigit()
+                                        and len(parts[1]) == 2
+                                        and parts[1] in [
+                                            "00", "25", "50", "75"
+                                        ]
+                                        and float(number_part) <= 5
+                                    ):
+                                        previous_right_add = (
+                                            new_right_add
+                                        )
+                                        break
+
+                                print(
+                                    "Invalid ADD. Enter like "
+                                    "+1.00, +1.25, +1.50, "
+                                    "+2.00 or leave blank."
+                                )
+
+                            print(
+                                "Right Eye ADD updated successfully."
+                            )
+                            continue
+
+                        if previous_edit_choice == "6":
+                            previous_left_sph = get_old_sph(
+                                "Left Eye"
+                            )
+                            print(
+                                "Left Eye SPH updated successfully."
+                            )
+                            continue
+
+                        if previous_edit_choice == "7":
+                            previous_left_cyl = get_old_cyl(
+                                "Left Eye"
+                            )
+                            print(
+                                "Left Eye CYL updated successfully."
+                            )
+                            continue
+
+                        if previous_edit_choice == "8":
+                            previous_left_axis = get_old_axis(
+                                "Left Eye"
+                            )
+                            print(
+                                "Left Eye AXIS updated successfully."
+                            )
+                            continue
+
+                        if previous_edit_choice == "9":
+
+                            while True:
+
+                                new_left_add = input(
+                                    "Enter Left Eye ADD / "
+                                    "Near Power "
+                                    "(Optional - press Enter "
+                                    "if not required): "
+                                ).strip()
+
+                                if new_left_add in ("", "0"):
+                                    previous_left_add = ""
+                                    break
+
+                                if new_left_add.startswith("+"):
+                                    number_part = new_left_add[1:]
+                                    parts = number_part.split(".")
+
+                                    if (
+                                        len(parts) == 2
+                                        and parts[0].isdigit()
+                                        and len(parts[1]) == 2
+                                        and parts[1] in [
+                                            "00", "25", "50", "75"
+                                        ]
+                                        and float(number_part) <= 5
+                                    ):
+                                        previous_left_add = (
+                                            new_left_add
+                                        )
+                                        break
+
+                                print(
+                                    "Invalid ADD. Enter like "
+                                    "+1.00, +1.25, +1.50, "
+                                    "+2.00 or leave blank."
+                                )
+
+                            print(
+                                "Left Eye ADD updated successfully."
+                            )
+                            continue
+
+                        print(
+                            "Please select a number from 1 to 10."
+                        )
+
+                    continue
+
+                # ------------------------------------------
+                # EYE SURGERY / IOL HISTORY
+                # Previous Rx available  -> Option 4
+                # Previous Rx unavailable -> Option 3
+                # ------------------------------------------
+                eye_surgery_selected = (
+                    (
+                        has_previous_rx
+                        and prescription_edit_choice == "4"
+                    )
+                    or (
+                        not has_previous_rx
+                        and prescription_edit_choice == "3"
+                    )
+                )
+
+                if eye_surgery_selected:
+
+                    print("\n--- Edit Eye Surgery / IOL History ---")
+                    print("1. No Eye Surgery")
+                    print("2. Right Eye (OD)")
+                    print("3. Left Eye (OS)")
+                    print("4. Both Eyes")
+
+                    while True:
+
+                        new_surgery_choice = input(
+                            "Select Eye Surgery Status "
+                            "(1/2/3/4): "
+                        ).strip()
+
+                        if new_surgery_choice == "1":
+
+                            eye_surgery = "No"
+                            surgery_eye = ""
+                            right_iol = "No"
+                            left_iol = "No"
+
+                            break
+
+                        if new_surgery_choice == "2":
+
+                            eye_surgery = "Yes"
+                            surgery_eye = "Right Eye (OD)"
+                            left_iol = "No"
+
+                            print(
+                                "\nRight Eye IOL implanted?"
+                            )
+                            print("1. Yes")
+                            print("2. No")
+
+                            while True:
+
+                                new_right_iol_choice = input(
+                                    "Select (1/2): "
+                                ).strip()
+
+                                if new_right_iol_choice == "1":
+                                    right_iol = "Yes"
+                                    break
+
+                                if new_right_iol_choice == "2":
+                                    right_iol = "No"
+                                    break
+
+                                print(
+                                    "Please select 1 for Yes "
+                                    "or 2 for No."
+                                )
+
+                            break
+
+                        if new_surgery_choice == "3":
+
+                            eye_surgery = "Yes"
+                            surgery_eye = "Left Eye (OS)"
+                            right_iol = "No"
+
+                            print(
+                                "\nLeft Eye IOL implanted?"
+                            )
+                            print("1. Yes")
+                            print("2. No")
+
+                            while True:
+
+                                new_left_iol_choice = input(
+                                    "Select (1/2): "
+                                ).strip()
+
+                                if new_left_iol_choice == "1":
+                                    left_iol = "Yes"
+                                    break
+
+                                if new_left_iol_choice == "2":
+                                    left_iol = "No"
+                                    break
+
+                                print(
+                                    "Please select 1 for Yes "
+                                    "or 2 for No."
+                                )
+
+                            break
+
+                        if new_surgery_choice == "4":
+
+                            eye_surgery = "Yes"
+                            surgery_eye = "Both Eyes"
+
+                            print(
+                                "\nRight Eye IOL implanted?"
+                            )
+                            print("1. Yes")
+                            print("2. No")
+
+                            while True:
+
+                                new_right_iol_choice = input(
+                                    "Select (1/2): "
+                                ).strip()
+
+                                if new_right_iol_choice == "1":
+                                    right_iol = "Yes"
+                                    break
+
+                                if new_right_iol_choice == "2":
+                                    right_iol = "No"
+                                    break
+
+                                print(
+                                    "Please select 1 for Yes "
+                                    "or 2 for No."
+                                )
+
+                            print(
+                                "\nLeft Eye IOL implanted?"
+                            )
+                            print("1. Yes")
+                            print("2. No")
+
+                            while True:
+
+                                new_left_iol_choice = input(
+                                    "Select (1/2): "
+                                ).strip()
+
+                                if new_left_iol_choice == "1":
+                                    left_iol = "Yes"
+                                    break
+
+                                if new_left_iol_choice == "2":
+                                    left_iol = "No"
+                                    break
+
+                                print(
+                                    "Please select 1 for Yes "
+                                    "or 2 for No."
+                                )
+
+                            break
+
+                        print(
+                            "Please select 1, 2, 3 or 4."
+                        )
+
+                    print(
+                        "Eye Surgery / IOL History "
+                        "updated successfully."
+                    )
+                    continue
+
+                # ------------------------------------------
+                # CURRENT PRESCRIPTION
+                # Previous Rx available  -> Option 5
+                # Previous Rx unavailable -> Option 4
+                # ------------------------------------------
+                current_rx_selected = (
+                    (
+                        has_previous_rx
+                        and prescription_edit_choice == "5"
+                    )
+                    or (
+                        not has_previous_rx
+                        and prescription_edit_choice == "4"
+                    )
+                )
+
+                if current_rx_selected:
+
+                    while True:
+
+                        print("\n--- Edit Current Prescription ---")
+                        print("1. Right Eye (OD) SPH")
+                        print("2. Right Eye (OD) CYL")
+                        print("3. Right Eye (OD) AXIS")
+
+                        if (
+                            lens_type_choice != "1"
+                            and add_requirement != "3"
+                        ):
+                            print("4. Right Eye (OD) ADD")
+                        else:
+                            print("4. Right Eye (OD) ADD - Not Required")
+
+                        print("5. Left Eye (OS) SPH")
+                        print("6. Left Eye (OS) CYL")
+                        print("7. Left Eye (OS) AXIS")
+
+                        if (
+                            lens_type_choice != "1"
+                            and add_requirement != "2"
+                        ):
+                            print("8. Left Eye (OS) ADD")
+                        else:
+                            print("8. Left Eye (OS) ADD - Not Required")
+
+                        print("9. Back")
+
+                        current_rx_edit_choice = input(
+                            "Select Field (1-9): "
+                        ).strip()
+
+                        if current_rx_edit_choice == "9":
+                            break
+
+                        # ----------------------------------
+                        # 1. RIGHT EYE (OD) SPH
+                        # ----------------------------------
+                        if current_rx_edit_choice == "1":
+
+                            while True:
+
+                                new_right_sph = input(
+                                    "Enter Right Eye SPH (+/-): "
+                                ).strip()
+
+                                if new_right_sph.lower() == "plano":
+                                    right_sph = "Plano"
+                                    break
+
+                                if new_right_sph == "0":
+                                    right_sph = "0"
+                                    break
+
+                                if new_right_sph.startswith(("+", "-")):
+                                    number_part = new_right_sph[1:]
+                                    parts = number_part.split(".")
+
+                                    if (
+                                        len(parts) == 2
+                                        and parts[0].isdigit()
+                                        and len(parts[1]) == 2
+                                        and parts[1]
+                                        in ["00", "25", "50", "75"]
+                                        and float(number_part) <= 30
+                                    ):
+                                        right_sph = new_right_sph
+                                        break
+
+                                print(
+                                    "Invalid SPH. Enter like "
+                                    "-1.00, +1.25, 0 or Plano."
+                                )
+
+                            print(
+                                "Right Eye SPH updated successfully."
+                            )
+                            continue
+
+                        # ----------------------------------
+                        # 2. RIGHT EYE (OD) CYL
+                        # ----------------------------------
+                        if current_rx_edit_choice == "2":
+
+                            while True:
+
+                                new_right_cyl = input(
+                                    "Enter Right Eye CYL (+/-): "
+                                ).strip()
+
+                                if new_right_cyl == "":
+                                    right_cyl = ""
+                                    break
+
+                                if new_right_cyl == "0":
+                                    right_cyl = "0"
+                                    break
+
+                                if new_right_cyl.startswith(("+", "-")):
+                                    number_part = new_right_cyl[1:]
+                                    parts = number_part.split(".")
+
+                                    if (
+                                        len(parts) == 2
+                                        and parts[0].isdigit()
+                                        and len(parts[1]) == 2
+                                        and parts[1]
+                                        in ["00", "25", "50", "75"]
+                                        and float(number_part) <= 10
+                                    ):
+                                        right_cyl = new_right_cyl
+                                        break
+
+                                print(
+                                    "Invalid CYL. Enter like "
+                                    "-0.50, +1.25, 0 or leave blank."
+                                )
+
+                            print(
+                                "Right Eye CYL updated successfully."
+                            )
+                            continue
+
+                        # ----------------------------------
+                        # 3. RIGHT EYE (OD) AXIS
+                        # ----------------------------------
+                        if current_rx_edit_choice == "3":
+
+                            while True:
+
+                                new_right_axis = input(
+                                    "Enter Right Eye AXIS (0-180): "
+                                ).strip()
+
+                                if new_right_axis == "":
+                                    right_axis = ""
+                                    break
+
+                                if new_right_axis.isdigit():
+                                    axis_value = int(new_right_axis)
+
+                                    if 0 <= axis_value <= 180:
+                                        right_axis = new_right_axis
+                                        break
+
+                                print(
+                                    "Invalid AXIS. Enter a number "
+                                    "from 0 to 180 or leave blank."
+                                )
+
+                            print(
+                                "Right Eye AXIS updated successfully."
+                            )
+                            continue
+
+                        # ----------------------------------
+                        # 4. RIGHT EYE (OD) ADD
+                        # ----------------------------------
+                        if current_rx_edit_choice == "4":
+
+                            if (
+                                lens_type_choice == "1"
+                                or add_requirement == "3"
+                            ):
+                                right_add = ""
+                                print(
+                                    "Right Eye ADD is Not Required."
+                                )
+                                continue
+
+                            while True:
+
+                                new_right_add = input(
+                                    "Enter Right Eye ADD / "
+                                    "Near Power (+): "
+                                ).strip()
+
+                                if new_right_add in ["", "0"]:
+                                    print(
+                                        "ADD is required for Right Eye."
+                                    )
+                                    continue
+
+                                if new_right_add.startswith("+"):
+                                    number_part = new_right_add[1:]
+                                    parts = number_part.split(".")
+
+                                    if (
+                                        len(parts) == 2
+                                        and parts[0].isdigit()
+                                        and len(parts[1]) == 2
+                                        and parts[1]
+                                        in ["00", "25", "50", "75"]
+                                        and float(number_part) <= 5
+                                    ):
+                                        right_add = new_right_add
+                                        break
+
+                                print(
+                                    "Invalid ADD. Enter like "
+                                    "+1.00, +1.25, +1.50 or +2.00."
+                                )
+
+                            print(
+                                "Right Eye ADD updated successfully."
+                            )
+                            continue
+
+                        # ----------------------------------
+                        # 5. LEFT EYE (OS) SPH
+                        # ----------------------------------
+                        if current_rx_edit_choice == "5":
+
+                            while True:
+
+                                new_left_sph = input(
+                                    "Enter Left Eye SPH (+/-): "
+                                ).strip()
+
+                                if new_left_sph.lower() == "plano":
+                                    left_sph = "Plano"
+                                    break
+
+                                if new_left_sph == "0":
+                                    left_sph = "0"
+                                    break
+
+                                if new_left_sph.startswith(("+", "-")):
+                                    number_part = new_left_sph[1:]
+                                    parts = number_part.split(".")
+
+                                    if (
+                                        len(parts) == 2
+                                        and parts[0].isdigit()
+                                        and len(parts[1]) == 2
+                                        and parts[1]
+                                        in ["00", "25", "50", "75"]
+                                        and float(number_part) <= 30
+                                    ):
+                                        left_sph = new_left_sph
+                                        break
+
+                                print(
+                                    "Invalid SPH. Enter like "
+                                    "-1.00, +1.25, 0 or Plano."
+                                )
+
+                            print(
+                                "Left Eye SPH updated successfully."
+                            )
+                            continue
+
+                        # ----------------------------------
+                        # 6. LEFT EYE (OS) CYL
+                        # ----------------------------------
+                        if current_rx_edit_choice == "6":
+
+                            while True:
+
+                                new_left_cyl = input(
+                                    "Enter Left Eye CYL (+/-): "
+                                ).strip()
+
+                                if new_left_cyl == "":
+                                    left_cyl = ""
+                                    break
+
+                                if new_left_cyl == "0":
+                                    left_cyl = "0"
+                                    break
+
+                                if new_left_cyl.startswith(("+", "-")):
+                                    number_part = new_left_cyl[1:]
+                                    parts = number_part.split(".")
+
+                                    if (
+                                        len(parts) == 2
+                                        and parts[0].isdigit()
+                                        and len(parts[1]) == 2
+                                        and parts[1]
+                                        in ["00", "25", "50", "75"]
+                                        and float(number_part) <= 10
+                                    ):
+                                        left_cyl = new_left_cyl
+                                        break
+
+                                print(
+                                    "Invalid CYL. Enter like "
+                                    "-1.00, +0.50, 0 or leave blank."
+                                )
+
+                            print(
+                                "Left Eye CYL updated successfully."
+                            )
+                            continue
+
+                        # ----------------------------------
+                        # 7. LEFT EYE (OS) AXIS
+                        # ----------------------------------
+                        if current_rx_edit_choice == "7":
+
+                            while True:
+
+                                new_left_axis = input(
+                                    "Enter Left Eye AXIS (0-180): "
+                                ).strip()
+
+                                if new_left_axis == "":
+                                    left_axis = ""
+                                    break
+
+                                if new_left_axis.isdigit():
+                                    axis_value = int(new_left_axis)
+
+                                    if 0 <= axis_value <= 180:
+                                        left_axis = new_left_axis
+                                        break
+
+                                print(
+                                    "Invalid AXIS. Enter a number "
+                                    "from 0 to 180 or leave blank."
+                                )
+
+                            print(
+                                "Left Eye AXIS updated successfully."
+                            )
+                            continue
+
+                        # ----------------------------------
+                        # 8. LEFT EYE (OS) ADD
+                        # ----------------------------------
+                        if current_rx_edit_choice == "8":
+
+                            if (
+                                lens_type_choice == "1"
+                                or add_requirement == "2"
+                            ):
+                                left_add = ""
+                                print(
+                                    "Left Eye ADD is Not Required."
+                                )
+                                continue
+
+                            while True:
+
+                                new_left_add = input(
+                                    "Enter Left Eye ADD / "
+                                    "Near Power (+): "
+                                ).strip()
+
+                                if new_left_add in ["", "0"]:
+                                    print(
+                                        "ADD is required for Left Eye."
+                                    )
+                                    continue
+
+                                if new_left_add.startswith("+"):
+                                    number_part = new_left_add[1:]
+                                    parts = number_part.split(".")
+
+                                    if (
+                                        len(parts) == 2
+                                        and parts[0].isdigit()
+                                        and len(parts[1]) == 2
+                                        and parts[1]
+                                        in ["00", "25", "50", "75"]
+                                        and float(number_part) <= 5
+                                    ):
+                                        left_add = new_left_add
+                                        break
+
+                                print(
+                                    "Invalid ADD. Enter like "
+                                    "+1.00, +1.25, +1.50 or +2.00."
+                                )
+
+                            print(
+                                "Left Eye ADD updated successfully."
+                            )
+                            continue
+
+                        print(
+                            "Please select a number from 1 to 9."
+                        )
+                    continue
+
+                # ------------------------------------------
+                # PD / VISION DETAILS
+                # Previous Rx available  -> Option 6
+                # Previous Rx unavailable -> Option 5
+                # ------------------------------------------
+                pd_vision_selected = (
+                    (
+                        has_previous_rx
+                        and prescription_edit_choice == "6"
+                    )
+                    or (
+                        not has_previous_rx
+                        and prescription_edit_choice == "5"
+                    )
+                )
+
+                if pd_vision_selected:
+
+                    while True:
+
+                        print("\n--- Edit PD / Vision Details ---")
+                        print("1. Distance PD")
+                        print("2. Near PD")
+                        print("3. Right Eye Visual Acuity")
+                        print("4. Left Eye Visual Acuity")
+                        print("5. Right Eye Pinhole")
+                        print("6. Left Eye Pinhole")
+                        print("7. Back")
+
+                        pd_vision_edit_choice = input(
+                            "Select Field (1-7): "
+                        ).strip()
+
+                        if pd_vision_edit_choice == "1":
+                            distance_pd = input(
+                                "Enter Distance PD in mm "
+                                "(Example: 62, press Enter "
+                                "if not measured): "
+                            ).strip()
+
+                            print(
+                                "Distance PD updated successfully."
+                            )
+                            continue
+
+                        if pd_vision_edit_choice == "2":
+                            near_pd = input(
+                                "Enter Near PD in mm "
+                                "(Example: 59, press Enter "
+                                "if not measured): "
+                            ).strip()
+
+                            print(
+                                "Near PD updated successfully."
+                            )
+                            continue
+
+                        if pd_vision_edit_choice == "3":
+                            right_va = input(
+                                "Right Eye Visual Acuity "
+                                "(Example: 6/6, press Enter "
+                                "if not measured): "
+                            ).strip()
+
+                            print(
+                                "Right Eye Visual Acuity "
+                                "updated successfully."
+                            )
+                            continue
+
+                        if pd_vision_edit_choice == "4":
+                            left_va = input(
+                                "Left Eye Visual Acuity "
+                                "(Example: 6/6, press Enter "
+                                "if not measured): "
+                            ).strip()
+
+                            print(
+                                "Left Eye Visual Acuity "
+                                "updated successfully."
+                            )
+                            continue
+
+                        if pd_vision_edit_choice == "5":
+                            right_pinhole = input(
+                                "Right Eye Pinhole "
+                                "(Example: 6/6, press Enter "
+                                "if not measured): "
+                            ).strip()
+
+                            print(
+                                "Right Eye Pinhole "
+                                "updated successfully."
+                            )
+                            continue
+
+                        if pd_vision_edit_choice == "6":
+                            left_pinhole = input(
+                                "Left Eye Pinhole "
+                                "(Example: 6/6, press Enter "
+                                "if not measured): "
+                            ).strip()
+
+                            print(
+                                "Left Eye Pinhole "
+                                "updated successfully."
+                            )
+                            continue
+
+                        if pd_vision_edit_choice == "7":
+                            break
+
+                        print(
+                            "Please select a number from 1 to 7."
+                        )
+
+                    continue
+
+                print(
+                    "Please select a valid "
+                    "Prescription / Eye Details option."
+                )
+            continue
+        if review_choice == "4":
+
+            while True:
+
+                print("\n--- Edit Lens Details ---")
+                print("1. Lens Type")
+
+                if lens_type != "Single Vision":
+                    print("2. ADD Requirement")
+                else:
+                    print("2. ADD Requirement - Not Required")
+
+                print("3. Lens Features / Coating")
+                print("4. Lens Brand")
+                print("5. Lens Offer")
+                print("6. Lens Price")
+                print("7. Back")
+
+                lens_edit_choice = input(
+                    "Select Field (1-7): "
+                ).strip()
+
+                # ------------------------------------------
+                # 1. LENS TYPE
+                # ------------------------------------------
+                if lens_edit_choice == "1":
+
+                    print("\n--- Edit Lens Type ---")
+                    print("1. Single Vision")
+                    print("2. Bifocal")
+
+                    while True:
+
+                        new_lens_type_choice = input(
+                            "Select Lens Type (1/2): "
+                        ).strip()
+
+                        if new_lens_type_choice == "1":
+
+                            lens_type_choice = "1"
+                            lens_type = "Single Vision"
+                            add_requirement = ""
+
+                            right_add = ""
+                            left_add = ""
+
+                            break
+
+                        if new_lens_type_choice == "2":
+
+                            lens_type_choice = "2"
+
+                            print("\n--- Bifocal Type ---")
+                            print("1. Kryptok Bifocal")
+                            print("2. D Bifocal")
+                            print("3. Progressive Bifocal")
+                            print("4. Other")
+
+                            while True:
+
+                                new_bifocal_choice = input(
+                                    "Select Bifocal Type "
+                                    "(1/2/3/4): "
+                                ).strip()
+
+                                if new_bifocal_choice == "1":
+                                    lens_type = "Kryptok Bifocal"
+                                    break
+
+                                if new_bifocal_choice == "2":
+                                    lens_type = "D Bifocal"
+                                    break
+
+                                if new_bifocal_choice == "3":
+                                    lens_type = (
+                                        "Progressive Bifocal"
+                                    )
+                                    break
+
+                                if new_bifocal_choice == "4":
+                                    lens_type = "Other"
+                                    break
+
+                                print(
+                                    "Invalid option. Please select "
+                                    "1, 2, 3 or 4."
+                                )
+
+                            print("\n--- ADD Requirement ---")
+                            print("1. Both Eyes")
+                            print("2. Right Eye (OD) Only")
+                            print("3. Left Eye (OS) Only")
+
+                            while True:
+
+                                add_requirement = input(
+                                    "Select ADD Requirement "
+                                    "(1/2/3): "
+                                ).strip()
+
+                                if add_requirement in [
+                                    "1", "2", "3"
+                                ]:
+                                    break
+
+                                print(
+                                    "Invalid option. Please select "
+                                    "1, 2 or 3."
+                                )
+
+                            if add_requirement == "2":
+                                left_add = ""
+
+                            elif add_requirement == "3":
+                                right_add = ""
+
+                            break
+
+                        print(
+                            "Invalid option. Please select 1 or 2."
+                        )
+
+                    print(
+                        "Lens Type updated successfully."
+                    )
+                    continue
+
+                # ------------------------------------------
+                # 2. ADD REQUIREMENT
+                # ------------------------------------------
+                if lens_edit_choice == "2":
+
+                    if lens_type == "Single Vision":
+                        add_requirement = ""
+                        right_add = ""
+                        left_add = ""
+
+                        print(
+                            "ADD Requirement is Not Required "
+                            "for Single Vision."
+                        )
+                        continue
+
+                    print("\n--- Edit ADD Requirement ---")
+                    print("1. Both Eyes")
+                    print("2. Right Eye (OD) Only")
+                    print("3. Left Eye (OS) Only")
+
+                    while True:
+
+                        new_add_requirement = input(
+                            "Select ADD Requirement "
+                            "(1/2/3): "
+                        ).strip()
+
+                        if new_add_requirement in [
+                            "1", "2", "3"
+                        ]:
+                            add_requirement = (
+                                new_add_requirement
+                            )
+                            break
+
+                        print(
+                            "Invalid option. Please select "
+                            "1, 2 or 3."
+                        )
+
+                    if add_requirement == "2":
+                        left_add = ""
+
+                    elif add_requirement == "3":
+                        right_add = ""
+
+                    print(
+                        "ADD Requirement updated successfully."
+                    )
+                    continue
+
+                # ------------------------------------------
+                # 3. LENS FEATURES / COATING
+                # ------------------------------------------
+                if lens_edit_choice == "3":
+
+                    while True:
+
+                        new_lens_features = input(
+                            "Enter Lens Features / Coating "
+                            "(Optional): "
+                        ).strip().title()
+
+                        normalized_features = (
+                            new_lens_features.lower()
+                            .replace(".", " ")
+                            .replace("-", " ")
+                            .replace("/", " ")
+                            .replace(",", " ")
+                            .replace("_", " ")
+                        )
+
+                        feature_words = (
+                            normalized_features.split()
+                        )
+
+                        has_kt = (
+                            "kt" in feature_words
+                            or "kryptok" in feature_words
+                        )
+
+                        has_progressive = (
+                            "progressive" in feature_words
+                        )
+
+                        has_d_bifocal = (
+                            "d bifocal"
+                            in normalized_features
+                            or "dbifocal"
+                            in normalized_features
+                        )
+
+                        if lens_type == "Single Vision":
+
+                            if has_kt:
+                                print(
+                                    "KT / Kryptok is a Bifocal "
+                                    "type and cannot be used "
+                                    "with Single Vision."
+                                )
+                                continue
+
+                            if has_progressive:
+                                print(
+                                    "Progressive cannot be used "
+                                    "with Single Vision."
+                                )
+                                continue
+
+                            if has_d_bifocal:
+                                print(
+                                    "D Bifocal cannot be used "
+                                    "with Single Vision."
+                                )
+                                continue
+
+                        elif lens_type == "Kryptok Bifocal":
+
+                            if has_progressive:
+                                print(
+                                    "Progressive cannot be used "
+                                    "with Kryptok Bifocal."
+                                )
+                                continue
+
+                            if has_d_bifocal:
+                                print(
+                                    "D Bifocal cannot be used "
+                                    "with Kryptok Bifocal."
+                                )
+                                continue
+
+                        elif lens_type == "D Bifocal":
+
+                            if has_kt:
+                                print(
+                                    "KT / Kryptok cannot be used "
+                                    "with D Bifocal."
+                                )
+                                continue
+
+                            if has_progressive:
+                                print(
+                                    "Progressive cannot be used "
+                                    "with D Bifocal."
+                                )
+                                continue
+
+                        elif lens_type == "Progressive Bifocal":
+
+                            if has_kt:
+                                print(
+                                    "KT / Kryptok cannot be used "
+                                    "with Progressive Bifocal."
+                                )
+                                continue
+
+                            if has_d_bifocal:
+                                print(
+                                    "D Bifocal cannot be used "
+                                    "with Progressive Bifocal."
+                                )
+                                continue
+
+                        lens_features = new_lens_features
+                        break
+
+                    print(
+                        "Lens Features / Coating "
+                        "updated successfully."
+                    )
+                    continue
+
+                # ------------------------------------------
+                # 4. LENS BRAND
+                # ------------------------------------------
+                if lens_edit_choice == "4":
+
+                    lens_brand = input(
+                        "Enter Lens Brand (Optional): "
+                    ).strip().title()
+
+                    print(
+                        "Lens Brand updated successfully."
+                    )
+                    continue
+
+                # ------------------------------------------
+                # 5. LENS OFFER
+                # ------------------------------------------
+                if lens_edit_choice == "5":
+
+                    lens_offer = normalize_offer(
+                        input("Enter Lens Offer (Example: 10 or 10%): ")
+                    )
+                    print(
+                        "Lens Offer updated successfully."
+                    )
+                    continue
+
+                # ------------------------------------------
+                # 6. LENS PRICE
+                # ------------------------------------------
+                if lens_edit_choice == "6":
+
+                    while True:
+
+                        new_lens_price_input = input(
+                            "Enter Lens Price: "
+                        ).strip()
+
+                        try:
+                            new_lens_price = float(
+                                new_lens_price_input
+                            )
+
+                            if new_lens_price < 0:
+                                print(
+                                    "Lens Price cannot be negative."
+                                )
+                                continue
+
+                            lens_price = new_lens_price
+                            break
+
+                        except ValueError:
+                            print(
+                                "Please enter Lens Price "
+                                "using numbers only."
+                            )
+
+                    # Recalculate all dependent payment values
+                    order_total = frame_price + lens_price
+
+                    if less_amount > order_total:
+                        less_amount = order_total
+
+                    total_amount = (
+                        order_total - less_amount
+                    )
+
+                    if advance_amount > total_amount:
+                        advance_amount = total_amount
+
+                    balance = (
+                        total_amount - advance_amount
+                    )
+
+                    print(
+                        "Lens Price updated successfully."
+                    )
+                    continue
+
+                # ------------------------------------------
+                # 7. BACK
+                # ------------------------------------------
+                if lens_edit_choice == "7":
                     break
+
+                print(
+                    "Please select a number from 1 to 7."
+                )
+
+            continue
+        if review_choice == "5":
+
+            while True:
+
+                print("\n--- Edit Payment Details ---")
+                print(f"Order Total    : ₹{order_total:.2f}")
+                print(f"Less Amount    : ₹{less_amount:.2f}")
+                print(f"Final Total    : ₹{total_amount:.2f}")
+                print(f"Advance Amount : ₹{advance_amount:.2f}")
+                print(f"Balance        : ₹{balance:.2f}")
+
+                print("\n1. Less Amount")
+                print("2. Advance Amount")
+                print("3. Back")
+
+                payment_edit_choice = input(
+                    "Select Field / Back (1/2/3): "
+                ).strip()
+
+                if payment_edit_choice == "3":
+                    break
+
+                if payment_edit_choice == "1":
+
+                    while True:
+
+                        new_less_input = input(
+                            "Enter Less Amount "
+                            "(Optional - press Enter for 0): "
+                        ).strip()
+
+                        if new_less_input == "":
+                            new_less_amount = 0.0
+                        else:
+                            try:
+                                new_less_amount = float(
+                                    new_less_input
+                                )
+                            except ValueError:
+                                print(
+                                    "Please enter Less Amount "
+                                    "using numbers only."
+                                )
+                                continue
+
+                        if new_less_amount < 0:
+                            print(
+                                "Less Amount cannot be negative."
+                            )
+                            continue
+
+                        if new_less_amount > order_total:
+                            print(
+                                "Less Amount cannot be greater "
+                                "than Order Total."
+                            )
+                            continue
+
+                        new_total_amount = (
+                            order_total - new_less_amount
+                        )
+
+                        if advance_amount > new_total_amount:
+                            print(
+                                "This Less Amount cannot be used "
+                                "because the current Advance Amount "
+                                "would be greater than "
+                                "Final Total Amount."
+                            )
+                            continue
+
+                        less_amount = new_less_amount
+                        total_amount = new_total_amount
+                        balance = (
+                            total_amount - advance_amount
+                        )
+                        break
+
+                    print(
+                        "Less Amount updated successfully."
+                    )
+                    continue
+
+                if payment_edit_choice == "2":
+
+                    while True:
+
+                        new_advance_input = input(
+                            "Enter Advance Amount: "
+                        ).strip()
+
+                        try:
+                            new_advance_amount = float(
+                                new_advance_input
+                            )
+
+                            if new_advance_amount < 0:
+                                print(
+                                    "Advance amount cannot be negative."
+                                )
+                                continue
+
+                            if new_advance_amount > total_amount:
+                                print(
+                                    "Advance amount cannot be greater "
+                                    "than Final Total Amount."
+                                )
+                                continue
+
+                            advance_amount = new_advance_amount
+                            balance = (
+                                total_amount - advance_amount
+                            )
+                            break
+
+                        except ValueError:
+                            print(
+                                "Please enter amount "
+                                "using numbers only."
+                            )
+
+                    print(
+                        "Advance Amount updated successfully."
+                    )
+                    continue
+
+                print(
+                    "Please select 1, 2 or 3."
+                )
+
+            continue
+        if review_choice == "6":
+
+            while True:
+
+                print("\n--- Edit Delivery Details ---")
+                print("1. Delivery Status")
+
+                if delivery_status == "Pending":
+                    print("2. Back")
+
+                elif (
+                    delivery_status == "Delivered"
+                    and delivered_to == "Customer / Same Person"
+                ):
+                    print("2. Delivered To")
+                    print("3. Back")
 
                 else:
-                    print(
-                        "Invalid option. Please select 1 or 2."
-                    )
+                    print("2. Delivered To")
+                    print("3. Receiver Name")
+                    print("4. Back")
 
-            # Lens Features / Coating
-            while True:
-
-                lens_features = input(
-                    "Enter Lens Features / Coating (Optional): "
-                ).strip().title()
-
-                normalized_features = (
-                    lens_features.lower()
-                    .replace(".", " ")
-                    .replace("-", " ")
-                    .replace("/", " ")
-                    .replace(",", " ")
-                    .replace("_", " ")
-                )
-
-                feature_words = normalized_features.split()
-
-                has_kt = (
-                    "kt" in feature_words
-                    or "kryptok" in feature_words
-                )
-
-                has_progressive = (
-                    "progressive" in feature_words
-                )
-
-                has_d_bifocal = (
-                    "d bifocal" in normalized_features
-                    or "dbifocal" in normalized_features
-                )
-
-                if lens_type == "Single Vision":
-
-                    if has_kt:
-                        print(
-                            "KT / Kryptok is a Bifocal type and "
-                            "cannot be used with Single Vision."
-                        )
-                        continue
-
-                    if has_progressive:
-                        print(
-                            "Progressive cannot be used with "
-                            "Single Vision."
-                        )
-                        continue
-
-                    if has_d_bifocal:
-                        print(
-                            "D Bifocal cannot be used with "
-                            "Single Vision."
-                        )
-                        continue
-
-                elif lens_type == "Kryptok Bifocal":
-
-                    if has_progressive:
-                        print(
-                            "Progressive cannot be used with "
-                            "Kryptok Bifocal."
-                        )
-                        continue
-
-                    if has_d_bifocal:
-                        print(
-                            "D Bifocal cannot be used with "
-                            "Kryptok Bifocal."
-                        )
-                        continue
-
-                elif lens_type == "D Bifocal":
-
-                    if has_kt:
-                        print(
-                            "KT / Kryptok cannot be used with "
-                            "D Bifocal."
-                        )
-                        continue
-
-                    if has_progressive:
-                        print(
-                            "Progressive cannot be used with "
-                            "D Bifocal."
-                        )
-                        continue
-
-                elif lens_type == "Progressive Bifocal":
-
-                    if has_kt:
-                        print(
-                            "KT / Kryptok cannot be used with "
-                            "Progressive Bifocal."
-                        )
-                        continue
-
-                    if has_d_bifocal:
-                        print(
-                            "D Bifocal cannot be used with "
-                            "Progressive Bifocal."
-                        )
-                        continue
-
-                break
-
-            lens_brand = input(
-                "Enter Lens Brand (Optional): "
-            ).strip().title()
-
-            lens_offer = input(
-                "Enter Lens Offer: "
-            ).strip()
-
-            while True:
-
-                lens_price_input = input(
-                    "Enter Lens Price: "
+                delivery_edit_choice = input(
+                    "Select Field / Back: "
                 ).strip()
 
-                try:
-                    lens_price = float(lens_price_input)
-
-                    if lens_price < 0:
-                        print(
-                            "Lens Price cannot be negative."
-                        )
-                        continue
-
+                if (
+                    delivery_status == "Pending"
+                    and delivery_edit_choice == "2"
+                ):
                     break
 
-                except ValueError:
-                    print(
-                        "Please enter Lens Price using numbers only."
-                    )
-
-            print("\n--- Edit Distance Prescription ---")
-
-            print("\nRight Eye (OD)")
-            print(
-                f"Current: SPH={right_sph} "
-                f"CYL={right_cyl} "
-                f"AXIS={right_axis}"
-            )
-
-            while True:
-                new_right_sph = input(
-                    "New Right SPH "
-                    "(press Enter to keep current): "
-                ).strip()
-
-                if new_right_sph == "":
+                if (
+                    delivery_status == "Delivered"
+                    and delivered_to == "Customer / Same Person"
+                    and delivery_edit_choice == "3"
+                ):
                     break
 
-                if new_right_sph.lower() == "plano":
-                    right_sph = "Plano"
+                if (
+                    delivery_status == "Delivered"
+                    and delivered_to == "Other Person"
+                    and delivery_edit_choice == "4"
+                ):
                     break
 
-                if new_right_sph == "0":
-                    right_sph = "0"
-                    break
-
-                if new_right_sph.startswith(("+", "-")):
-                    number_part = new_right_sph[1:]
-                    parts = number_part.split(".")
-
-                    if (
-                        len(parts) == 2
-                        and parts[0].isdigit()
-                        and len(parts[1]) == 2
-                        and parts[1] in ["00", "25", "50", "75"]
-                        and float(number_part) <= 30
-                    ):
-                        right_sph = new_right_sph
-                        break
-
-                print(
-                    "Invalid SPH. Enter like "
-                    "-1.00, +1.25, 0, Plano "
-                    "or press Enter to keep current."
-                )
-
-            while True:
-                new_right_cyl = input(
-                    "New Right CYL "
-                    "(press Enter to keep current): "
-                ).strip()
-
-                if new_right_cyl == "":
-                    break
-
-                if new_right_cyl == "0":
-                    right_cyl = "0"
-                    break
-
-                if new_right_cyl.startswith(("+", "-")):
-                    number_part = new_right_cyl[1:]
-                    parts = number_part.split(".")
-
-                    if (
-                        len(parts) == 2
-                        and parts[0].isdigit()
-                        and len(parts[1]) == 2
-                        and parts[1] in ["00", "25", "50", "75"]
-                        and float(number_part) <= 10
-                    ):
-                        right_cyl = new_right_cyl
-                        break
-
-                print(
-                    "Invalid CYL. Enter like "
-                    "-0.50, +1.25, 0 "
-                    "or press Enter to keep current."
-                )
-
-            while True:
-                new_right_axis = input(
-                    "New Right AXIS "
-                    "(press Enter to keep current): "
-                ).strip()
-
-                if new_right_axis == "":
-                    break
-
-                if new_right_axis.isdigit():
-                    axis_value = int(new_right_axis)
-
-                    if 0 <= axis_value <= 180:
-                        right_axis = new_right_axis
-                        break
-
-                print(
-                    "Invalid AXIS. Enter 0-180 "
-                    "or press Enter to keep current."
-                )
-            print("\nLeft Eye (OS)")
-            print(
-                f"Current: SPH={left_sph} "
-                f"CYL={left_cyl} "
-                f"AXIS={left_axis}"
-            )
-
-            while True:
-                new_left_sph = input(
-                    "New Left SPH "
-                    "(press Enter to keep current): "
-                ).strip()
-
-                if new_left_sph == "":
-                    break
-
-                if new_left_sph.lower() == "plano":
-                    left_sph = "Plano"
-                    break
-
-                if new_left_sph == "0":
-                    left_sph = "0"
-                    break
-
-                if new_left_sph.startswith(("+", "-")):
-                    number_part = new_left_sph[1:]
-                    parts = number_part.split(".")
-
-                    if (
-                        len(parts) == 2
-                        and parts[0].isdigit()
-                        and len(parts[1]) == 2
-                        and parts[1] in ["00", "25", "50", "75"]
-                        and float(number_part) <= 30
-                    ):
-                        left_sph = new_left_sph
-                        break
-
-                print(
-                    "Invalid SPH. Enter like "
-                    "-1.00, +1.25, 0, Plano "
-                    "or press Enter to keep current."
-                )
-
-            while True:
-                new_left_cyl = input(
-                    "New Left CYL "
-                    "(press Enter to keep current): "
-                ).strip()
-
-                if new_left_cyl == "":
-                    break
-
-                if new_left_cyl == "0":
-                    left_cyl = "0"
-                    break
-
-                if new_left_cyl.startswith(("+", "-")):
-                    number_part = new_left_cyl[1:]
-                    parts = number_part.split(".")
-
-                    if (
-                        len(parts) == 2
-                        and parts[0].isdigit()
-                        and len(parts[1]) == 2
-                        and parts[1] in ["00", "25", "50", "75"]
-                        and float(number_part) <= 10
-                    ):
-                        left_cyl = new_left_cyl
-                        break
-
-                print(
-                    "Invalid CYL. Enter like "
-                    "-0.50, +1.25, 0 "
-                    "or press Enter to keep current."
-                )
-
-            while True:
-                new_left_axis = input(
-                    "New Left AXIS "
-                    "(press Enter to keep current): "
-                ).strip()
-
-                if new_left_axis == "":
-                    break
-
-                if new_left_axis.isdigit():
-                    axis_value = int(new_left_axis)
-
-                    if 0 <= axis_value <= 180:
-                        left_axis = new_left_axis
-                        break
-
-                print(
-                    "Invalid AXIS. Enter 0-180 "
-                    "or press Enter to keep current."
-                )
-            # Recalculate Payment
-            order_total = frame_price + lens_price
-
-            if less_amount > order_total:
-                less_amount = 0.0
-
-            total_amount = order_total - less_amount
-
-            if advance_amount > total_amount:
-                advance_amount = total_amount
-
-            balance = total_amount - advance_amount
-
-            print("Lens Details updated.")
-            print(
-                f"Updated Order Total: ₹{order_total:.2f}"
-            )
-            print(
-                f"Updated Final Total: ₹{total_amount:.2f}"
-            )
-            print(
-                f"Updated Balance: ₹{balance:.2f}"
-            )
-    # ---------------- EDIT EYE SURGERY / IOL ----------------
-    elif edit_choice == "8":
-
-        if order_type not in ["2", "3"]:
-            print(
-                "Eye Surgery / IOL details are not applicable "
-                "for this order."
-            )
-
-        else:
-            print("\n--- Edit Eye Surgery / IOL History ---")
-            print("1. No Eye Surgery")
-            print("2. Right Eye (OD)")
-            print("3. Left Eye (OS)")
-            print("4. Both Eyes")
-            while True:
-
-                surgery_choice = input(
-                    "Select Eye Surgery Status (1/2/3/4): "
-                ).strip()
-
-                if surgery_choice == "1":
-                    eye_surgery = "No"
-                    surgery_eye = ""
-                    right_iol = ""
-                    left_iol = ""
-                    print(
-                        "Eye Surgery / IOL details updated."
-                    )
-                    break
-                elif surgery_choice == "2":
-                    eye_surgery = "Yes"
-                    surgery_eye = "Right Eye (OD)"
-                    left_iol = ""
+                if delivery_edit_choice == "1":
 
                     while True:
-                        right_iol_input = input(
-                            "Right Eye IOL implanted? (y/n): "
-                        ).strip().lower()
 
-                        if right_iol_input in ["y", "yes"]:
-                            right_iol = "Yes"
-                            break
+                        print("\n--- Delivery Status ---")
+                        print("1. Delivered")
+                        print("2. Pending")
 
-                        elif right_iol_input in ["n", "no"]:
-                            right_iol = "No"
-                            break
+                        new_delivery_choice = input(
+                            "Select Delivery Status (1/2): "
+                        ).strip()
 
-                        else:
-                            print(
-                                "Please enter y for Yes or n for No."
+                        if new_delivery_choice == "1":
+                            delivery_status = "Delivered"
+                            delivered_to = (
+                                "Customer / Same Person"
                             )
+                            receiver_name = ""
+                            break
+
+                        if new_delivery_choice == "2":
+                            delivery_status = "Pending"
+                            delivered_to = ""
+                            receiver_name = ""
+                            break
+
+                        print("Please select 1 or 2.")
 
                     print(
-                        "Eye Surgery / IOL details updated."
+                        "Delivery Status updated successfully."
                     )
-                    break
-                elif surgery_choice == "3":
-                    eye_surgery = "Yes"
-                    surgery_eye = "Left Eye (OS)"
-                    right_iol = ""
+                    continue
+
+                if (
+                    delivery_status == "Delivered"
+                    and delivery_edit_choice == "2"
+                ):
 
                     while True:
-                        left_iol_input = input(
-                            "Left Eye IOL implanted? (y/n): "
-                        ).strip().lower()
 
-                        if left_iol_input in ["y", "yes"]:
-                            left_iol = "Yes"
-                            break
+                        print("\n--- Delivered To ---")
+                        print("1. Customer / Same Person")
+                        print("2. Other Person")
 
-                        elif left_iol_input in ["n", "no"]:
-                            left_iol = "No"
-                            break
+                        new_delivered_to_choice = input(
+                            "Select Delivered To (1/2): "
+                        ).strip()
 
-                        else:
-                            print(
-                                "Please enter y for Yes or n for No."
+                        if new_delivered_to_choice == "1":
+                            delivered_to = (
+                                "Customer / Same Person"
                             )
+                            receiver_name = ""
+                            break
+
+                        if new_delivered_to_choice == "2":
+                            delivered_to = "Other Person"
+                            receiver_name = ""
+                            break
+
+                        print("Please select 1 or 2.")
 
                     print(
-                        "Eye Surgery / IOL details updated."
+                        "Delivered To updated successfully."
                     )
-                    break
-                elif surgery_choice == "4":
-                    eye_surgery = "Yes"
-                    surgery_eye = "Both Eyes"
+                    continue
 
-                    while True:
-                        right_iol_input = input(
-                            "Right Eye IOL implanted? (y/n): "
-                        ).strip().lower()
+                if (
+                    delivery_status == "Delivered"
+                    and delivered_to == "Other Person"
+                    and delivery_edit_choice == "3"
+                ):
 
-                        if right_iol_input in ["y", "yes"]:
-                            right_iol = "Yes"
-                            break
-
-                        elif right_iol_input in ["n", "no"]:
-                            right_iol = "No"
-                            break
-
-                        else:
-                            print(
-                                "Please enter y for Yes or n for No."
-                            )
-
-                    while True:
-                        left_iol_input = input(
-                            "Left Eye IOL implanted? (y/n): "
-                        ).strip().lower()
-
-                        if left_iol_input in ["y", "yes"]:
-                            left_iol = "Yes"
-                            break
-
-                        elif left_iol_input in ["n", "no"]:
-                            left_iol = "No"
-                            break
-
-                        else:
-                            print(
-                                "Please enter y for Yes or n for No."
-                            )
+                    receiver_name = input(
+                        "Enter Receiver Name "
+                        "(Optional - press Enter to skip): "
+                    ).strip().title()
 
                     print(
-                        "Eye Surgery / IOL details updated."
+                        "Receiver Name updated successfully."
                     )
-                    break
+                    continue
 
-                else:
-                    print(
-                        "Please select 1, 2, 3 or 4."
-                    )
-    # ---------------- CONFIRM SAVE ----------------
-    elif edit_choice == "9":
+                print(
+                    "Please select a valid "
+                    "Delivery Details option."
+                )
 
-        print("\nEntry confirmed. Saving record...")
-        break
-
-    else:
-        print("Please select 1, 2, 3, 4, 5, 6, 7, 8 or 9.")
-# ----------------------------------------------
+            continue
+# ==================================================
 # SAVE INITIAL PAYMENT RECORD
 # ----------------------------------------------
 
@@ -4068,10 +11167,11 @@ if order_type in ["1", "2", "3"]:
             balance,
             payment_type,
             payment_status,
-            "Pending",
-            ""
-            ])
-
+            delivery_status,
+            payment_datetime if delivery_status == "Delivered" else "",
+            delivered_to,
+            receiver_name
+        ])
 
 # ==================================================
 # 13. FINAL CUSTOMER SUMMARY
@@ -4156,6 +11256,14 @@ print(
 )
 
 if order_type in ["2", "3"]:
+    if order_type in ["2", "3"]:
+       print("Prescription Source:", prescription_source)
+
+    if (
+        prescription_source == "External Prescription"
+        and prescription_from
+    ):
+        print("Prescription From:", prescription_from)
 
     print("\n--- Eye Surgery / IOL History ---")
 
@@ -4398,7 +11506,13 @@ with open(CUSTOMER_DATA_FILE, "a", newline="", encoding="utf-8") as file:
     "Surgery Eye",
     "Right Eye IOL",
     "Left Eye IOL",
-    "Previous Prescription Date"
+    "Previous Prescription Date",
+    "Prescription Source",
+    "Prescription From",
+    "C/O / S/O Details",
+    "Delivery Status",
+    "Delivered To",
+    "Receiver Name"
     ])
     writer.writerow([
 
@@ -4457,6 +11571,12 @@ with open(CUSTOMER_DATA_FILE, "a", newline="", encoding="utf-8") as file:
     right_iol,
     left_iol,
     previous_prescription_date,
+     prescription_source,
+    prescription_from,
+    customer_relation,
+    delivery_status,
+    delivered_to,
+    receiver_name
     ])
 print("\n==================================================")
 print("        CUSTOMER RECORD COMPLETED SUCCESSFULLY")
@@ -4469,6 +11589,8 @@ if order_type == "1":
     prescription_message = f"""
 {store_name}
 Customer Name: {customer_name}
+Phone: {phone if phone else "Not Provided"}
+Town / Village: {address}
 Date: {record_date}
 Time: {record_time}
 
@@ -4486,10 +11608,15 @@ else:
     prescription_message = f"""
 {store_name}
 Customer Name: {customer_name}
+Phone: {phone if phone else "Not Provided"}
+Town / Village: {address}
 Date: {record_date}
 Time: {record_time}
-Spectacle Prescription
+Prescription Source: {prescription_source}
+{f"Prescription From: {prescription_from}" if prescription_source == "External Prescription" and prescription_from else ""}
+{("Prescription details are as provided in the external prescription." if prescription_source == "External Prescription" else "Prescription details are based on the existing prescription on record." if prescription_source == "Existing Prescription on Record" else "")}
 
+Spectacle Prescription
 Right Eye (OD):
 SPH: {right_sph}
 CYL: {right_cyl}
@@ -4564,12 +11691,47 @@ if message_choice == "3":
         import urllib.parse
         import webbrowser
 
+        if order_type == "1":
+            payment_order_details = (
+                "Order Type: Frame Only\n"
+                f"Frame Details: {frame_details}\n"
+                f"Frame Brand: {frame_brand}\n"
+                f"Frame Price: ₹{frame_price}"
+            )
+
+        elif order_type == "2":
+            payment_order_details = (
+                "Order Type: Lenses Only\n"
+                f"Lens Type: {lens_type}\n"
+                f"{f'Lens Features / Coating: {lens_features}' if lens_features else ''}\n"
+                f"{f'Lens Brand: {lens_brand}' if lens_brand else ''}\n"
+                f"Lens Price: ₹{lens_price}"
+            )
+
+        else:
+            payment_order_details = (
+                "Order Type: Frame + Lenses\n"
+                f"Frame Details: {frame_details}\n"
+                f"Frame Brand: {frame_brand}\n"
+                f"Lens Type: {lens_type}\n"
+                f"{f'Lens Features / Coating: {lens_features}' if lens_features else ''}\n"
+                f"{f'Lens Brand: {lens_brand}' if lens_brand else ''}\n"
+                f"Frame & Lenses Price: ₹{order_total}"
+            )
         payment_message = f"""{store_name}
 Customer Name: {customer_name}
+Phone: {phone if phone else "Not Provided"}
+Town / Village: {address}
 
 Payment Receipt
 
-Total Amount: ₹{total_amount}
+Order Details
+{payment_order_details}
+
+Payment Details
+Order Total: ₹{order_total}
+Less Amount: ₹{less_amount}
+Final Total: ₹{total_amount}
 Advance Amount: ₹{advance_amount}
 Balance Amount: ₹{balance}
 
@@ -4590,6 +11752,8 @@ if message_choice == "4":
 
         balance_message = f"""{store_name}
 Customer Name: {customer_name}
+Phone: {phone if phone else "Not Provided"}
+Town / Village: {address}
 
 Balance Payment Reminder
 
@@ -4633,30 +11797,6 @@ Thank you for choosing {store_name}.
 # PRINT HELPERS
 # ==================================================
 
-def print_text_document(document_text):
-    import tempfile
-
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            suffix=".txt",
-            delete=False,
-            encoding="utf-8-sig"
-        ) as print_file:
-            print_file.write(document_text)
-            print_file_path = print_file.name
-
-        os.startfile(print_file_path, "print")
-
-        print(
-            "Print job sent to the Windows default printer."
-        )
-
-    except Exception as error:
-        print(
-            "Unable to print document:",
-            error
-        )
 # ==================================================
 # PRINT MENU
 # ==================================================
