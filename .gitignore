@@ -9,3 +9,4 @@ demo_payments.csv
 build/
 dist/
 *.spec
+backups/

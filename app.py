@@ -1,5 +1,6 @@
-import csv
+﻿import csv
 import os
+import shutil
 import webbrowser
 import urllib.parse
 from datetime import datetime
@@ -78,6 +79,61 @@ while True:
 
     else:
         print("Please select 1 for Real Data or 2 for Demo Data.")
+
+def create_startup_backup():
+    backup_folder = "backups"
+
+    try:
+        os.makedirs(backup_folder, exist_ok=True)
+
+        backup_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        files_to_backup = [
+            CUSTOMER_DATA_FILE,
+            PAYMENT_DATA_FILE
+        ]
+
+        backed_up_files = []
+
+        for source_file in files_to_backup:
+            if not os.path.exists(source_file):
+                continue
+
+            file_name, file_extension = os.path.splitext(
+                os.path.basename(source_file)
+            )
+
+            backup_file = os.path.join(
+                backup_folder,
+                f"{file_name}_{backup_time}{file_extension}"
+            )
+
+            shutil.copy2(
+                source_file,
+                backup_file
+            )
+
+            backed_up_files.append(source_file)
+
+        if backed_up_files:
+            print(
+                "\nAutomatic data backup completed successfully."
+            )
+        else:
+            print(
+                "\nNo existing data files found. "
+                "Backup not required yet."
+            )
+
+    except Exception as error:
+        print(
+            "\nWarning: Automatic data backup could not be completed."
+        )
+        print("Backup Error:", error)
+
+
+create_startup_backup()
+
 
 def migrate_customer_csv(file_name):
     if not os.path.exists(file_name):
