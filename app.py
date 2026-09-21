@@ -4,7 +4,7 @@ import shutil
 import webbrowser
 import urllib.parse
 from datetime import datetime
-from store_config import store_name, store_city, store_phone, store_email, store_website, store_logo
+from store_config import store_name, store_city, store_address, store_phone, store_email, store_website, store_logo
 def print_text_document(document_text):
     import tempfile
 
@@ -47,11 +47,125 @@ def normalize_offer(offer):
 
     except ValueError:
         return offer
+STORE_PROFILE_FILE = "store_profile.csv"
+
+
+def load_store_profile():
+    global store_name
+    global store_city
+    global store_address
+    global store_phone
+    global store_email
+    global store_website
+    global store_logo
+
+    if not os.path.exists(STORE_PROFILE_FILE):
+        return
+
+    try:
+        with open(
+            STORE_PROFILE_FILE,
+            "r",
+            newline="",
+            encoding="utf-8-sig"
+        ) as profile_file:
+            reader = csv.DictReader(profile_file)
+            profile = next(reader, None)
+
+        if not profile:
+            return
+
+        store_name = profile.get(
+            "Store Name",
+            store_name
+        ).strip() or store_name
+
+        store_city = profile.get(
+            "Store City",
+            store_city
+        ).strip()
+
+        store_address = profile.get(
+            "Store Address",
+            store_address
+        ).strip()
+
+        store_phone = profile.get(
+            "Store Phone",
+            store_phone
+        ).strip()
+
+        store_email = profile.get(
+            "Store Email",
+            store_email
+        ).strip()
+
+        store_website = profile.get(
+            "Store Website",
+            store_website
+        ).strip()
+
+        store_logo = profile.get(
+            "Store Logo",
+            store_logo
+        ).strip()
+
+    except Exception as error:
+        print(
+            "\nWarning: Store Profile could not be loaded."
+        )
+        print("Store Profile Error:", error)
+def save_store_profile():
+    fieldnames = [
+        "Store Name",
+        "Store City",
+        "Store Address",
+        "Store Phone",
+        "Store Email",
+        "Store Website",
+        "Store Logo"
+    ]
+
+    profile_data = {
+        "Store Name": store_name,
+        "Store City": store_city,
+        "Store Address": store_address,
+        "Store Phone": store_phone,
+        "Store Email": store_email,
+        "Store Website": store_website,
+        "Store Logo": store_logo
+    }
+
+    try:
+        with open(
+            STORE_PROFILE_FILE,
+            "w",
+            newline="",
+            encoding="utf-8-sig"
+        ) as profile_file:
+            writer = csv.DictWriter(
+                profile_file,
+                fieldnames=fieldnames
+            )
+            writer.writeheader()
+            writer.writerow(profile_data)
+
+        return True
+
+    except Exception as error:
+        print(
+            "\nStore Profile could not be saved."
+        )
+        print("Store Profile Error:", error)
+        return False
 record_date = datetime.now().strftime("%d-%m-%Y")
 record_time = datetime.now().strftime("%I:%M %p")
 CUSTOMER_DATA_FILE = "customers.csv"
 PAYMENT_DATA_FILE = "payments.csv"
-
+if os.path.exists(STORE_PROFILE_FILE):
+    load_store_profile()
+else:
+    save_store_profile()
 print("==================================================")
 print("          OPTICAL STORE CUSTOMER MANAGER")
 print("==================================================")
@@ -249,13 +363,14 @@ print("2. Existing Customer")
 print("3. Pending Balance Customers")
 print("4. Pending Delivery Customers")
 print("5. Old Customer / Historical Entry")
+print("6. Store Profile / Settings")
 
 while True:
     customer_type = input(
-        "Select Customer Type (1/2/3/4/5): "
+        "Select Customer Type (1/2/3/4/5/6): "
     ).strip()
 
-    if customer_type in ["1", "2", "3", "4", "5"]:
+    if customer_type in ["1", "2", "3", "4", "5", "6"]:
         break
 
     print(
@@ -263,7 +378,8 @@ while True:
         "2 for Existing Customer, "
         "3 for Pending Balance Customers, "
         "4 for Pending Delivery Customers, "
-        "or 5 for Old Customer / Historical Entry."
+        "5 for Old Customer / Historical Entry, "
+        "or 6 for Store Profile / Settings."
     )
 # --------------------------------------------------
 # PHONE NORMALIZATION HELPER
@@ -570,6 +686,194 @@ def build_old_prescription_row(
         "",
         "",
     ]
+# ==================================================
+# STORE PROFILE / SETTINGS
+# ==================================================
+
+if customer_type == "6":
+    print("\n--- Store Profile / Settings ---")
+
+    print("Store Name   :", store_name)
+    print("Store City   :", store_city)
+    print(
+        "Store Address:",
+        store_address if store_address else "Not Added"
+    )
+    print(
+        "Store Phone  :",
+        store_phone if store_phone else "Not Added"
+    )
+    print(
+        "Store Email  :",
+        store_email if store_email else "Not Added"
+    )
+    print(
+        "Store Website:",
+        store_website if store_website else "Not Added"
+    )
+    print(
+        "Store Logo   :",
+        store_logo if store_logo else "Not Added"
+    )
+
+    while True:
+        edit_store_profile = input(
+            "\nEdit Store Profile? (y/n): "
+        ).strip().lower()
+
+        if edit_store_profile in ("y", "n"):
+            break
+
+        print("Please enter y or n.")
+
+    if edit_store_profile == "n":
+        print("\nNo changes made to Store Profile.")
+        input("\nPress Enter to close...")
+        raise SystemExit
+
+    while True:
+        new_store_name = input(
+            f"Store Name [{store_name}]: "
+        ).strip()
+
+        if new_store_name:
+            store_name = new_store_name
+            break
+
+        if store_name:
+            break
+
+        print("Store Name is required.")
+
+    new_store_city = input(
+        f"Store City [{store_city}]: "
+    ).strip()
+
+    if new_store_city:
+        store_city = new_store_city
+
+    current_address_display = (
+        store_address if store_address else "Not Added"
+    )
+
+    new_store_address = input(
+        f"Store Address [{current_address_display}] "
+        "(press Enter to keep current): "
+    ).strip()
+
+    if new_store_address:
+        store_address = new_store_address
+
+    while True:
+        current_phone_display = (
+            store_phone if store_phone else "Not Added"
+        )
+
+        new_store_phone = input(
+            f"Store Phone [{current_phone_display}] "
+            "(press Enter to keep current): "
+        ).strip()
+
+        if not new_store_phone:
+            break
+
+        normalized_store_phone = normalize_indian_phone(
+            new_store_phone
+        )
+
+        if (
+            normalized_store_phone.isdigit()
+            and len(normalized_store_phone) == 10
+            and normalized_store_phone[0] in "6789"
+        ):
+            store_phone = normalized_store_phone
+            break
+
+        print(
+            "Please enter a valid 10-digit Indian mobile number."
+        )
+
+    current_email_display = (
+        store_email if store_email else "Not Added"
+    )
+
+    new_store_email = input(
+        f"Store Email [{current_email_display}] "
+        "(press Enter to keep current): "
+    ).strip()
+
+    if new_store_email:
+        store_email = new_store_email
+
+    current_website_display = (
+        store_website if store_website else "Not Added"
+    )
+
+    new_store_website = input(
+        f"Store Website [{current_website_display}] "
+        "(press Enter to keep current): "
+    ).strip()
+
+    if new_store_website:
+        store_website = new_store_website
+
+    current_logo_display = (
+        store_logo if store_logo else "Not Added"
+    )
+
+    new_store_logo = input(
+        f"Store Logo Path [{current_logo_display}] "
+        "(Optional - press Enter to keep current): "
+    ).strip()
+
+    if new_store_logo:
+        store_logo = new_store_logo
+
+    print("\n--- Updated Store Profile ---")
+    print("Store Name   :", store_name)
+    print("Store City   :", store_city)
+    print(
+        "Store Address:",
+        store_address if store_address else "Not Added"
+    )
+    print(
+        "Store Phone  :",
+        store_phone if store_phone else "Not Added"
+    )
+    print(
+        "Store Email  :",
+        store_email if store_email else "Not Added"
+    )
+    print(
+        "Store Website:",
+        store_website if store_website else "Not Added"
+    )
+    print(
+        "Store Logo   :",
+        store_logo if store_logo else "Not Added"
+    )
+
+    while True:
+        confirm_store_profile = input(
+            "\nSave these Store Profile details? (y/n): "
+        ).strip().lower()
+
+        if confirm_store_profile in ("y", "n"):
+            break
+
+        print("Please enter y or n.")
+
+    if confirm_store_profile == "y":
+        if save_store_profile():
+            print("\nStore Profile saved successfully.")
+        else:
+            print("\nStore Profile was not saved.")
+    else:
+        load_store_profile()
+        print("\nStore Profile changes cancelled.")
+
+    input("\nPress Enter to close...")
+    raise SystemExit
 # ==================================================
 # PENDING BALANCE CUST OMERS
 # ==================================================
@@ -1173,8 +1477,11 @@ Thank you,
 
             payment_update_message = f"""
 {store_name}
-Customer Name: {selected_pending_order[1]}
+{store_city}
+{f"Address: {store_address}" if store_address else ""}
+{f"Phone: {store_phone}" if store_phone else ""}
 
+Customer Name: {selected_pending_order[1]}
 {update_title}
 
 Order Type: {selected_pending_order[5]}
@@ -2774,6 +3081,8 @@ if customer_type == "5":
         old_prescription_message = f"""
 {store_name}
 {store_city}
+{f"Address: {store_address}" if store_address else ""}
+{f"Phone: {store_phone}" if store_phone else ""}
 
 PRESCRIPTION DETAILS
 
@@ -2987,6 +3296,8 @@ if customer_type == "2" and order_type == "7":
         old_prescription_message = f"""
 {store_name}
 {store_city}
+{f"Address: {store_address}" if store_address else ""}
+{f"Phone: {store_phone}" if store_phone else ""}
 
 PRESCRIPTION DETAILS
 
@@ -3712,13 +4023,13 @@ Spectacle Prescription
 Right Eye (OD):
 SPH: {right_sph}
 CYL: {right_cyl}
-AXIS: {right_axis}
+AXIS: {right_axis if right_axis else "Not Required"}
 ADD: {right_add if right_add else "Not Required"}
 
 Left Eye (OS):
 SPH: {left_sph}
 CYL: {left_cyl}
-AXIS: {left_axis}
+AXIS: {left_axis if left_axis else "Not Required"}
 ADD: {left_add if left_add else "Not Required"}
 
 Please keep this prescription for your reference.
@@ -4601,8 +4912,11 @@ if customer_type == "2" and order_type == "6":
 
             payment_update_message = f"""
 {store_name}
-Customer Name: {selected_customer[5]}
+{store_city}
+{f"Address: {store_address}" if store_address else ""}
+{f"Phone: {store_phone}" if store_phone else ""}
 
+Customer Name: {selected_customer[5]}
 {update_title}
 
 Order Type: {order_type_name}
@@ -11252,7 +11566,11 @@ print(
     "Town / City:",
     store_city
 )
-
+if store_address:
+    print(
+        "Store Address:",
+        store_address
+    )
 print(
     "Store Phone:",
     store_phone
@@ -11644,6 +11962,10 @@ else:
 if order_type == "1":
     prescription_message = f"""
 {store_name}
+{store_city}
+{f"Address: {store_address}" if store_address else ""}
+{f"Phone: {store_phone}" if store_phone else ""}
+
 Customer Name: {customer_name}
 Phone: {phone if phone else "Not Provided"}
 Town / Village: {address}
@@ -11663,6 +11985,10 @@ Thank you for choosing {store_name}.
 else:
     prescription_message = f"""
 {store_name}
+{store_city}
+{f"Address: {store_address}" if store_address else ""}
+{f"Phone: {store_phone}" if store_phone else ""}
+
 Customer Name: {customer_name}
 Phone: {phone if phone else "Not Provided"}
 Town / Village: {address}
@@ -11676,13 +12002,13 @@ Spectacle Prescription
 Right Eye (OD):
 SPH: {right_sph}
 CYL: {right_cyl}
-AXIS: {right_axis}
+AXIS: {right_axis if right_axis else "Not Required"}
 ADD: {right_add if right_add else "Not Required"}
 
 Left Eye (OS):
 SPH: {left_sph}
 CYL: {left_cyl}
-AXIS: {left_axis}
+AXIS: {left_axis if left_axis else "Not Required"}
 ADD: {left_add if left_add else "Not Required"}
 {f"Pupillary Distance (PD):\nDistance PD: {distance_pd}\nNear PD: {near_pd}\n" if distance_pd or near_pd else ""}
 
@@ -11775,6 +12101,10 @@ if message_choice == "3":
                 f"Frame & Lenses Price: ₹{order_total}"
             )
         payment_message = f"""{store_name}
+{store_city}
+{f"Address: {store_address}" if store_address else ""}
+{f"Phone: {store_phone}" if store_phone else ""}
+
 Customer Name: {customer_name}
 Phone: {phone if phone else "Not Provided"}
 Town / Village: {address}
@@ -11807,6 +12137,10 @@ if message_choice == "4":
         import webbrowser
 
         balance_message = f"""{store_name}
+{store_city}
+{f"Address: {store_address}" if store_address else ""}
+{f"Phone: {store_phone}" if store_phone else ""}
+
 Customer Name: {customer_name}
 Phone: {phone if phone else "Not Provided"}
 Town / Village: {address}
@@ -11887,6 +12221,7 @@ if print_choice == "2":
     bill_print_text = f"""
 {store_name}
 {store_city}
+{f"Address: {store_address}" if store_address else ""}
 Phone: {store_phone}
 
 PAYMENT RECEIPT
@@ -11915,6 +12250,7 @@ if print_choice == "3":
     full_record_lines = [
         store_name,
         store_city,
+        f"Address: {store_address}" if store_address else "",
         f"Phone: {store_phone}",
         "",
         "FULL CUSTOMER RECORD",
