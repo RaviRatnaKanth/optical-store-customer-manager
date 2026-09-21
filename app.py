@@ -48,6 +48,7 @@ def normalize_offer(offer):
     except ValueError:
         return offer
 STORE_PROFILE_FILE = "store_profile.csv"
+STORE_REGISTRY_FILE = "stores.csv"
 
 
 def load_store_profile():
@@ -115,6 +116,69 @@ def load_store_profile():
             "\nWarning: Store Profile could not be loaded."
         )
         print("Store Profile Error:", error)
+def initialize_store_registry():
+    if os.path.exists(STORE_REGISTRY_FILE):
+        return
+
+    fieldnames = [
+        "Store ID",
+        "Store Name",
+        "Store City",
+        "Status"
+    ]
+
+    initial_store = {
+        "Store ID": "STORE001",
+        "Store Name": store_name,
+        "Store City": store_city,
+        "Status": "Active"
+    }
+
+    try:
+        with open(
+            STORE_REGISTRY_FILE,
+            "w",
+            newline="",
+            encoding="utf-8-sig"
+        ) as store_file:
+            writer = csv.DictWriter(
+                store_file,
+                fieldnames=fieldnames
+            )
+            writer.writeheader()
+            writer.writerow(initial_store)
+
+    except Exception as error:
+        print(
+            "\nWarning: Store Registry could not be created."
+        )
+        print("Store Registry Error:", error)
+
+def load_store_registry():
+    stores = []
+
+    try:
+        with open(
+            STORE_REGISTRY_FILE,
+            "r",
+            newline="",
+            encoding="utf-8-sig"
+        ) as store_file:
+            reader = csv.DictReader(store_file)
+
+            for row in reader:
+                if row.get("Status", "").strip().lower() == "active":
+                    stores.append(row)
+
+    except Exception as error:
+        print(
+            "\nWarning: Store Registry could not be loaded."
+        )
+        print("Store Registry Error:", error)
+
+    return stores
+
+
 def save_store_profile():
     fieldnames = [
         "Store Name",
@@ -162,10 +226,56 @@ record_date = datetime.now().strftime("%d-%m-%Y")
 record_time = datetime.now().strftime("%I:%M %p")
 CUSTOMER_DATA_FILE = "customers.csv"
 PAYMENT_DATA_FILE = "payments.csv"
+initialize_store_registry()
+active_stores = load_store_registry()
+
+if not active_stores:
+    print("\nNo active stores found.")
+    input("Press Enter to exit...")
+    raise SystemExit
+
+print("\n--- Select Store / Branch ---")
+
+for index, store in enumerate(active_stores, start=1):
+    print(
+        f"{index}. "
+        f"{store['Store Name']} - "
+        f"{store['Store City']}"
+    )
+
+while True:
+    store_choice = input(
+        f"Select Store / Branch (1-{len(active_stores)}): "
+    ).strip()
+
+    if store_choice.isdigit():
+        store_index = int(store_choice) - 1
+
+        if 0 <= store_index < len(active_stores):
+            selected_store = active_stores[store_index]
+            break
+
+    print("Please select a valid Store / Branch number.")
+
+CURRENT_STORE_ID = selected_store["Store ID"]
+CURRENT_STORE_NAME = selected_store["Store Name"]
+CURRENT_STORE_CITY = selected_store["Store City"]
+if CURRENT_STORE_ID == "STORE001":
+    STORE_PROFILE_FILE = "store_profile.csv"
+else:
+    STORE_PROFILE_FILE = (
+        f"store_profile_{CURRENT_STORE_ID.lower()}.csv"
+    )
+
 if os.path.exists(STORE_PROFILE_FILE):
     load_store_profile()
 else:
     save_store_profile()
+
+print(
+    f"\nSelected Store: "
+    f"{CURRENT_STORE_NAME} - {CURRENT_STORE_CITY}"
+)
 print("==================================================")
 print("          OPTICAL STORE CUSTOMER MANAGER")
 print("==================================================")
@@ -182,15 +292,29 @@ while True:
     ).strip()
 
     if data_mode == "1":
-        CUSTOMER_DATA_FILE = "customers.csv"
-        PAYMENT_DATA_FILE = "payments.csv"
+        if CURRENT_STORE_ID == "STORE001":
+            CUSTOMER_DATA_FILE = "customers.csv"
+            PAYMENT_DATA_FILE = "payments.csv"
+        else:
+            CUSTOMER_DATA_FILE = (
+                f"customers_{CURRENT_STORE_ID.lower()}.csv"
+            )
+            PAYMENT_DATA_FILE = (
+                f"payments_{CURRENT_STORE_ID.lower()}.csv"
+            )
         break
-
     elif data_mode == "2":
-        CUSTOMER_DATA_FILE = "demo_customers.csv"
-        PAYMENT_DATA_FILE = "demo_payments.csv"
+        if CURRENT_STORE_ID == "STORE001":
+            CUSTOMER_DATA_FILE = "demo_customers.csv"
+            PAYMENT_DATA_FILE = "demo_payments.csv"
+        else:
+            CUSTOMER_DATA_FILE = (
+                f"demo_customers_{CURRENT_STORE_ID.lower()}.csv"
+            )
+            PAYMENT_DATA_FILE = (
+                f"demo_payments_{CURRENT_STORE_ID.lower()}.csv"
+            )
         break
-
     else:
         print("Please select 1 for Real Data or 2 for Demo Data.")
 

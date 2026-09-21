@@ -11,3 +11,7 @@ dist/
 *.spec
 backups/
 store_profile.csv
+stores.csv
+demo_customers_*.csv
+demo_payments_*.csv
+store_profile_*.csv
