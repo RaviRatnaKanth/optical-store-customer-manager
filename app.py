@@ -178,6 +178,52 @@ def load_store_registry():
 
     return stores
 
+def update_current_store_registry():
+    try:
+        stores = []
+
+        with open(
+            STORE_REGISTRY_FILE,
+            "r",
+            newline="",
+            encoding="utf-8-sig"
+        ) as store_file:
+            reader = csv.DictReader(store_file)
+            stores = list(reader)
+
+        for store in stores:
+            if store.get("Store ID") == CURRENT_STORE_ID:
+                store["Store Name"] = store_name
+                store["Store City"] = store_city
+                break
+
+        with open(
+            STORE_REGISTRY_FILE,
+            "w",
+            newline="",
+            encoding="utf-8-sig"
+        ) as store_file:
+            writer = csv.DictWriter(
+                store_file,
+                fieldnames=[
+                    "Store ID",
+                    "Store Name",
+                    "Store City",
+                    "Status"
+                ]
+            )
+            writer.writeheader()
+            writer.writerows(stores)
+
+        return True
+
+    except Exception as error:
+        print(
+            "\nWarning: Store Registry could not be updated."
+        )
+        print("Store Registry Error:", error)
+        return False
+
 
 def save_store_profile():
     fieldnames = [
@@ -991,6 +1037,7 @@ if customer_type == "6":
 
     if confirm_store_profile == "y":
         if save_store_profile():
+            update_current_store_registry()
             print("\nStore Profile saved successfully.")
         else:
             print("\nStore Profile was not saved.")
