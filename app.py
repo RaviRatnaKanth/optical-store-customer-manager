@@ -364,13 +364,14 @@ print("3. Pending Balance Customers")
 print("4. Pending Delivery Customers")
 print("5. Old Customer / Historical Entry")
 print("6. Store Profile / Settings")
+print("7. Customer Reports")
 
 while True:
     customer_type = input(
-        "Select Customer Type (1/2/3/4/5/6): "
+        "Select Customer Type (1/2/3/4/5/6/7): "
     ).strip()
 
-    if customer_type in ["1", "2", "3", "4", "5", "6"]:
+    if customer_type in ["1", "2", "3", "4", "5", "6", "7"]:
         break
 
     print(
@@ -379,7 +380,8 @@ while True:
         "3 for Pending Balance Customers, "
         "4 for Pending Delivery Customers, "
         "5 for Old Customer / Historical Entry, "
-        "or 6 for Store Profile / Settings."
+        "6 for Store Profile / Settings, "
+        "or 7 for Customer Reports."
     )
 # --------------------------------------------------
 # PHONE NORMALIZATION HELPER
@@ -871,6 +873,236 @@ if customer_type == "6":
     else:
         load_store_profile()
         print("\nStore Profile changes cancelled.")
+
+    input("\nPress Enter to close...")
+    raise SystemExit
+# ==================================================
+# CUSTOMER REPORTS
+# ==================================================
+
+if customer_type == "7":
+
+    print("\n--- Customer Reports ---")
+    print("1. Today's Customers")
+    print("2. This Month Customers")
+    print("3. Date-to-Date Customers")
+    print("4. All Customers")
+
+    while True:
+        report_choice = input(
+            "Select Report (1/2/3/4): "
+        ).strip()
+
+        if report_choice in ["1", "2", "3", "4"]:
+            break
+
+        print(
+            "Please select 1 for Today's Customers, "
+            "2 for This Month Customers, "
+            "3 for Date-to-Date Customers, "
+            "or 4 for All Customers."
+        )
+    if not os.path.exists(CUSTOMER_DATA_FILE):
+        print(
+            "\nNo customer data file found for the selected Data Mode."
+        )
+        input("\nPress Enter to close...")
+        raise SystemExit
+
+    with open(
+        CUSTOMER_DATA_FILE,
+        "r",
+        newline="",
+        encoding="utf-8-sig"
+    ) as customer_file:
+        customer_reader = csv.reader(customer_file)
+        customer_rows = list(customer_reader)
+
+    if len(customer_rows) <= 1:
+        print(
+            "\nNo customer records found for the selected Data Mode."
+        )
+        input("\nPress Enter to close...")
+        raise SystemExit
+
+    customer_records = customer_rows[1:]
+    if report_choice == "1":
+
+        today_date = datetime.now().date()
+        report_records = []
+
+        for customer_record in customer_records:
+
+            if not customer_record:
+                continue
+
+            try:
+                record_datetime = datetime.strptime(
+                    customer_record[0].strip(),
+                    "%Y-%m-%d %H:%M:%S"
+                )
+            except (ValueError, IndexError):
+                continue
+
+            if record_datetime.date() == today_date:
+                report_records.append(customer_record)
+
+        report_title = "Today's Customers"
+    elif report_choice == "2":
+
+        current_date = datetime.now()
+        report_records = []
+
+        for customer_record in customer_records:
+
+            if not customer_record:
+                continue
+
+            try:
+                record_datetime = datetime.strptime(
+                    customer_record[0].strip(),
+                    "%Y-%m-%d %H:%M:%S"
+                )
+            except (ValueError, IndexError):
+                continue
+
+            if (
+                record_datetime.month == current_date.month
+                and record_datetime.year == current_date.year
+            ):
+                report_records.append(customer_record)
+
+        report_title = "This Month Customers"
+    elif report_choice == "3":
+
+        while True:
+            from_date_input = input(
+                "Enter From Date (DD-MM-YYYY): "
+            ).strip()
+
+            try:
+                from_date = datetime.strptime(
+                    from_date_input,
+                    "%d-%m-%Y"
+                ).date()
+                break
+            except ValueError:
+                print(
+                    "Invalid From Date. "
+                    "Please use DD-MM-YYYY format."
+                )
+
+        while True:
+            to_date_input = input(
+                "Enter To Date (DD-MM-YYYY): "
+            ).strip()
+
+            try:
+                to_date = datetime.strptime(
+                    to_date_input,
+                    "%d-%m-%Y"
+                ).date()
+            except ValueError:
+                print(
+                    "Invalid To Date. "
+                    "Please use DD-MM-YYYY format."
+                )
+                continue
+
+            if to_date < from_date:
+                print(
+                    "To Date cannot be earlier than From Date."
+                )
+                continue
+
+            break
+
+        report_records = []
+
+        for customer_record in customer_records:
+
+            if not customer_record:
+                continue
+
+            try:
+                record_datetime = datetime.strptime(
+                    customer_record[0].strip(),
+                    "%Y-%m-%d %H:%M:%S"
+                )
+            except (ValueError, IndexError):
+                continue
+
+            if (
+                from_date
+                <= record_datetime.date()
+                <= to_date
+            ):
+                report_records.append(customer_record)
+
+        report_title = (
+            "Customers from "
+            f"{from_date.strftime('%d-%m-%Y')} "
+            "to "
+            f"{to_date.strftime('%d-%m-%Y')}"
+        )
+    elif report_choice == "4":
+
+        report_records = customer_records.copy()
+        report_title = "All Customers"        
+    print("\n==================================================")
+    print(f"          {report_title.upper()}")
+    print("==================================================")
+
+    if not report_records:
+        print("\nNo customer records found for this report.")
+        input("\nPress Enter to close...")
+        raise SystemExit
+
+    print(f"\nTotal Records: {len(report_records)}")
+
+    for record_number, customer_record in enumerate(
+        report_records,
+        start=1
+    ):
+        frame_details = (
+            customer_record[20].strip()
+            if len(customer_record) > 20
+            else ""
+        )
+
+        lens_type = (
+            customer_record[24].strip()
+            if len(customer_record) > 24
+            else ""
+        )
+
+        if frame_details and lens_type:
+            report_order_type = "Frame + Lenses"
+        elif frame_details:
+            report_order_type = "Frame Only"
+        elif lens_type:
+            report_order_type = "Lenses Only"
+        else:
+            report_order_type = "Prescription Only / Historical"
+
+        print("\n----------------------------------------")
+        print(f"Record No.    : {record_number}")
+        print(f"Date / Time   : {customer_record[0]}")
+        print(f"Customer Name : {customer_record[5]}")
+        print(
+            "Phone         :",
+            customer_record[8]
+            if customer_record[8].strip()
+            else "No Phone"
+        )
+        print(f"Town / Village: {customer_record[9]}")
+        print(f"Order Type    : {report_order_type}")
+        print(f"Total Amount  : ₹{customer_record[42]}")
+        print(f"Balance       : ₹{customer_record[44]}")
+
+    print("\n==================================================")
+    print(f"Total Records: {len(report_records)}")
+    print("==================================================")
 
     input("\nPress Enter to close...")
     raise SystemExit
