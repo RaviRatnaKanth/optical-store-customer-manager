@@ -47,6 +47,29 @@ def normalize_offer(offer):
 
     except ValueError:
         return offer
+def normalize_indian_phone(value):
+    clean_phone = (
+        value.strip()
+        .replace(" ", "")
+        .replace("-", "")
+        .replace("(", "")
+        .replace(")", "")
+    )
+
+    if clean_phone.startswith("+91"):
+        clean_phone = clean_phone[3:]
+
+    elif clean_phone.startswith("0091"):
+        clean_phone = clean_phone[4:]
+
+    elif (
+        clean_phone.startswith("91")
+        and len(clean_phone) == 12
+    ):
+        clean_phone = clean_phone[2:]
+
+    return clean_phone
+
 STORE_PROFILE_FILE = "store_profile.csv"
 STORE_REGISTRY_FILE = "stores.csv"
 
@@ -116,6 +139,65 @@ def load_store_profile():
             "\nWarning: Store Profile could not be loaded."
         )
         print("Store Profile Error:", error)
+def get_first_store_setup():
+    global store_name, store_city, store_phone
+    print("\n" + "=" * 50)
+    print("          FIRST-TIME SHOP SETUP")
+    print("=" * 50)
+
+    while True:
+        first_store_name = input(
+            "Enter Store / Shop Name: "
+        ).strip()
+
+        if first_store_name:
+            break
+
+        print("Store / Shop Name is required.")
+
+    while True:
+        first_store_city = input(
+            "Enter Store City / Town: "
+        ).strip()
+
+        if first_store_city:
+            break
+
+        print("Store City / Town is required.")
+    while True:
+        first_store_phone = input(
+            "Enter Store Phone Number "
+            "(Optional - press Enter if unavailable): "
+        ).strip()
+
+        if not first_store_phone:
+            first_store_phone = ""
+            break
+
+        normalized_phone = normalize_indian_phone(
+            first_store_phone
+        )
+
+        if (
+            normalized_phone.isdigit()
+            and len(normalized_phone) == 10
+            and normalized_phone[0] in "6789"
+        ):
+            first_store_phone = normalized_phone
+            break
+
+        print(
+            "Please enter a valid Indian mobile number "
+            "or press Enter to skip."
+        )
+
+    store_name = first_store_name
+    store_city = first_store_city
+    store_phone = first_store_phone
+
+    return first_store_name, first_store_city
+
+
 def initialize_store_registry():
     if os.path.exists(STORE_REGISTRY_FILE):
         return
@@ -127,13 +209,14 @@ def initialize_store_registry():
         "Status"
     ]
 
+    first_store_name, first_store_city = get_first_store_setup()
+
     initial_store = {
         "Store ID": "STORE001",
-        "Store Name": store_name,
-        "Store City": store_city,
+        "Store Name": first_store_name,
+        "Store City": first_store_city,
         "Status": "Active"
     }
-
     try:
         with open(
             STORE_REGISTRY_FILE,
@@ -557,28 +640,6 @@ while True:
 # PHONE NORMALIZATION HELPER
 # --------------------------------------------------
 
-def normalize_indian_phone(value):
-    clean_phone = (
-        value.strip()
-        .replace(" ", "")
-        .replace("-", "")
-        .replace("(", "")
-        .replace(")", "")
-    )
-
-    if clean_phone.startswith("+91"):
-        clean_phone = clean_phone[3:]
-
-    elif clean_phone.startswith("0091"):
-        clean_phone = clean_phone[4:]
-
-    elif (
-        clean_phone.startswith("91")
-        and len(clean_phone) == 12
-    ):
-        clean_phone = clean_phone[2:]
-
-    return clean_phone
 def get_old_prescription_date():
     while True:
         old_prescription_date = input(
