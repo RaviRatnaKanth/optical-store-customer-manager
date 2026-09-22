@@ -71,6 +71,7 @@ def normalize_indian_phone(value):
     return clean_phone
 
 STORE_PROFILE_FILE = "store_profile.csv"
+LICENSE_FILE = "license_data.csv"
 STORE_REGISTRY_FILE = "stores.csv"
 
 
@@ -308,6 +309,41 @@ def update_current_store_registry():
         return False
 
 
+def get_license_fieldnames():
+    return [
+        "License ID",
+        "Customer / Business Name",
+        "Plan",
+        "Start Date",
+        "Expiry Date",
+        "Allowed Stores",
+        "License Status"
+    ]
+
+def initialize_license_file():
+    if os.path.exists(LICENSE_FILE):
+        return
+
+    try:
+        with open(
+            LICENSE_FILE,
+            "w",
+            newline="",
+            encoding="utf-8-sig"
+        ) as license_file:
+            writer = csv.DictWriter(
+                license_file,
+                fieldnames=get_license_fieldnames()
+            )
+            writer.writeheader()
+
+    except Exception as error:
+        print(
+            "\nWarning: License file could not be created."
+        )
+        print("License File Error:", error)
+
+
 def save_store_profile():
     fieldnames = [
         "Store Name",
@@ -356,6 +392,7 @@ record_time = datetime.now().strftime("%I:%M %p")
 CUSTOMER_DATA_FILE = "customers.csv"
 PAYMENT_DATA_FILE = "payments.csv"
 initialize_store_registry()
+initialize_license_file()
 active_stores = load_store_registry()
 
 if not active_stores:
