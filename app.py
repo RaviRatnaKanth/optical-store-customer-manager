@@ -317,7 +317,8 @@ def get_license_fieldnames():
         "Start Date",
         "Expiry Date",
         "Allowed Stores",
-        "License Status"
+        "License Status",
+        "Last Updated"
     ]
 
 def initialize_license_file():
@@ -342,6 +343,56 @@ def initialize_license_file():
             "\nWarning: License file could not be created."
         )
         print("License File Error:", error)
+
+
+def load_license_records():
+    records = []
+
+    try:
+        with open(
+            LICENSE_FILE,
+            "r",
+            newline="",
+            encoding="utf-8-sig"
+        ) as license_file:
+            reader = csv.DictReader(license_file)
+            records = list(reader)
+
+    except Exception as error:
+        print(
+            "\nWarning: License file could not be loaded."
+        )
+        print("License File Error:", error)
+
+    return records
+
+
+def save_license_record(license_record):
+    try:
+        license_record["Last Updated"] = (
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        )
+
+        with open(
+            LICENSE_FILE,
+            "a",
+            newline="",
+            encoding="utf-8-sig"
+        ) as license_file:
+            writer = csv.DictWriter(
+                license_file,
+                fieldnames=get_license_fieldnames()
+            )
+            writer.writerow(license_record)
+
+        return True
+
+    except Exception as error:
+        print(
+            "\nWarning: License record could not be saved."
+        )
+        print("License File Error:", error)
+        return False
 
 
 def save_store_profile():
