@@ -1,5 +1,7 @@
-﻿import csv
+﻿import calendar
+import csv
 import os
+import uuid
 import shutil
 import webbrowser
 import urllib.parse
@@ -321,6 +323,56 @@ def get_license_fieldnames():
         "Last Updated"
     ]
 
+def generate_license_id():
+    return f"LIC-{uuid.uuid4().hex[:12].upper()}"
+
+
+def get_license_plans():
+    return [
+        "Trial",
+        "1 Year",
+        "2 Years",
+        "Lifetime",
+        "Free",
+        "Custom"
+    ]
+
+
+def add_calendar_months(start_date, months):
+    target_month = start_date.month - 1 + months
+    target_year = start_date.year + target_month // 12
+    target_month = target_month % 12 + 1
+
+    last_day = calendar.monthrange(
+        target_year,
+        target_month
+    )[1]
+
+    target_day = min(start_date.day, last_day)
+
+    return start_date.replace(
+        year=target_year,
+        month=target_month,
+        day=target_day
+    )
+
+
+def calculate_license_expiry(start_date, plan):
+    if plan == "Trial":
+        return add_calendar_months(start_date, 6)
+
+    if plan == "1 Year":
+        return add_calendar_months(start_date, 12)
+
+    if plan == "2 Years":
+        return add_calendar_months(start_date, 24)
+
+    if plan in ["Lifetime", "Free"]:
+        return None
+
+    return None
+
+
 def initialize_license_file():
     if os.path.exists(LICENSE_FILE):
         return
@@ -395,6 +447,114 @@ def save_license_record(license_record):
         return False
 
 
+def get_active_store_ids():
+    active_stores = load_store_registry()
+
+    return [
+        store["Store ID"]
+        for store in active_stores
+        if store.get("Store ID")
+    ]
+
+
+def license_record_exists():
+    license_records = load_license_records()
+
+    return len(license_records) > 0
+
+
+def create_initial_license():
+    if license_record_exists():
+        return False
+
+    active_store_ids = get_active_store_ids()
+
+    if not active_store_ids:
+        return False
+
+    license_id = generate_license_id()
+    business_name = store_name
+    start_date = datetime.now().date()
+
+
+    license_plans = get_license_plans()
+
+    print("\n--- Select License Plan ---")
+
+    for index, plan in enumerate(license_plans, start=1):
+        print(f"{index}. {plan}")
+    while True:
+        plan_choice = input(
+            f"Select License Plan (1-{len(license_plans)}): "
+        ).strip()
+
+        if plan_choice.isdigit():
+            plan_index = int(plan_choice) - 1
+
+            if 0 <= plan_index < len(license_plans):
+                selected_plan = license_plans[plan_index]
+                break
+
+        print("Please select a valid License Plan number.")
+    expiry_date = calculate_license_expiry(
+        start_date,
+        selected_plan
+    )
+    if selected_plan == "Custom":
+        while True:
+            custom_expiry_input = input(
+                "Enter Custom Expiry Date "
+                "(DD-MM-YYYY): "
+            ).strip()
+
+            accepted_formats = (
+                "%d-%m-%Y",
+                "%d/%m/%Y",
+                "%d-%m-%y",
+                "%d/%m/%y",
+            )
+
+            custom_expiry_date = None
+
+            for date_format in accepted_formats:
+                try:
+                    custom_expiry_date = datetime.strptime(
+                        custom_expiry_input,
+                        date_format
+                    ).date()
+                    break
+                except ValueError:
+                    continue
+
+            if (
+                custom_expiry_date is not None
+                and custom_expiry_date > start_date
+            ):
+                expiry_date = custom_expiry_date
+                break
+
+            print(
+                "Please enter a valid future expiry date."
+            )
+    allowed_stores = "|".join(active_store_ids)
+    license_record = {
+        "License ID": license_id,
+        "Customer / Business Name": business_name,
+        "Plan": selected_plan,
+        "Start Date": start_date.strftime("%Y-%m-%d"),
+        "Expiry Date": (
+            expiry_date.strftime("%Y-%m-%d")
+            if expiry_date is not None
+            else ""
+        ),
+        "Allowed Stores": allowed_stores,
+        "License Status": "Active",
+        "Last Updated": ""
+    }
+    if save_license_record(license_record):
+        return True
+
+    return False
 def save_store_profile():
     fieldnames = [
         "Store Name",
@@ -489,6 +649,8 @@ if os.path.exists(STORE_PROFILE_FILE):
 else:
     save_store_profile()
 
+if not license_record_exists():
+    create_initial_license()
 print(
     f"\nSelected Store: "
     f"{CURRENT_STORE_NAME} - {CURRENT_STORE_CITY}"
