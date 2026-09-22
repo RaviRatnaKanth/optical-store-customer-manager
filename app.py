@@ -555,6 +555,65 @@ def create_initial_license():
         return True
 
     return False
+
+def get_current_license_record():
+    license_records = load_license_records()
+
+    if not license_records:
+        return None
+
+    return license_records[-1]
+
+
+def get_license_access_status():
+    license_record = get_current_license_record()
+
+    if license_record is None:
+        return "NO_LICENSE"
+
+    license_status = (
+        license_record.get("License Status", "")
+        .strip()
+        .lower()
+    )
+
+    if license_status != "active":
+        return "SUSPENDED"
+
+    expiry_text = license_record.get(
+        "Expiry Date",
+        ""
+    ).strip()
+
+    if expiry_text:
+        try:
+            expiry_date = datetime.strptime(
+                expiry_text,
+                "%Y-%m-%d"
+            ).date()
+
+            if datetime.now().date() > expiry_date:
+                return "EXPIRED"
+
+        except ValueError:
+            return "INVALID_LICENSE"
+    allowed_stores_text = license_record.get(
+        "Allowed Stores",
+        ""
+    ).strip()
+
+    allowed_store_ids = [
+        store_id.strip()
+        for store_id in allowed_stores_text.split("|")
+        if store_id.strip()
+    ]
+
+    if CURRENT_STORE_ID not in allowed_store_ids:
+        return "STORE_NOT_ALLOWED"
+    return "ACTIVE"
+
+
+
 def save_store_profile():
     fieldnames = [
         "Store Name",
@@ -651,6 +710,9 @@ else:
 
 if not license_record_exists():
     create_initial_license()
+
+license_access_status = get_license_access_status()
+
 print(
     f"\nSelected Store: "
     f"{CURRENT_STORE_NAME} - {CURRENT_STORE_CITY}"
