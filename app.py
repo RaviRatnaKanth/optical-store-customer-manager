@@ -969,7 +969,21 @@ while True:
             "until the license is active."
         )
         continue
-
+    if (
+        customer_type == "5"
+        and license_access_status != "ACTIVE"
+    ):
+        print(
+            "\n"
+            + get_license_access_message(
+                license_access_status
+            )
+        )
+        print(
+            "Old Customer / Historical Entry is not available "
+            "until the license is active."
+        )
+        continue
     if customer_type in ["1", "2", "3", "4", "5", "6", "7"]:
         break
 
@@ -1301,8 +1315,23 @@ if customer_type == "6":
         ).strip().lower()
 
         if edit_store_profile in ("y", "n"):
-            break
+            if (
+                edit_store_profile == "y"
+                and license_access_status != "ACTIVE"
+            ):
+                print(
+                    "\n"
+                    + get_license_access_message(
+                        license_access_status
+                    )
+                )
+                print(
+                    "Store Profile editing is not available "
+                    "until the license is active."
+                )
+                continue
 
+            break
         print("Please enter y or n.")
 
     if edit_store_profile == "n":
@@ -2002,8 +2031,23 @@ if customer_type == "3":
         ).strip()
 
         if pending_action in ["1", "2", "3", "4"]:
-            break
+            if (
+                pending_action == "1"
+                and license_access_status != "ACTIVE"
+            ):
+                print(
+                    "\n"
+                    + get_license_access_message(
+                        license_access_status
+                    )
+                )
+                print(
+                    "Payment / Delivery Update is not available "
+                    "until the license is active."
+                )
+                continue
 
+            break
         print("Please select 1, 2, 3, or 4.")
 
     if pending_action == "4":
@@ -2601,8 +2645,23 @@ if customer_type == "4":
         ).strip()
 
         if delivery_action in ["1", "2", "3", "4"]:
-            break
+            if (
+                delivery_action == "1"
+                and license_access_status != "ACTIVE"
+            ):
+                print(
+                    "\n"
+                    + get_license_access_message(
+                        license_access_status
+                    )
+                )
+                print(
+                    "Payment / Delivery Update is not available "
+                    "until the license is active."
+                )
+                continue
 
+            break
         print("Please select 1, 2, 3, or 4.")
 
     if delivery_action == "4":
