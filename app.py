@@ -386,6 +386,39 @@ def calculate_license_expiry(start_date, plan):
     return None
 
 
+def get_custom_license_expiry_date(start_date):
+    while True:
+        custom_expiry_input = input(
+            "Enter Custom Expiry Date "
+            "(DD-MM-YYYY): "
+        ).strip()
+
+        accepted_formats = (
+            "%d-%m-%Y",
+            "%d/%m/%Y",
+            "%d-%m-%y",
+            "%d/%m/%y",
+        )
+
+        custom_expiry_date = None
+
+        for date_format in accepted_formats:
+            try:
+                custom_expiry_date = datetime.strptime(
+                    custom_expiry_input,
+                    date_format
+                ).date()
+                break
+            except ValueError:
+                continue
+
+        if (
+            custom_expiry_date is not None
+            and custom_expiry_date > start_date
+        ):
+            return custom_expiry_date
+
+        print("Please enter a valid future expiry date.")
 def initialize_license_file():
     if os.path.exists(LICENSE_FILE):
         return
@@ -581,41 +614,9 @@ def create_initial_license():
         selected_plan
     )
     if selected_plan == "Custom":
-        while True:
-            custom_expiry_input = input(
-                "Enter Custom Expiry Date "
-                "(DD-MM-YYYY): "
-            ).strip()
-
-            accepted_formats = (
-                "%d-%m-%Y",
-                "%d/%m/%Y",
-                "%d-%m-%y",
-                "%d/%m/%y",
-            )
-
-            custom_expiry_date = None
-
-            for date_format in accepted_formats:
-                try:
-                    custom_expiry_date = datetime.strptime(
-                        custom_expiry_input,
-                        date_format
-                    ).date()
-                    break
-                except ValueError:
-                    continue
-
-            if (
-                custom_expiry_date is not None
-                and custom_expiry_date > start_date
-            ):
-                expiry_date = custom_expiry_date
-                break
-
-            print(
-                "Please enter a valid future expiry date."
-            )
+        expiry_date = get_custom_license_expiry_date(
+            start_date
+        )
     allowed_stores = "|".join(active_store_ids)
     license_record = {
         "License ID": license_id,
@@ -758,6 +759,111 @@ def change_license_status():
         )
 
     return True
+def change_license_plan():
+    license_record = get_current_license_record()
+
+    if license_record is None:
+        print("\nNo license record found.")
+        return False
+
+    current_plan = license_record.get(
+        "Plan",
+        ""
+    ).strip()
+
+    license_plans = get_license_plans()
+
+    print("\n--- Change License Plan ---")
+    print("Current Plan:", current_plan or "Not Set")
+
+    for index, plan in enumerate(license_plans, start=1):
+        print(f"{index}. {plan}")
+
+    while True:
+        plan_choice = input(
+            f"Select New License Plan "
+            f"(1-{len(license_plans)}): "
+        ).strip()
+
+        if plan_choice.isdigit():
+            plan_index = int(plan_choice) - 1
+
+            if 0 <= plan_index < len(license_plans):
+                new_plan = license_plans[plan_index]
+                break
+
+        print("Please select a valid License Plan number.")
+
+    if current_plan.lower() == new_plan.lower():
+        print(
+            "\nLicense plan is already set to",
+            new_plan + "."
+        )
+        return False
+
+    new_start_date = datetime.now().date()
+
+    new_expiry_date = calculate_license_expiry(
+        new_start_date,
+        new_plan
+    )
+
+    if new_plan == "Custom":
+        new_expiry_date = get_custom_license_expiry_date(
+            new_start_date
+        )
+
+    updated_license = license_record.copy()
+    updated_license["Plan"] = new_plan
+    updated_license["Start Date"] = (
+        new_start_date.strftime("%Y-%m-%d")
+    )
+    updated_license["Expiry Date"] = (
+        new_expiry_date.strftime("%Y-%m-%d")
+        if new_expiry_date is not None
+        else ""
+    )
+
+    if not save_license_record(updated_license):
+        print("\nLicense plan could not be changed.")
+        return False
+
+    audit_saved = save_license_audit_record(
+        license_record.get("License ID", ""),
+        "LICENSE PLAN CHANGED",
+        current_plan,
+        new_plan,
+        "Developer/Admin",
+        "License plan updated"
+    )
+
+    print(
+        "\nLicense plan changed successfully:",
+        current_plan,
+        "->",
+        new_plan
+    )
+
+    print(
+        "New Start Date:",
+        updated_license["Start Date"]
+    )
+
+    print(
+        "New Expiry Date:",
+        updated_license["Expiry Date"]
+        or "No Expiry"
+    )
+
+    if not audit_saved:
+        print(
+            "Warning: License changed, but audit history "
+            "could not be saved."
+        )
+
+    return True
+
+
 def get_license_access_status():
     license_record = get_current_license_record()
 
