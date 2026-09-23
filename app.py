@@ -645,6 +645,119 @@ def get_current_license_record():
     return license_records[-1]
 
 
+def display_current_license_details():
+    license_record = get_current_license_record()
+
+    if license_record is None:
+        print("\nNo license record found.")
+        return False
+
+    print("\n--- Current License Details ---")
+    print(
+        "License ID:",
+        license_record.get("License ID", "")
+    )
+    print(
+        "Business Name:",
+        license_record.get("Customer / Business Name", "")
+    )
+    print(
+        "Plan:",
+        license_record.get("Plan", "")
+    )
+    print(
+        "Start Date:",
+        license_record.get("Start Date", "")
+    )
+    print(
+        "Expiry Date:",
+        license_record.get("Expiry Date", "")
+        or "No Expiry"
+    )
+    print(
+        "Allowed Stores:",
+        license_record.get("Allowed Stores", "")
+    )
+    print(
+        "License Status:",
+        license_record.get("License Status", "")
+    )
+    print(
+        "Last Updated:",
+        license_record.get("Last Updated", "")
+    )
+
+    return True
+
+
+def change_license_status():
+    license_record = get_current_license_record()
+
+    if license_record is None:
+        print("\nNo license record found.")
+        return False
+
+    current_status = (
+        license_record.get("License Status", "").strip()
+    )
+
+    print("\n--- Change License Status ---")
+    print("Current Status:", current_status or "Not Set")
+    print("1. Active")
+    print("2. Suspended")
+
+    while True:
+        status_choice = input(
+            "Select New License Status (1/2): "
+        ).strip()
+
+        if status_choice == "1":
+            new_status = "Active"
+            break
+
+        if status_choice == "2":
+            new_status = "Suspended"
+            break
+
+        print("Please select 1 or 2.")
+
+    if current_status.lower() == new_status.lower():
+        print(
+            "\nLicense status is already set to",
+            new_status + "."
+        )
+        return False
+
+    updated_license = license_record.copy()
+    updated_license["License Status"] = new_status
+
+    if not save_license_record(updated_license):
+        print("\nLicense status could not be changed.")
+        return False
+
+    audit_saved = save_license_audit_record(
+        license_record.get("License ID", ""),
+        "LICENSE STATUS CHANGED",
+        current_status,
+        new_status,
+        "Developer/Admin",
+        "License status updated"
+    )
+
+    print(
+        "\nLicense status changed successfully:",
+        current_status,
+        "->",
+        new_status
+    )
+
+    if not audit_saved:
+        print(
+            "Warning: License changed, but audit history "
+            "could not be saved."
+        )
+
+    return True
 def get_license_access_status():
     license_record = get_current_license_record()
 
