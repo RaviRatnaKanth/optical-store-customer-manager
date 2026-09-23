@@ -863,7 +863,152 @@ def change_license_plan():
 
     return True
 
+def change_license_allowed_stores():
+    license_record = get_current_license_record()
 
+    if license_record is None:
+        print("\nNo license record found.")
+        return False
+
+    active_stores = load_store_registry()
+
+    if not active_stores:
+        print("\nNo active stores were found.")
+        return False
+
+    current_allowed_stores = [
+        store_id.strip()
+        for store_id in license_record.get(
+            "Allowed Stores",
+            ""
+        ).split("|")
+        if store_id.strip()
+    ]
+    print("\n--- Change Allowed Stores ---")
+    print(
+        "Current Allowed Stores:",
+        "|".join(current_allowed_stores)
+        or "None"
+    )
+
+    print("\n--- Active Stores ---")
+
+    for index, store in enumerate(active_stores, start=1):
+        store_id = store.get("Store ID", "")
+        store_name = store.get("Store Name", "")
+        store_city = store.get("Store City", "")
+
+        selected_text = ""
+
+        if store_id in current_allowed_stores:
+            selected_text = " [Currently Allowed]"
+
+        print(
+            f"{index}. {store_id} - "
+            f"{store_name} - {store_city}"
+            f"{selected_text}"
+        )
+    while True:
+        store_choice = input(
+            "\nSelect Allowed Store Number(s) "
+            "(example: 1,2): "
+        ).strip()
+
+        selected_parts = [
+            part.strip()
+            for part in store_choice.split(",")
+            if part.strip()
+        ]
+
+        if not selected_parts:
+            print("Please select at least one store.")
+            continue
+
+        if not all(
+            part.isdigit()
+            for part in selected_parts
+        ):
+            print(
+                "Please enter store numbers only, "
+                "separated by commas."
+            )
+            continue
+
+        selected_indexes = [
+            int(part) - 1
+            for part in selected_parts
+        ]
+
+        if not all(
+            0 <= index < len(active_stores)
+            for index in selected_indexes
+        ):
+            print("Please select valid store numbers.")
+            continue
+
+        selected_indexes = list(
+            dict.fromkeys(selected_indexes)
+        )
+
+        selected_store_ids = [
+            active_stores[index].get("Store ID", "")
+            for index in selected_indexes
+        ]
+
+        selected_store_ids = [
+            store_id
+            for store_id in selected_store_ids
+            if store_id
+        ]
+
+        if selected_store_ids:
+            break
+
+        print("Please select at least one valid store.")
+    new_allowed_stores = "|".join(selected_store_ids)
+
+    if set(current_allowed_stores) == set(selected_store_ids):
+        print(
+            "\nSelected stores are already allowed "
+            "under this license."
+        )
+        return False
+
+    updated_license = license_record.copy()
+    updated_license["Allowed Stores"] = new_allowed_stores
+
+    if not save_license_record(updated_license):
+        print("\nAllowed stores could not be changed.")
+        return False
+
+    old_allowed_stores = "|".join(current_allowed_stores)
+
+    audit_saved = save_license_audit_record(
+        license_record.get("License ID", ""),
+        "LICENSE ALLOWED STORES CHANGED",
+        old_allowed_stores,
+        new_allowed_stores,
+        "Developer/Admin",
+        "Allowed stores updated"
+    )
+
+    print("\nAllowed stores changed successfully.")
+    print(
+        "Old Allowed Stores:",
+        old_allowed_stores or "None"
+    )
+    print(
+        "New Allowed Stores:",
+        new_allowed_stores
+    )
+
+    if not audit_saved:
+        print(
+            "Warning: Allowed stores changed, but "
+            "audit history could not be saved."
+        )
+
+    return True
 def get_license_access_status():
     license_record = get_current_license_record()
 
