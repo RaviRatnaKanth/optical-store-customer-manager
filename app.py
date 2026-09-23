@@ -3980,8 +3980,24 @@ if customer_type != "5":
             valid_options = ["1", "2", "3"]
 
         if order_type in valid_options:
-            break
+            if (
+                customer_type == "2"
+                and order_type in ["1", "2", "3", "6", "7"]
+                and license_access_status != "ACTIVE"
+            ):
+                print(
+                    "\n"
+                    + get_license_access_message(
+                        license_access_status
+                    )
+                )
+                print(
+                    "This Existing Customer action is not available "
+                    "until the license is active."
+                )
+                continue
 
+            break
         print("Please select a valid Order Type.")
 if customer_type == "2" and order_type == "7":
     print("\n--- Old Prescription Entry ---")
@@ -4856,6 +4872,23 @@ Please keep this prescription for your reference.
             previous_action_choice = input(
                 "Select Option (1/2/3/4/5): "
             ).strip()
+
+            if (
+                previous_action_choice in ["1", "2"]
+                and license_access_status != "ACTIVE"
+            ):
+                print(
+                    "\n"
+                    + get_license_access_message(
+                        license_access_status
+                    )
+                )
+                print(
+                    "Creating a new order from the previous "
+                    "prescription is not available until "
+                    "the license is active."
+                )
+                continue
 
             if previous_action_choice == "1":
                 previous_prescription_action = "use_same"
