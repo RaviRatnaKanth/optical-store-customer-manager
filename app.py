@@ -74,6 +74,7 @@ def normalize_indian_phone(value):
 
 STORE_PROFILE_FILE = "store_profile.csv"
 LICENSE_FILE = "license_data.csv"
+LICENSE_AUDIT_FILE = "license_audit.csv"
 STORE_REGISTRY_FILE = "stores.csv"
 
 
@@ -323,6 +324,18 @@ def get_license_fieldnames():
         "Last Updated"
     ]
 
+def get_license_audit_fieldnames():
+    return [
+        "Audit Date Time",
+        "License ID",
+        "Action",
+        "Old Value",
+        "New Value",
+        "Changed By",
+        "Notes"
+    ]
+
+
 def generate_license_id():
     return f"LIC-{uuid.uuid4().hex[:12].upper()}"
 
@@ -397,6 +410,30 @@ def initialize_license_file():
         print("License File Error:", error)
 
 
+def initialize_license_audit_file():
+    if os.path.exists(LICENSE_AUDIT_FILE):
+        return
+
+    try:
+        with open(
+            LICENSE_AUDIT_FILE,
+            "w",
+            newline="",
+            encoding="utf-8-sig"
+        ) as audit_file:
+            writer = csv.DictWriter(
+                audit_file,
+                fieldnames=get_license_audit_fieldnames()
+            )
+            writer.writeheader()
+
+    except Exception as error:
+        print(
+            "\nWarning: License audit file could not be created."
+        )
+        print("License Audit File Error:", error)
+
+
 def load_license_records():
     records = []
 
@@ -444,6 +481,49 @@ def save_license_record(license_record):
             "\nWarning: License record could not be saved."
         )
         print("License File Error:", error)
+        return False
+
+
+def save_license_audit_record(
+    license_id,
+    action,
+    old_value="",
+    new_value="",
+    changed_by="Developer/Admin",
+    notes=""
+):
+    try:
+        audit_record = {
+            "Audit Date Time": datetime.now().strftime(
+                "%Y-%m-%d %H:%M:%S"
+            ),
+            "License ID": license_id,
+            "Action": action,
+            "Old Value": old_value,
+            "New Value": new_value,
+            "Changed By": changed_by,
+            "Notes": notes
+        }
+
+        with open(
+            LICENSE_AUDIT_FILE,
+            "a",
+            newline="",
+            encoding="utf-8-sig"
+        ) as audit_file:
+            writer = csv.DictWriter(
+                audit_file,
+                fieldnames=get_license_audit_fieldnames()
+            )
+            writer.writerow(audit_record)
+
+        return True
+
+    except Exception as error:
+        print(
+            "\nWarning: License audit record could not be saved."
+        )
+        print("License Audit Error:", error)
         return False
 
 
@@ -681,6 +761,7 @@ CUSTOMER_DATA_FILE = "customers.csv"
 PAYMENT_DATA_FILE = "payments.csv"
 initialize_store_registry()
 initialize_license_file()
+initialize_license_audit_file()
 active_stores = load_store_registry()
 
 if not active_stores:
