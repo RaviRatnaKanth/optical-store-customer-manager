@@ -614,6 +614,24 @@ def get_license_access_status():
 
 
 
+def get_license_access_message(status):
+    messages = {
+        "NO_LICENSE": "No valid license was found.",
+        "SUSPENDED": "This license is currently suspended.",
+        "EXPIRED": "This license has expired.",
+        "INVALID_LICENSE": "The license information is invalid.",
+        "STORE_NOT_ALLOWED": (
+            "This store / branch is not allowed "
+            "under the current license."
+        )
+    }
+
+    return messages.get(
+        status,
+        "License access is restricted."
+    )
+
+
 def save_store_profile():
     fieldnames = [
         "Store Name",
@@ -935,6 +953,22 @@ while True:
     customer_type = input(
         "Select Customer Type (1/2/3/4/5/6/7): "
     ).strip()
+
+    if (
+        customer_type == "1"
+        and license_access_status != "ACTIVE"
+    ):
+        print(
+            "\n"
+            + get_license_access_message(
+                license_access_status
+            )
+        )
+        print(
+            "New Customer entry is not available "
+            "until the license is active."
+        )
+        continue
 
     if customer_type in ["1", "2", "3", "4", "5", "6", "7"]:
         break
