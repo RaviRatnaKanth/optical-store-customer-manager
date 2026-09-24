@@ -1360,8 +1360,8 @@ else:
     save_store_profile()
 
 if not license_record_exists():
-    create_initial_license()
-
+    if load_admin_security() is not None:
+        create_initial_license()
 license_access_status = get_license_access_status()
 
 print(
