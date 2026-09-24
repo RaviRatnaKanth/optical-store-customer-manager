@@ -1,6 +1,7 @@
 ﻿import base64
 import calendar
 import csv
+import json
 import os
 import sys
 import uuid
@@ -321,6 +322,41 @@ def update_current_store_registry():
         print("Store Registry Error:", error)
         return False
 
+
+def get_license_signature_data(license_record):
+    signed_data = {
+        "Allowed Stores": str(
+            license_record.get("Allowed Stores", "")
+        ).strip(),
+        "Customer / Business Name": str(
+            license_record.get(
+                "Customer / Business Name",
+                ""
+            )
+        ).strip(),
+        "Expiry Date": str(
+            license_record.get("Expiry Date", "")
+        ).strip(),
+        "License ID": str(
+            license_record.get("License ID", "")
+        ).strip(),
+        "License Status": str(
+            license_record.get("License Status", "")
+        ).strip(),
+        "Plan": str(
+            license_record.get("Plan", "")
+        ).strip(),
+        "Start Date": str(
+            license_record.get("Start Date", "")
+        ).strip()
+    }
+
+    return json.dumps(
+        signed_data,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False
+    ).encode("utf-8")
 
 def get_license_fieldnames():
     return [
