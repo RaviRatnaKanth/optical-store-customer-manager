@@ -1123,10 +1123,9 @@ def setup_admin_password():
 
     print("\n--- First-Time Admin Security Setup ---")
 
-    password = input(
+    password = getpass.getpass(
         "Create Developer/Admin Password: "
     ).strip()
-
     if len(password) < 8:
         print(
             "Admin password must contain "
@@ -1134,10 +1133,9 @@ def setup_admin_password():
         )
         return False
 
-    confirm_password = input(
+    confirm_password = getpass.getpass(
         "Confirm Developer/Admin Password: "
     ).strip()
-
     if password != confirm_password:
         print("Passwords do not match.")
         return False
