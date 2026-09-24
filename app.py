@@ -5,6 +5,10 @@ import uuid
 import shutil
 import webbrowser
 import urllib.parse
+import hashlib
+import hmac
+import secrets
+import getpass
 from datetime import datetime
 from store_config import store_name, store_city, store_address, store_phone, store_email, store_website, store_logo
 def print_text_document(document_text):
@@ -76,6 +80,7 @@ STORE_PROFILE_FILE = "store_profile.csv"
 LICENSE_FILE = "license_data.csv"
 LICENSE_AUDIT_FILE = "license_audit.csv"
 STORE_REGISTRY_FILE = "stores.csv"
+ADMIN_SECURITY_FILE = "admin_security.csv"
 
 
 def load_store_profile():
@@ -1008,6 +1013,155 @@ def change_license_allowed_stores():
             "audit history could not be saved."
         )
 
+    return True
+def hash_admin_password(password, salt):
+    password_bytes = password.encode("utf-8")
+
+    return hashlib.pbkdf2_hmac(
+        "sha256",
+        password_bytes,
+        salt,
+        200000
+    )
+def save_admin_security(password):
+    try:
+        salt = secrets.token_bytes(32)
+        password_hash = hash_admin_password(
+            password,
+            salt
+        )
+
+        with open(
+            ADMIN_SECURITY_FILE,
+            "w",
+            newline="",
+            encoding="utf-8-sig"
+        ) as security_file:
+            writer = csv.writer(security_file)
+            writer.writerow([
+                "Salt",
+                "Password Hash"
+            ])
+            writer.writerow([
+                salt.hex(),
+                password_hash.hex()
+            ])
+
+        return True
+
+    except Exception as error:
+        print(
+            "\nAdmin security information "
+            "could not be saved."
+        )
+        print("Admin Security Error:", error)
+        return False
+def load_admin_security():
+    try:
+        if not os.path.exists(ADMIN_SECURITY_FILE):
+            return None
+
+        with open(
+            ADMIN_SECURITY_FILE,
+            "r",
+            newline="",
+            encoding="utf-8-sig"
+        ) as security_file:
+            reader = csv.DictReader(security_file)
+            security_record = next(reader, None)
+
+        if security_record is None:
+            return None
+
+        salt_hex = security_record.get(
+            "Salt",
+            ""
+        ).strip()
+
+        password_hash_hex = security_record.get(
+            "Password Hash",
+            ""
+        ).strip()
+
+        if not salt_hex or not password_hash_hex:
+            return None
+
+        return {
+            "salt": bytes.fromhex(salt_hex),
+            "password_hash": bytes.fromhex(
+                password_hash_hex
+            )
+        }
+
+    except Exception as error:
+        print(
+            "\nAdmin security information "
+            "could not be loaded."
+        )
+        print("Admin Security Error:", error)
+        return None
+
+def verify_admin_password(password):
+    security_record = load_admin_security()
+
+    if security_record is None:
+        return False
+
+    entered_password_hash = hash_admin_password(
+        password,
+        security_record["salt"]
+    )
+
+    return hmac.compare_digest(
+        entered_password_hash,
+        security_record["password_hash"]
+    )
+def setup_admin_password():
+    if os.path.exists(ADMIN_SECURITY_FILE):
+        print("\nAdmin security is already configured.")
+        return False
+
+    print("\n--- First-Time Admin Security Setup ---")
+
+    password = input(
+        "Create Developer/Admin Password: "
+    ).strip()
+
+    if len(password) < 8:
+        print(
+            "Admin password must contain "
+            "at least 8 characters."
+        )
+        return False
+
+    confirm_password = input(
+        "Confirm Developer/Admin Password: "
+    ).strip()
+
+    if password != confirm_password:
+        print("Passwords do not match.")
+        return False
+
+    if not save_admin_security(password):
+        return False
+
+    print("\nAdmin password created successfully.")
+    return True
+def open_protected_admin_control():
+    if not os.path.exists(ADMIN_SECURITY_FILE):
+        print("\nAdmin security is not configured.")
+        return False
+
+    password = getpass.getpass(
+        "Enter Developer/Admin Password: "
+    )
+
+    if not verify_admin_password(password):
+        print("\nIncorrect Admin password.")
+        return False
+
+    print("\nAdmin access granted.")
+    developer_admin_license_control()
     return True
 def developer_admin_license_control():
     while True:
