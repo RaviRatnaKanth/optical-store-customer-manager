@@ -1,6 +1,7 @@
 ﻿import calendar
 import csv
 import os
+import sys
 import uuid
 import shutil
 import webbrowser
@@ -1145,6 +1146,23 @@ def setup_admin_password():
 
     print("\nAdmin password created successfully.")
     return True
+def developer_first_time_provisioning():
+    if load_admin_security() is not None:
+        print("\nDeveloper/Admin security is already configured.")
+        return False
+
+    print("\n--- Developer First-Time Provisioning ---")
+
+    if not setup_admin_password():
+        return False
+
+    if not create_initial_license():
+        print("\nInitial license creation was not completed.")
+        return False
+
+    print("\nDeveloper provisioning completed successfully.")
+    return True
+
 def open_protected_admin_control():
     if not os.path.exists(ADMIN_SECURITY_FILE):
         print("\nAdmin security is not configured.")
@@ -1359,9 +1377,8 @@ if os.path.exists(STORE_PROFILE_FILE):
 else:
     save_store_profile()
 
-if not license_record_exists():
-    if load_admin_security() is not None:
-        create_initial_license()
+provisioning_mode = "--developer-provision" in sys.argv
+
 license_access_status = get_license_access_status()
 
 print(
