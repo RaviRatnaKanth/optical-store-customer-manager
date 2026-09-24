@@ -1,4 +1,5 @@
-﻿import calendar
+﻿import base64
+import calendar
 import csv
 import os
 import sys
@@ -11,6 +12,8 @@ import hmac
 import secrets
 import getpass
 from datetime import datetime
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from store_config import store_name, store_city, store_address, store_phone, store_email, store_website, store_logo
 def print_text_document(document_text):
     import tempfile
@@ -82,6 +85,7 @@ LICENSE_FILE = "license_data.csv"
 LICENSE_AUDIT_FILE = "license_audit.csv"
 STORE_REGISTRY_FILE = "stores.csv"
 ADMIN_SECURITY_FILE = "admin_security.csv"
+LICENSE_PUBLIC_KEY_B64 = "Ol35h0I8OiVjbw/PxEFM+HF1tVzGyxUqSr8LgOS1NRw="
 
 
 def load_store_profile():
