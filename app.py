@@ -358,6 +358,32 @@ def get_license_signature_data(license_record):
         ensure_ascii=False
     ).encode("utf-8")
 
+def verify_license_signature(license_record, signature_text):
+    try:
+        public_key_bytes = base64.b64decode(
+            LICENSE_PUBLIC_KEY_B64,
+            validate=True
+        )
+        signature_bytes = base64.b64decode(
+            signature_text,
+            validate=True
+        )
+
+        public_key = Ed25519PublicKey.from_public_bytes(
+            public_key_bytes
+        )
+
+        public_key.verify(
+            signature_bytes,
+            get_license_signature_data(license_record)
+        )
+
+        return True
+
+    except (InvalidSignature, ValueError, TypeError):
+        return False
+
+
 def get_license_fieldnames():
     return [
         "License ID",
