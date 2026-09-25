@@ -1489,7 +1489,6 @@ if os.path.exists(STORE_PROFILE_FILE):
 else:
     save_store_profile()
 
-provisioning_mode = "--developer-provision" in sys.argv
 
 license_access_status = get_license_access_status()
 
