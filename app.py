@@ -1310,35 +1310,23 @@ def developer_admin_license_control():
         print("=" * 50)
 
         print("1. View Current License Details")
-        print("2. Change License Status")
-        print("3. Change License Plan")
-        print("4. Change Allowed Stores")
-        print("5. Exit Admin License Control")
+        print("2. Exit Admin License Control")
 
         admin_choice = input(
-            "Select Option (1-5): "
+            "Select Option (1-2): "
         ).strip()
+
         if admin_choice == "1":
             display_current_license_details()
             continue
 
         if admin_choice == "2":
-            change_license_status()
-            continue
-
-        if admin_choice == "3":
-            change_license_plan()
-            continue
-
-        if admin_choice == "4":
-            change_license_allowed_stores()
-            continue
-
-        if admin_choice == "5":
             print("\nExiting Admin License Control.")
             break
 
-        print("Please select a valid option from 1 to 5.")
+        print("Please select a valid option from 1 to 2.")
+
+
 def get_license_access_status():
     license_record = get_current_license_record()
 
