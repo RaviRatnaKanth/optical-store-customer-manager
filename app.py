@@ -83,6 +83,7 @@ def normalize_indian_phone(value):
 
 STORE_PROFILE_FILE = "store_profile.csv"
 LICENSE_FILE = "license_data.csv"
+SIGNED_LICENSE_FILE = "license.json"
 LICENSE_AUDIT_FILE = "license_audit.csv"
 STORE_REGISTRY_FILE = "stores.csv"
 ADMIN_SECURITY_FILE = "admin_security.csv"
@@ -539,6 +540,61 @@ def initialize_license_audit_file():
         print("License Audit File Error:", error)
 
 
+def load_signed_license_package():
+    if not os.path.exists(SIGNED_LICENSE_FILE):
+        return None
+
+    try:
+        with open(
+            SIGNED_LICENSE_FILE,
+            "r",
+            encoding="utf-8-sig"
+        ) as license_file:
+            package = json.load(license_file)
+
+        if not isinstance(package, dict):
+            return None
+
+        license_record = package.get("license")
+        signature = package.get("signature", "")
+
+        if not isinstance(license_record, dict):
+            return None
+
+        if not signature:
+            return None
+
+        return package
+
+    except Exception as error:
+        print(
+            "\nWarning: Signed license could not be loaded."
+        )
+        print("Signed License Error:", error)
+        return None
+
+
+def get_verified_signed_license_record():
+    package = load_signed_license_package()
+
+    if package is None:
+        return None
+
+    license_record = package.get("license")
+    signature = package.get("signature", "")
+
+    if not verify_license_signature(
+        license_record,
+        signature
+    ):
+        print(
+            "\nWarning: Signed license verification failed."
+        )
+        return None
+
+    return license_record
+
+
 def load_license_records():
     records = []
 
@@ -710,13 +766,15 @@ def create_initial_license():
     return False
 
 def get_current_license_record():
+    if os.path.exists(SIGNED_LICENSE_FILE):
+        return get_verified_signed_license_record()
+
     license_records = load_license_records()
 
     if not license_records:
         return None
 
     return license_records[-1]
-
 
 def display_current_license_details():
     license_record = get_current_license_record()

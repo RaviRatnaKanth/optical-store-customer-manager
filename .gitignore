@@ -19,3 +19,4 @@ license_data.csv
 license_audit.csv
 admin_security.csv
 developer_provision.key
+license*.json
