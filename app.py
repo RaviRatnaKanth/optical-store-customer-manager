@@ -82,7 +82,6 @@ def normalize_indian_phone(value):
     return clean_phone
 
 STORE_PROFILE_FILE = "store_profile.csv"
-LICENSE_FILE = "license_data.csv"
 SIGNED_LICENSE_FILE = "license.json"
 STORE_REGISTRY_FILE = "stores.csv"
 ADMIN_SECURITY_FILE = "admin_security.csv"
@@ -384,54 +383,6 @@ def verify_license_signature(license_record, signature_text):
         return False
 
 
-def get_license_fieldnames():
-    return [
-        "License ID",
-        "Customer / Business Name",
-        "Plan",
-        "Start Date",
-        "Expiry Date",
-        "Allowed Stores",
-        "License Status",
-        "Last Updated"
-    ]
-
-
-
-
-
-
-
-
-
-
-
-def initialize_license_file():
-    if os.path.exists(LICENSE_FILE):
-        return
-
-    try:
-        with open(
-            LICENSE_FILE,
-            "w",
-            newline="",
-            encoding="utf-8-sig"
-        ) as license_file:
-            writer = csv.DictWriter(
-                license_file,
-                fieldnames=get_license_fieldnames()
-            )
-            writer.writeheader()
-
-    except Exception as error:
-        print(
-            "\nWarning: License file could not be created."
-        )
-        print("License File Error:", error)
-
-
-
-
 def load_signed_license_package():
     if not os.path.exists(SIGNED_LICENSE_FILE):
         return None
@@ -487,47 +438,9 @@ def get_verified_signed_license_record():
     return license_record
 
 
-def load_license_records():
-    records = []
-
-    try:
-        with open(
-            LICENSE_FILE,
-            "r",
-            newline="",
-            encoding="utf-8-sig"
-        ) as license_file:
-            reader = csv.DictReader(license_file)
-            records = list(reader)
-
-    except Exception as error:
-        print(
-            "\nWarning: License file could not be loaded."
-        )
-        print("License File Error:", error)
-
-    return records
-
-
-
-
-
-
-
-
-
-
-
 def get_current_license_record():
-    if os.path.exists(SIGNED_LICENSE_FILE):
-        return get_verified_signed_license_record()
+    return get_verified_signed_license_record()
 
-    license_records = load_license_records()
-
-    if not license_records:
-        return None
-
-    return license_records[-1]
 
 def display_current_license_details():
     license_record = get_current_license_record()
@@ -574,7 +487,6 @@ def display_current_license_details():
     return True
 
 
-
 def hash_admin_password(password, salt):
     password_bytes = password.encode("utf-8")
 
@@ -584,6 +496,8 @@ def hash_admin_password(password, salt):
         salt,
         200000
     )
+
+
 def save_admin_security(password):
     try:
         salt = secrets.token_bytes(32)
@@ -795,7 +709,6 @@ def get_license_access_status():
     return "ACTIVE"
 
 
-
 def get_license_access_message(status):
     messages = {
         "NO_LICENSE": "No valid license was found.",
@@ -862,7 +775,6 @@ record_time = datetime.now().strftime("%I:%M %p")
 CUSTOMER_DATA_FILE = "customers.csv"
 PAYMENT_DATA_FILE = "payments.csv"
 initialize_store_registry()
-initialize_license_file()
 active_stores = load_store_registry()
 
 if not active_stores:
@@ -918,8 +830,6 @@ print(
 print("==================================================")
 print("          OPTICAL STORE CUSTOMER MANAGER")
 print("==================================================")
-
-
 
 print("\n--- Data Mode ---")
 print("1. Real / Production Data")
@@ -3964,9 +3874,6 @@ previous_left_sph = ""
 previous_left_cyl = ""
 previous_left_axis = ""
 previous_left_add = ""
-
-
-
 
 if customer_type == "5":
     (
