@@ -84,7 +84,6 @@ def normalize_indian_phone(value):
 STORE_PROFILE_FILE = "store_profile.csv"
 LICENSE_FILE = "license_data.csv"
 SIGNED_LICENSE_FILE = "license.json"
-LICENSE_AUDIT_FILE = "license_audit.csv"
 STORE_REGISTRY_FILE = "stores.csv"
 ADMIN_SECURITY_FILE = "admin_security.csv"
 LICENSE_PUBLIC_KEY_B64 = "Ol35h0I8OiVjbw/PxEFM+HF1tVzGyxUqSr8LgOS1NRw="
@@ -397,101 +396,16 @@ def get_license_fieldnames():
         "Last Updated"
     ]
 
-def get_license_audit_fieldnames():
-    return [
-        "Audit Date Time",
-        "License ID",
-        "Action",
-        "Old Value",
-        "New Value",
-        "Changed By",
-        "Notes"
-    ]
 
 
-def generate_license_id():
-    return f"LIC-{uuid.uuid4().hex[:12].upper()}"
 
 
-def get_license_plans():
-    return [
-        "Trial",
-        "1 Year",
-        "2 Years",
-        "Lifetime",
-        "Free",
-        "Custom"
-    ]
 
 
-def add_calendar_months(start_date, months):
-    target_month = start_date.month - 1 + months
-    target_year = start_date.year + target_month // 12
-    target_month = target_month % 12 + 1
-
-    last_day = calendar.monthrange(
-        target_year,
-        target_month
-    )[1]
-
-    target_day = min(start_date.day, last_day)
-
-    return start_date.replace(
-        year=target_year,
-        month=target_month,
-        day=target_day
-    )
 
 
-def calculate_license_expiry(start_date, plan):
-    if plan == "Trial":
-        return add_calendar_months(start_date, 6)
-
-    if plan == "1 Year":
-        return add_calendar_months(start_date, 12)
-
-    if plan == "2 Years":
-        return add_calendar_months(start_date, 24)
-
-    if plan in ["Lifetime", "Free"]:
-        return None
-
-    return None
 
 
-def get_custom_license_expiry_date(start_date):
-    while True:
-        custom_expiry_input = input(
-            "Enter Custom Expiry Date "
-            "(DD-MM-YYYY): "
-        ).strip()
-
-        accepted_formats = (
-            "%d-%m-%Y",
-            "%d/%m/%Y",
-            "%d-%m-%y",
-            "%d/%m/%y",
-        )
-
-        custom_expiry_date = None
-
-        for date_format in accepted_formats:
-            try:
-                custom_expiry_date = datetime.strptime(
-                    custom_expiry_input,
-                    date_format
-                ).date()
-                break
-            except ValueError:
-                continue
-
-        if (
-            custom_expiry_date is not None
-            and custom_expiry_date > start_date
-        ):
-            return custom_expiry_date
-
-        print("Please enter a valid future expiry date.")
 def initialize_license_file():
     if os.path.exists(LICENSE_FILE):
         return
@@ -516,28 +430,6 @@ def initialize_license_file():
         print("License File Error:", error)
 
 
-def initialize_license_audit_file():
-    if os.path.exists(LICENSE_AUDIT_FILE):
-        return
-
-    try:
-        with open(
-            LICENSE_AUDIT_FILE,
-            "w",
-            newline="",
-            encoding="utf-8-sig"
-        ) as audit_file:
-            writer = csv.DictWriter(
-                audit_file,
-                fieldnames=get_license_audit_fieldnames()
-            )
-            writer.writeheader()
-
-    except Exception as error:
-        print(
-            "\nWarning: License audit file could not be created."
-        )
-        print("License Audit File Error:", error)
 
 
 def load_signed_license_package():
@@ -617,153 +509,14 @@ def load_license_records():
     return records
 
 
-def save_license_record(license_record):
-    try:
-        license_record["Last Updated"] = (
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        )
-
-        with open(
-            LICENSE_FILE,
-            "a",
-            newline="",
-            encoding="utf-8-sig"
-        ) as license_file:
-            writer = csv.DictWriter(
-                license_file,
-                fieldnames=get_license_fieldnames()
-            )
-            writer.writerow(license_record)
-
-        return True
-
-    except Exception as error:
-        print(
-            "\nWarning: License record could not be saved."
-        )
-        print("License File Error:", error)
-        return False
 
 
-def save_license_audit_record(
-    license_id,
-    action,
-    old_value="",
-    new_value="",
-    changed_by="Developer/Admin",
-    notes=""
-):
-    try:
-        audit_record = {
-            "Audit Date Time": datetime.now().strftime(
-                "%Y-%m-%d %H:%M:%S"
-            ),
-            "License ID": license_id,
-            "Action": action,
-            "Old Value": old_value,
-            "New Value": new_value,
-            "Changed By": changed_by,
-            "Notes": notes
-        }
-
-        with open(
-            LICENSE_AUDIT_FILE,
-            "a",
-            newline="",
-            encoding="utf-8-sig"
-        ) as audit_file:
-            writer = csv.DictWriter(
-                audit_file,
-                fieldnames=get_license_audit_fieldnames()
-            )
-            writer.writerow(audit_record)
-
-        return True
-
-    except Exception as error:
-        print(
-            "\nWarning: License audit record could not be saved."
-        )
-        print("License Audit Error:", error)
-        return False
 
 
-def get_active_store_ids():
-    active_stores = load_store_registry()
-
-    return [
-        store["Store ID"]
-        for store in active_stores
-        if store.get("Store ID")
-    ]
 
 
-def license_record_exists():
-    license_records = load_license_records()
-
-    return len(license_records) > 0
 
 
-def create_initial_license():
-    if license_record_exists():
-        return False
-
-    active_store_ids = get_active_store_ids()
-
-    if not active_store_ids:
-        return False
-
-    license_id = generate_license_id()
-    business_name = store_name
-    start_date = datetime.now().date()
-
-
-    license_plans = get_license_plans()
-
-    print("\n--- Select License Plan ---")
-
-    for index, plan in enumerate(license_plans, start=1):
-        print(f"{index}. {plan}")
-    while True:
-        plan_choice = input(
-            f"Select License Plan (1-{len(license_plans)}): "
-        ).strip()
-
-        if plan_choice.isdigit():
-            plan_index = int(plan_choice) - 1
-
-            if 0 <= plan_index < len(license_plans):
-                selected_plan = license_plans[plan_index]
-                break
-
-        print("Please select a valid License Plan number.")
-    expiry_date = calculate_license_expiry(
-        start_date,
-        selected_plan
-    )
-    if selected_plan == "Custom":
-        expiry_date = get_custom_license_expiry_date(
-            start_date
-        )
-    allowed_stores = "|".join(active_store_ids)
-    license_record = {
-        "License ID": license_id,
-        "Customer / Business Name": business_name,
-        "Plan": selected_plan,
-        "Start Date": start_date.strftime("%Y-%m-%d"),
-        "Expiry Date": (
-            expiry_date.strftime("%Y-%m-%d")
-            if expiry_date is not None
-            else ""
-        ),
-        "Allowed Stores": allowed_stores,
-        "License Status": "Active",
-        "Last Updated": ""
-    }
-    if save_license_record(license_record):
-        return True
-
-    return False
 
 def get_current_license_record():
     if os.path.exists(SIGNED_LICENSE_FILE):
@@ -821,324 +574,7 @@ def display_current_license_details():
     return True
 
 
-def change_license_status():
-    license_record = get_current_license_record()
 
-    if license_record is None:
-        print("\nNo license record found.")
-        return False
-
-    current_status = (
-        license_record.get("License Status", "").strip()
-    )
-
-    print("\n--- Change License Status ---")
-    print("Current Status:", current_status or "Not Set")
-    print("1. Active")
-    print("2. Suspended")
-
-    while True:
-        status_choice = input(
-            "Select New License Status (1/2): "
-        ).strip()
-
-        if status_choice == "1":
-            new_status = "Active"
-            break
-
-        if status_choice == "2":
-            new_status = "Suspended"
-            break
-
-        print("Please select 1 or 2.")
-
-    if current_status.lower() == new_status.lower():
-        print(
-            "\nLicense status is already set to",
-            new_status + "."
-        )
-        return False
-
-    updated_license = license_record.copy()
-    updated_license["License Status"] = new_status
-
-    if not save_license_record(updated_license):
-        print("\nLicense status could not be changed.")
-        return False
-
-    audit_saved = save_license_audit_record(
-        license_record.get("License ID", ""),
-        "LICENSE STATUS CHANGED",
-        current_status,
-        new_status,
-        "Developer/Admin",
-        "License status updated"
-    )
-
-    print(
-        "\nLicense status changed successfully:",
-        current_status,
-        "->",
-        new_status
-    )
-
-    if not audit_saved:
-        print(
-            "Warning: License changed, but audit history "
-            "could not be saved."
-        )
-
-    return True
-def change_license_plan():
-    license_record = get_current_license_record()
-
-    if license_record is None:
-        print("\nNo license record found.")
-        return False
-
-    current_plan = license_record.get(
-        "Plan",
-        ""
-    ).strip()
-
-    license_plans = get_license_plans()
-
-    print("\n--- Change License Plan ---")
-    print("Current Plan:", current_plan or "Not Set")
-
-    for index, plan in enumerate(license_plans, start=1):
-        print(f"{index}. {plan}")
-
-    while True:
-        plan_choice = input(
-            f"Select New License Plan "
-            f"(1-{len(license_plans)}): "
-        ).strip()
-
-        if plan_choice.isdigit():
-            plan_index = int(plan_choice) - 1
-
-            if 0 <= plan_index < len(license_plans):
-                new_plan = license_plans[plan_index]
-                break
-
-        print("Please select a valid License Plan number.")
-
-    if current_plan.lower() == new_plan.lower():
-        print(
-            "\nLicense plan is already set to",
-            new_plan + "."
-        )
-        return False
-
-    new_start_date = datetime.now().date()
-
-    new_expiry_date = calculate_license_expiry(
-        new_start_date,
-        new_plan
-    )
-
-    if new_plan == "Custom":
-        new_expiry_date = get_custom_license_expiry_date(
-            new_start_date
-        )
-
-    updated_license = license_record.copy()
-    updated_license["Plan"] = new_plan
-    updated_license["Start Date"] = (
-        new_start_date.strftime("%Y-%m-%d")
-    )
-    updated_license["Expiry Date"] = (
-        new_expiry_date.strftime("%Y-%m-%d")
-        if new_expiry_date is not None
-        else ""
-    )
-
-    if not save_license_record(updated_license):
-        print("\nLicense plan could not be changed.")
-        return False
-
-    audit_saved = save_license_audit_record(
-        license_record.get("License ID", ""),
-        "LICENSE PLAN CHANGED",
-        current_plan,
-        new_plan,
-        "Developer/Admin",
-        "License plan updated"
-    )
-
-    print(
-        "\nLicense plan changed successfully:",
-        current_plan,
-        "->",
-        new_plan
-    )
-
-    print(
-        "New Start Date:",
-        updated_license["Start Date"]
-    )
-
-    print(
-        "New Expiry Date:",
-        updated_license["Expiry Date"]
-        or "No Expiry"
-    )
-
-    if not audit_saved:
-        print(
-            "Warning: License changed, but audit history "
-            "could not be saved."
-        )
-
-    return True
-
-def change_license_allowed_stores():
-    license_record = get_current_license_record()
-
-    if license_record is None:
-        print("\nNo license record found.")
-        return False
-
-    active_stores = load_store_registry()
-
-    if not active_stores:
-        print("\nNo active stores were found.")
-        return False
-
-    current_allowed_stores = [
-        store_id.strip()
-        for store_id in license_record.get(
-            "Allowed Stores",
-            ""
-        ).split("|")
-        if store_id.strip()
-    ]
-    print("\n--- Change Allowed Stores ---")
-    print(
-        "Current Allowed Stores:",
-        "|".join(current_allowed_stores)
-        or "None"
-    )
-
-    print("\n--- Active Stores ---")
-
-    for index, store in enumerate(active_stores, start=1):
-        store_id = store.get("Store ID", "")
-        store_name = store.get("Store Name", "")
-        store_city = store.get("Store City", "")
-
-        selected_text = ""
-
-        if store_id in current_allowed_stores:
-            selected_text = " [Currently Allowed]"
-
-        print(
-            f"{index}. {store_id} - "
-            f"{store_name} - {store_city}"
-            f"{selected_text}"
-        )
-    while True:
-        store_choice = input(
-            "\nSelect Allowed Store Number(s) "
-            "(example: 1,2): "
-        ).strip()
-
-        selected_parts = [
-            part.strip()
-            for part in store_choice.split(",")
-            if part.strip()
-        ]
-
-        if not selected_parts:
-            print("Please select at least one store.")
-            continue
-
-        if not all(
-            part.isdigit()
-            for part in selected_parts
-        ):
-            print(
-                "Please enter store numbers only, "
-                "separated by commas."
-            )
-            continue
-
-        selected_indexes = [
-            int(part) - 1
-            for part in selected_parts
-        ]
-
-        if not all(
-            0 <= index < len(active_stores)
-            for index in selected_indexes
-        ):
-            print("Please select valid store numbers.")
-            continue
-
-        selected_indexes = list(
-            dict.fromkeys(selected_indexes)
-        )
-
-        selected_store_ids = [
-            active_stores[index].get("Store ID", "")
-            for index in selected_indexes
-        ]
-
-        selected_store_ids = [
-            store_id
-            for store_id in selected_store_ids
-            if store_id
-        ]
-
-        if selected_store_ids:
-            break
-
-        print("Please select at least one valid store.")
-    new_allowed_stores = "|".join(selected_store_ids)
-
-    if set(current_allowed_stores) == set(selected_store_ids):
-        print(
-            "\nSelected stores are already allowed "
-            "under this license."
-        )
-        return False
-
-    updated_license = license_record.copy()
-    updated_license["Allowed Stores"] = new_allowed_stores
-
-    if not save_license_record(updated_license):
-        print("\nAllowed stores could not be changed.")
-        return False
-
-    old_allowed_stores = "|".join(current_allowed_stores)
-
-    audit_saved = save_license_audit_record(
-        license_record.get("License ID", ""),
-        "LICENSE ALLOWED STORES CHANGED",
-        old_allowed_stores,
-        new_allowed_stores,
-        "Developer/Admin",
-        "Allowed stores updated"
-    )
-
-    print("\nAllowed stores changed successfully.")
-    print(
-        "Old Allowed Stores:",
-        old_allowed_stores or "None"
-    )
-    print(
-        "New Allowed Stores:",
-        new_allowed_stores
-    )
-
-    if not audit_saved:
-        print(
-            "Warning: Allowed stores changed, but "
-            "audit history could not be saved."
-        )
-
-    return True
 def hash_admin_password(password, salt):
     password_bytes = password.encode("utf-8")
 
@@ -1269,22 +705,6 @@ def setup_admin_password():
         return False
 
     print("\nAdmin password created successfully.")
-    return True
-def developer_first_time_provisioning():
-    if load_admin_security() is not None:
-        print("\nDeveloper/Admin security is already configured.")
-        return False
-
-    print("\n--- Developer First-Time Provisioning ---")
-
-    if not setup_admin_password():
-        return False
-
-    if not create_initial_license():
-        print("\nInitial license creation was not completed.")
-        return False
-
-    print("\nDeveloper provisioning completed successfully.")
     return True
 
 def open_protected_admin_control():
@@ -1443,7 +863,6 @@ CUSTOMER_DATA_FILE = "customers.csv"
 PAYMENT_DATA_FILE = "payments.csv"
 initialize_store_registry()
 initialize_license_file()
-initialize_license_audit_file()
 active_stores = load_store_registry()
 
 if not active_stores:
