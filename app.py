@@ -2195,14 +2195,12 @@ Thank you,
 
 Dear {selected_pending_order[1]},
 
-Your spectacles/order are ready for collection.
-
+Your spectacle order is ready for collection.
 Order Type: {selected_pending_order[5]}
 Order Date / Time: {selected_pending_order[4]}
 Pending Balance: ₹{current_balance:.2f}
 
-Kindly collect your spectacles/order and complete the pending payment.
-
+Kindly collect your spectacle order and complete the pending payment.
 Thank you,
 {store_name}
 """
@@ -2984,13 +2982,11 @@ if customer_type == "4":
 
 Dear {selected_delivery_order[1]},
 
-Your spectacles/order are ready for collection.
-
+Your spectacle order is ready for collection.
 Order Type: {selected_delivery_order[5]}
 Order Date / Time: {selected_delivery_order[4]}
 
-Kindly collect your spectacles/order at your convenience.
-
+Kindly collect your spectacle order at your convenience.
 Thank you,
 {store_name}
 """
@@ -3009,14 +3005,12 @@ Thank you,
 
 Dear {selected_delivery_order[1]},
 
-Your spectacles/order are ready for collection.
-
+Your spectacle order is ready for collection.
 Order Type: {selected_delivery_order[5]}
 Order Date / Time: {selected_delivery_order[4]}
 Pending Balance: ₹{delivery_balance:.2f}
 
-Kindly collect your spectacles/order and complete the pending payment.
-
+Kindly collect your spectacle order and complete the pending payment.
 Thank you,
 {store_name}
 """
@@ -4046,7 +4040,7 @@ PRESCRIPTION DETAILS
 
 Customer Name: {customer_name}
 Prescription Date: {previous_prescription_date}
-Prescription Source: {"Ravi Opticals Eye Testing" if prescription_source == "In-Store Refraction" else prescription_source}
+Prescription Source: {f"{store_name} Eye Testing" if prescription_source == "In-Store Refraction" else prescription_source}
 {f"Prescription From: {prescription_from}" if prescription_from else ""}
 
 Right Eye (OD):
@@ -4277,7 +4271,7 @@ PRESCRIPTION DETAILS
 
 Customer Name: {customer_name}
 Prescription Date: {previous_prescription_date}
-Prescription Source: {"Ravi Opticals Eye Testing" if prescription_source == "In-Store Refraction" else prescription_source}
+Prescription Source: {f"{store_name} Eye Testing" if prescription_source == "In-Store Refraction" else prescription_source}
 {f"Prescription From: {prescription_from}" if prescription_from else ""}
 
 Right Eye (OD):
@@ -6054,37 +6048,35 @@ elif order_type in ["2", "3"]:
             prescription_source_choice = input(
                 "Select Prescription Source (1/2): "
             ).strip()
-            if prescription_source_choice == "1":
-                prescription_source = "In-Store Refraction"
-                break
 
-            elif prescription_source_choice == "2":
-                prescription_source = "External Prescription"
+        if prescription_source_choice == "1":
+            prescription_source = "In-Store Refraction"
+            break
 
-                prescription_from = input(
-                    "Prescription From "
-                    "(Optional - Hospital / Doctor / Optical Shop): "
-                ).strip()
+        elif prescription_source_choice == "2":
+            prescription_source = "External Prescription"
 
-                break
+            prescription_from = input(
+                "Prescription From "
+                "(Optional - Hospital / Doctor / Optical Shop): "
+            ).strip()
 
-            elif prescription_source_choice == "3":
+            break
 
-                if customer_type == "2":
-                    prescription_source = (
-                        "Existing Prescription on Record"
-                    )
-                    break
+        elif (
+            prescription_source_choice == "3"
+            and customer_type == "2"
+        ):
+            prescription_source = (
+                "Existing Prescription on Record"
+            )
+            break
 
-                else:
-                    print(
-                        "Existing Prescription on Record is "
-                        "available only for Existing Customers."
-                    )
-
-            else:
+        else:
+            if customer_type == "2":
                 print("Please select 1, 2, or 3.")
-
+            else:
+                print("Please select 1 or 2.")
 order_purpose = "Not Applicable"
 
 if prescription_source == "Existing Prescription on Record":
@@ -6249,8 +6241,30 @@ elif (
 
     else:
         lens_type = ""
-    add_requirement = ""
+    if lens_type == "Single Vision":
+        lens_type_choice = "1"
+        add_requirement = ""
 
+    else:
+        lens_type_choice = "2"
+
+        previous_od_add = right_add.strip()
+        previous_os_add = left_add.strip()
+
+        if (
+            previous_od_add not in ["", "0"]
+            and previous_os_add not in ["", "0"]
+        ):
+            add_requirement = "1"
+
+        elif previous_od_add not in ["", "0"]:
+            add_requirement = "2"
+
+        elif previous_os_add not in ["", "0"]:
+            add_requirement = "3"
+
+        else:
+            add_requirement = ""
     print(
         "Previous Lens Type loaded:",
         lens_type if lens_type else "Not Recorded"
@@ -13106,10 +13120,10 @@ Order Details
 {payment_order_details}
 
 Payment Details
-Order Total: ₹{order_total}
-Less Amount: ₹{less_amount}
-Final Total: ₹{total_amount}
-Advance Amount: ₹{advance_amount}
+Original Amount: ₹{order_total}
+Discount Amount: ₹{less_amount}
+Final Amount: ₹{total_amount}
+Paid Amount: ₹{advance_amount}
 Balance Amount: ₹{balance}
 
 Thank you for choosing {store_name}.
@@ -13162,8 +13176,10 @@ if message_choice == "5":
 
 Payment Details
 
-Total Amount: ₹{total_amount}
-Advance Amount: ₹{advance_amount}
+Original Amount: ₹{order_total}
+Discount Amount: ₹{less_amount}
+Final Amount: ₹{total_amount}
+Paid Amount: ₹{advance_amount}
 Balance Amount: ₹{balance}
 
 Thank you for choosing {store_name}.
@@ -13223,11 +13239,11 @@ Phone         : {phone}
 Address       : {address}
 
 ----------------------------------------
-Order Total   : Rs. {order_total}
-Less Amount   : Rs. {less_amount}
-Final Total   : Rs. {total_amount}
-Advance       : Rs. {advance_amount}
-Balance       : Rs. {balance}
+Original Amount : Rs. {order_total}
+Discount Amount : Rs. {less_amount}
+Final Amount    : Rs. {total_amount}
+Paid Amount     : Rs. {advance_amount}
+Balance Amount  : Rs. {balance}
 ----------------------------------------
 
 Thank you for choosing {store_name}.
@@ -13387,11 +13403,11 @@ if print_choice == "3":
         full_record_lines.extend([
         "",
         "PAYMENT DETAILS",
-        f"Order Total   : Rs. {order_total}",
-        f"Less Amount   : Rs. {less_amount}",
-        f"Final Total   : Rs. {total_amount}",
-        f"Advance       : Rs. {advance_amount}",
-        f"Balance       : Rs. {balance}",
+        f"Original Amount : Rs. {order_total}",
+        f"Discount Amount : Rs. {less_amount}",
+        f"Final Amount    : Rs. {total_amount}",
+        f"Paid Amount     : Rs. {advance_amount}",
+        f"Balance Amount  : Rs. {balance}",
         "",
         "=" * 45,
         f"Thank you for choosing {store_name}.",
@@ -13416,11 +13432,11 @@ PAYMENT RECEIPT
 Customer Name : {customer_name}
 Phone         : {phone}
 
-Order Total   : Rs. {order_total}
-Less Amount   : Rs. {less_amount}
-Final Total   : Rs. {total_amount}
-Advance       : Rs. {advance_amount}
-Balance       : Rs. {balance}
+Original Amount : Rs. {order_total}
+Discount Amount : Rs. {less_amount}
+Final Amount    : Rs. {total_amount}
+Paid Amount     : Rs. {advance_amount}
+Balance Amount  : Rs. {balance}
 
 Thank you for choosing {store_name}.
 """
