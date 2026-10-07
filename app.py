@@ -2152,6 +2152,23 @@ if customer_type == "7":
         raise SystemExit
 
     customer_records = customer_rows[1:]
+
+    report_order_items = []
+
+    if os.path.exists(ORDER_ITEMS_DATA_FILE):
+        with open(
+            ORDER_ITEMS_DATA_FILE,
+            "r",
+            newline="",
+            encoding="utf-8-sig"
+        ) as order_items_file:
+            order_items_reader = csv.reader(order_items_file)
+            next(order_items_reader, None)
+
+            for item_row in order_items_reader:
+                if len(item_row) >= 39:
+                    report_order_items.append(item_row)
+
     if report_choice == "1":
 
         today_date = datetime.now().date()
@@ -2290,23 +2307,65 @@ if customer_type == "7":
         report_records,
         start=1
     ):
-        frame_details = (
-            customer_record[20].strip()
-            if len(customer_record) > 20
-            else ""
+        matching_order_items = []
+
+        parent_datetime = customer_record[0].strip()
+        parent_name = customer_record[5].strip().lower()
+        parent_phone = normalize_indian_phone(
+            customer_record[8]
         )
 
-        lens_type = (
-            customer_record[24].strip()
-            if len(customer_record) > 24
-            else ""
-        )
+        for item_row in report_order_items:
+            same_datetime = (
+                item_row[1].strip() == parent_datetime
+            )
+            same_name = (
+                item_row[5].strip().lower() == parent_name
+            )
 
-        if frame_details and lens_type:
+            child_phone = normalize_indian_phone(
+                item_row[6]
+            )
+
+            if parent_phone:
+                same_customer = (
+                    same_name
+                    and child_phone == parent_phone
+                )
+            else:
+                same_customer = same_name
+
+            if same_datetime and same_customer:
+                matching_order_items.append(item_row)
+
+        if matching_order_items:
+            has_frame = any(
+                item_row[26].strip()
+                for item_row in matching_order_items
+            )
+            has_lenses = any(
+                item_row[32].strip()
+                for item_row in matching_order_items
+            )
+        else:
+            frame_details = (
+                customer_record[20].strip()
+                if len(customer_record) > 20
+                else ""
+            )
+            lens_type = (
+                customer_record[24].strip()
+                if len(customer_record) > 24
+                else ""
+            )
+            has_frame = bool(frame_details)
+            has_lenses = bool(lens_type)
+
+        if has_frame and has_lenses:
             report_order_type = "Frame + Lenses"
-        elif frame_details:
+        elif has_frame:
             report_order_type = "Frame Only"
-        elif lens_type:
+        elif has_lenses:
             report_order_type = "Lenses Only"
         else:
             report_order_type = "Prescription Only / Historical"
