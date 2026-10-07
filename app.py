@@ -935,6 +935,52 @@ def create_startup_backup():
 
             backed_up_files.append(source_file)
 
+        # Keep only the latest 30 automatic backups
+        # for each active data file.
+        # Manually named safety backups are not touched.
+        max_backups_per_file = 30
+
+        for source_file in files_to_backup:
+            source_name = os.path.basename(source_file)
+            file_name, file_extension = os.path.splitext(
+                source_name
+            )
+            automatic_prefix = f"{file_name}_"
+
+            automatic_backups = []
+
+            for backup_name in os.listdir(backup_folder):
+                if (
+                    backup_name.startswith(automatic_prefix)
+                    and backup_name.endswith(file_extension)
+                ):
+                    timestamp_text = backup_name[
+                        len(automatic_prefix):
+                        -len(file_extension)
+                    ]
+
+                    try:
+                        datetime.strptime(
+                            timestamp_text,
+                            "%Y%m%d_%H%M%S"
+                        )
+                    except ValueError:
+                        continue
+
+                    automatic_backups.append(backup_name)
+
+            automatic_backups.sort(reverse=True)
+
+            for old_backup in automatic_backups[
+                max_backups_per_file:
+            ]:
+                os.remove(
+                    os.path.join(
+                        backup_folder,
+                        old_backup
+                    )
+                )
+
         if backed_up_files:
             print(
                 "\nAutomatic data backup completed successfully."
