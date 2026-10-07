@@ -58,6 +58,29 @@ def normalize_offer(offer):
 
     except ValueError:
         return offer
+def calculate_item_amount(price, offer="", less_amount=0.0):
+    amount = float(price or 0.0)
+
+    offer_text = str(offer or "").strip()
+
+    if offer_text.endswith("%"):
+        try:
+            offer_percent = float(
+                offer_text.rstrip("%").strip()
+            )
+
+            if 0 <= offer_percent <= 100:
+                amount -= (
+                    amount * offer_percent / 100
+                )
+
+        except ValueError:
+            pass
+
+    amount -= float(less_amount or 0.0)
+
+    return max(amount, 0.0)
+
 def normalize_indian_phone(value):
     clean_phone = (
         value.strip()
@@ -774,6 +797,7 @@ record_date = datetime.now().strftime("%d-%m-%Y")
 record_time = datetime.now().strftime("%I:%M %p")
 CUSTOMER_DATA_FILE = "customers.csv"
 PAYMENT_DATA_FILE = "payments.csv"
+ORDER_ITEMS_DATA_FILE = "order_items.csv"
 initialize_store_registry()
 active_stores = load_store_registry()
 
@@ -844,6 +868,7 @@ while True:
         if CURRENT_STORE_ID == "STORE001":
             CUSTOMER_DATA_FILE = "customers.csv"
             PAYMENT_DATA_FILE = "payments.csv"
+            ORDER_ITEMS_DATA_FILE = "order_items.csv"
         else:
             CUSTOMER_DATA_FILE = (
                 f"customers_{CURRENT_STORE_ID.lower()}.csv"
@@ -851,17 +876,24 @@ while True:
             PAYMENT_DATA_FILE = (
                 f"payments_{CURRENT_STORE_ID.lower()}.csv"
             )
+            ORDER_ITEMS_DATA_FILE = (
+                f"order_items_{CURRENT_STORE_ID.lower()}.csv"
+            )
         break
     elif data_mode == "2":
         if CURRENT_STORE_ID == "STORE001":
             CUSTOMER_DATA_FILE = "demo_customers.csv"
             PAYMENT_DATA_FILE = "demo_payments.csv"
+            ORDER_ITEMS_DATA_FILE = "demo_order_items.csv"
         else:
             CUSTOMER_DATA_FILE = (
                 f"demo_customers_{CURRENT_STORE_ID.lower()}.csv"
             )
             PAYMENT_DATA_FILE = (
                 f"demo_payments_{CURRENT_STORE_ID.lower()}.csv"
+            )
+            ORDER_ITEMS_DATA_FILE = (
+                f"demo_order_items_{CURRENT_STORE_ID.lower()}.csv"
             )
         break
     else:
@@ -877,7 +909,8 @@ def create_startup_backup():
 
         files_to_backup = [
             CUSTOMER_DATA_FILE,
-            PAYMENT_DATA_FILE
+            PAYMENT_DATA_FILE,
+            ORDER_ITEMS_DATA_FILE
         ]
 
         backed_up_files = []
@@ -1239,14 +1272,120 @@ def get_old_add(eye_name):
                 and parts[0].isdigit()
                 and len(parts[1]) == 2
                 and parts[1] in ["00", "25", "50", "75"]
-                and float(number_part) <= 5
+                and 0.75 <= float(number_part) <= 5
             ):
-                return old_add
+                if confirm_high_add(old_add):
+                    return old_add
+                continue
 
         print(
             "Invalid ADD. "
             "Enter like +1.00, +1.25, +1.50 or +2.00."
         )
+
+def confirm_high_add(add_value):
+    value = float(str(add_value).lstrip("+"))
+
+    if value <= 3.00:
+        return True
+
+    print(
+        f"\nHigh ADD Power: +{value:.2f}"
+    )
+    print(
+        "Please verify with doctor's prescription."
+    )
+
+    while True:
+        print("1. Confirm and Continue")
+        print("2. Re-enter ADD")
+
+        choice = input("Select 1 or 2: ").strip()
+
+        if choice == "1":
+            return True
+
+        if choice == "2":
+            return False
+
+        print("Please select 1 or 2.")
+
+
+def get_valid_pd(pd_name):
+    while True:
+        print(f"\n--- {pd_name} ---")
+
+        if "Near" in pd_name:
+            print("Examples: 56, 57, 58, 59, 60")
+        else:
+            print("Examples: 60, 61, 62, 62.5, 63")
+
+        pd_value = input(
+            f"Enter {pd_name} in mm "
+            "(press Enter if not measured): "
+        ).strip()
+
+        if pd_value == "":
+            return ""
+
+        try:
+            numeric_value = float(pd_value)
+        except ValueError:
+            print(
+                "Invalid PD. Enter numbers only "
+                "(Example: 62 or 62.5)."
+            )
+            continue
+
+        if 20 <= numeric_value <= 80:
+            if numeric_value.is_integer():
+                return str(int(numeric_value))
+
+            return str(numeric_value)
+
+        print(
+            "Invalid PD. Please check the value "
+            "and enter a PD between 20 and 80 mm."
+        )
+
+
+def get_valid_visual_acuity(field_name):
+    while True:
+        print(f"\n--- {field_name} ---")
+        print(
+            "Examples: 6/5, 6/6, 6/7.5, 6/9, 6/12, "
+            "6/18, 6/24, 6/36, 6/60"
+        )
+        print("Other accepted values: CF, HM, PL+, PL-")
+
+        value = input(
+            f"Enter {field_name} "
+            "(press Enter if not measured): "
+        ).strip().upper()
+
+        if value == "":
+            return ""
+
+        if value in ("CF", "HM", "PL+", "PL-"):
+            return value
+
+        if value.startswith("6/"):
+            denominator = value[2:]
+
+            try:
+                denominator_value = float(denominator)
+            except ValueError:
+                denominator_value = 0
+
+            if 3 <= denominator_value <= 120:
+                return value
+
+        print(
+            "Invalid vision value. Enter like 6/6, 6/9, "
+            "6/12, 6/60, CF, HM, PL+ or PL-."
+        )
+
+
 def get_old_prescription_details():
     print("\n--- Old Prescription Details ---")
 
@@ -1371,6 +1510,394 @@ def build_old_prescription_row(
         "",
         "",
     ]
+def get_item_prescription_details(
+    item_lens_type_choice,
+    item_add_requirement,
+):
+    print("\n--- Different Prescription ---")
+
+    print("\nRight Eye (OD)")
+
+    item_right_sph = get_old_sph("Right Eye")
+    item_right_cyl = get_old_cyl("Right Eye")
+    item_right_axis = get_old_axis("Right Eye")
+
+    if (
+        item_lens_type_choice == "1"
+        or item_add_requirement == "3"
+    ):
+        item_right_add = ""
+    else:
+        item_right_add = get_old_add("Right Eye")
+
+    print("\nLeft Eye (OS)")
+
+    item_left_sph = get_old_sph("Left Eye")
+    item_left_cyl = get_old_cyl("Left Eye")
+    item_left_axis = get_old_axis("Left Eye")
+
+    if (
+        item_lens_type_choice == "1"
+        or item_add_requirement == "2"
+    ):
+        item_left_add = ""
+    else:
+        item_left_add = get_old_add("Left Eye")
+
+    print("\n--- Pupillary Distance (PD) (Optional) ---")
+
+    item_distance_pd = get_valid_pd("Distance PD")
+
+    if item_lens_type_choice == "2":
+        item_near_pd = get_valid_pd("Near PD")
+    else:
+        item_near_pd = ""
+
+    return {
+        "right_sph": item_right_sph,
+        "right_cyl": item_right_cyl,
+        "right_axis": item_right_axis,
+        "right_add": item_right_add,
+        "left_sph": item_left_sph,
+        "left_cyl": item_left_cyl,
+        "left_axis": item_left_axis,
+        "left_add": item_left_add,
+        "distance_pd": item_distance_pd,
+        "near_pd": item_near_pd,
+    }
+
+
+def edit_item_prescription_keep_current(
+    current_item,
+    lens_type_choice,
+    add_requirement,
+):
+    def edit_sph(eye_name, current_value):
+        while True:
+            print(
+                f"Current {eye_name} SPH: "
+                f"{current_value if current_value else 'Not Set'}"
+            )
+
+            new_value = input(
+                "Enter New SPH "
+                "(Press Enter to keep current): "
+            ).strip()
+
+            if not new_value:
+                if current_value:
+                    return current_value
+
+                print("SPH is required.")
+                continue
+
+            if new_value.lower() == "plano":
+                return "Plano"
+
+            if new_value == "0":
+                return "0"
+
+            try:
+                value = float(new_value)
+
+                if abs(value) > 30:
+                    print(
+                        "SPH must be between -30.00 "
+                        "and +30.00."
+                    )
+                    continue
+
+                if round(value * 4) != value * 4:
+                    print(
+                        "SPH must be in 0.25 steps."
+                    )
+                    continue
+
+                if not new_value.startswith(("+", "-")):
+                    print(
+                        "Please enter + or - sign "
+                        "(Example: -1.00 or +1.00)."
+                    )
+                    continue
+
+                return new_value
+
+            except ValueError:
+                print(
+                    "Please enter a valid SPH "
+                    "(Example: -1.00, +1.25 or Plano)."
+                )
+
+    def edit_cyl(eye_name, current_value):
+        while True:
+            print(
+                f"Current {eye_name} CYL: "
+                f"{current_value if current_value else 'Blank'}"
+            )
+
+            new_value = input(
+                "Enter New CYL "
+                "(Press Enter to keep current): "
+            ).strip()
+
+            if not new_value:
+                return current_value
+
+            if new_value == "0":
+                return "0"
+
+            try:
+                value = float(new_value)
+
+                if abs(value) > 10:
+                    print(
+                        "CYL must be between -10.00 "
+                        "and +10.00."
+                    )
+                    continue
+
+                if round(value * 4) != value * 4:
+                    print(
+                        "CYL must be in 0.25 steps."
+                    )
+                    continue
+
+                if not new_value.startswith(("+", "-")):
+                    print(
+                        "Please enter + or - sign "
+                        "(Example: -0.50 or +0.50)."
+                    )
+                    continue
+
+                return new_value
+
+            except ValueError:
+                print(
+                    "Please enter a valid CYL "
+                    "(Example: -0.50 or +0.50)."
+                )
+
+    def edit_axis(eye_name, current_value):
+        while True:
+            print(
+                f"Current {eye_name} AXIS: "
+                f"{current_value if current_value else 'Blank'}"
+            )
+
+            new_value = input(
+                "Enter New AXIS "
+                "(Press Enter to keep current): "
+            ).strip()
+
+            if not new_value:
+                return current_value
+
+            if not new_value.isdigit():
+                print(
+                    "AXIS must be a whole number "
+                    "from 0 to 180."
+                )
+                continue
+
+            axis_value = int(new_value)
+
+            if 0 <= axis_value <= 180:
+                return new_value
+
+            print("AXIS must be between 0 and 180.")
+
+    def edit_add(eye_name, current_value):
+        while True:
+            print(
+                f"Current {eye_name} ADD: "
+                f"{current_value if current_value else 'Not Set'}"
+            )
+
+            new_value = input(
+                "Enter New ADD / Near Power (+) "
+                "(Press Enter to keep current): "
+            ).strip()
+
+            if not new_value:
+                if current_value:
+                    return current_value
+
+                print(
+                    "ADD / Near Power is required "
+                    "for this eye."
+                )
+                continue
+
+            if not new_value.startswith("+"):
+                print(
+                    "ADD must start with + "
+                    "(Example: +1.00)."
+                )
+                continue
+
+            try:
+                value = float(new_value)
+
+                if value < 0.75 or value > 5:
+                    print(
+                        "ADD must be greater than 0 "
+                        "and not more than +5.00."
+                    )
+                    continue
+
+                if round(value * 4) != value * 4:
+                    print(
+                        "ADD must be in 0.25 steps."
+                    )
+                    continue
+
+                if confirm_high_add(new_value):
+                    return new_value
+                continue
+
+            except ValueError:
+                print(
+                    "Please enter a valid ADD "
+                    "(Example: +1.00 or +1.50)."
+                )
+
+    print("\n--- Distance Vision ---")
+
+    print("\nRight Eye (OD)")
+    right_sph_value = edit_sph(
+        "Right Eye",
+        current_item["right_sph"],
+    )
+    right_cyl_value = edit_cyl(
+        "Right Eye",
+        current_item["right_cyl"],
+    )
+    right_axis_value = edit_axis(
+        "Right Eye",
+        current_item["right_axis"],
+    )
+
+    print("\nLeft Eye (OS)")
+    left_sph_value = edit_sph(
+        "Left Eye",
+        current_item["left_sph"],
+    )
+    left_cyl_value = edit_cyl(
+        "Left Eye",
+        current_item["left_cyl"],
+    )
+    left_axis_value = edit_axis(
+        "Left Eye",
+        current_item["left_axis"],
+    )
+
+    print("\n--- Distance PD ---")
+    print(
+        "Current Distance PD: "
+        f"{current_item['distance_pd'] or 'Not Set'}"
+    )
+    while True:
+        print("Examples: 60, 61, 62, 62.5, 63")
+        new_distance_pd = input(
+            "Enter New Distance PD "
+            "(Press Enter to keep current): "
+        ).strip()
+
+        if new_distance_pd == "":
+            distance_pd_value = current_item["distance_pd"]
+            break
+
+        try:
+            numeric_distance_pd = float(new_distance_pd)
+        except ValueError:
+            print(
+                "Invalid PD. Enter numbers only "
+                "(Example: 62 or 62.5)."
+            )
+            continue
+
+        if 20 <= numeric_distance_pd <= 80:
+            if numeric_distance_pd.is_integer():
+                distance_pd_value = str(int(numeric_distance_pd))
+            else:
+                distance_pd_value = str(numeric_distance_pd)
+            break
+
+        print(
+            "Invalid PD. Please check the value "
+            "and enter a PD between 20 and 80 mm."
+        )
+
+    right_add_value = ""
+    left_add_value = ""
+    near_pd_value = current_item["near_pd"]
+
+    if lens_type_choice == "2":
+        print("\n--- Near Vision ---")
+
+        if add_requirement in ["1", "2"]:
+            right_add_value = edit_add(
+                "Right Eye",
+                current_item["right_add"],
+            )
+
+        if add_requirement in ["1", "3"]:
+            left_add_value = edit_add(
+                "Left Eye",
+                current_item["left_add"],
+            )
+
+        print(
+            "Current Near PD: "
+            f"{current_item['near_pd'] or 'Not Set'}"
+        )
+        while True:
+            print("Examples: 56, 57, 58, 59, 60")
+            new_near_pd = input(
+                "Enter New Near PD "
+                "(Press Enter to keep current): "
+            ).strip()
+
+            if new_near_pd == "":
+                near_pd_value = current_item["near_pd"]
+                break
+
+            try:
+                numeric_near_pd = float(new_near_pd)
+            except ValueError:
+                print(
+                    "Invalid PD. Enter numbers only "
+                    "(Example: 58 or 58.5)."
+                )
+                continue
+
+            if 20 <= numeric_near_pd <= 80:
+                if numeric_near_pd.is_integer():
+                    near_pd_value = str(int(numeric_near_pd))
+                else:
+                    near_pd_value = str(numeric_near_pd)
+                break
+
+            print(
+                "Invalid PD. Please check the value "
+                "and enter a PD between 20 and 80 mm."
+            )
+
+    else:
+        near_pd_value = ""
+
+    return {
+        "right_sph": right_sph_value,
+        "right_cyl": right_cyl_value,
+        "right_axis": right_axis_value,
+        "right_add": right_add_value,
+        "left_sph": left_sph_value,
+        "left_cyl": left_cyl_value,
+        "left_axis": left_axis_value,
+        "left_add": left_add_value,
+        "distance_pd": distance_pd_value,
+        "near_pd": near_pd_value,
+    }
 # ==================================================
 # STORE PROFILE / SETTINGS
 # ==================================================
@@ -4090,6 +4617,14 @@ Please keep this prescription for your reference.
         print("\nOld Prescription Entry completed.")
         raise SystemExit
 # ==================================================
+# FLEXIBLE MULTI-ORDER ITEMS
+# ==================================================
+
+order_items = []
+
+
+
+
 # 6. FRAME DETAILS
 # ==================================================
 
@@ -5190,31 +5725,181 @@ if customer_type == "2" and order_type == "5":
 
     selected_order = customer_orders[order_choice - 1]
 
+    selected_order_items = []
+
+    if os.path.exists(ORDER_ITEMS_DATA_FILE):
+        with open(
+            ORDER_ITEMS_DATA_FILE,
+            "r",
+            encoding="utf-8-sig"
+        ) as order_items_file:
+
+            order_items_reader = csv.reader(
+                order_items_file
+            )
+            next(order_items_reader, None)
+
+            for item_row in order_items_reader:
+                if len(item_row) < 39:
+                    continue
+
+                same_order_datetime = (
+                    item_row[1].strip()
+                    == selected_order[0].strip()
+                )
+
+                same_customer_name = (
+                    item_row[5].strip().lower()
+                    == selected_order[5].strip().lower()
+                )
+
+                child_phone = normalize_indian_phone(
+                    item_row[6]
+                )
+                parent_phone = normalize_indian_phone(
+                    selected_order[8]
+                )
+
+                if parent_phone:
+                    same_customer = (
+                        same_customer_name
+                        and child_phone == parent_phone
+                    )
+                else:
+                    same_customer = same_customer_name
+
+                if same_order_datetime and same_customer:
+                    selected_order_items.append(item_row)
+
+
     print("\n==================================================")
     print("              OLD ORDER DETAILS")
     print("==================================================")
     print("Order Date / Time :", selected_order[0])
     print()
-    if selected_order[20].strip():
-        print("--- Frame Details ---")
-        print("Frame      :", selected_order[20])
-        if selected_order[21].strip():
-            print("Brand      :", selected_order[21])
-        if selected_order[22].strip() and selected_order[22].strip() not in ["0", "0.0"]:
-            print("Offer      :", selected_order[22])
-        if selected_order[23].strip() and selected_order[23].strip() not in ["0", "0.0"]:
-            print("Price      : ₹", selected_order[23])
-    if selected_order[24].strip():
-        print("--- Lens Details ---")
-        print("Lens Type  :", selected_order[24])
-    if selected_order[25].strip():
-        print("Brand      :", selected_order[25])
-    if selected_order[26].strip() and selected_order[26].strip() not in ["0", "0.0"]:
-        print("Offer      :", selected_order[26])
-    if selected_order[27].strip() and selected_order[27].strip() not in ["0", "0.0"]:
-        print("Price      : ₹", selected_order[27])
-    if len(selected_order) > 45 and selected_order[45].strip():
-        print("Features   :", selected_order[45])
+    if selected_order_items:
+        print("--- Order Items ---")
+
+        for item_number, item_row in enumerate(
+            selected_order_items,
+            start=1
+        ):
+            print(f"\n--- Item {item_number} ---")
+
+            if item_row[9].strip():
+                print("Person     :", item_row[9])
+
+            if item_row[10].strip():
+                print("Relation   :", item_row[10])
+
+            if item_row[13].strip():
+                print("Order Type :", item_row[13])
+
+            if item_row[26].strip():
+                print("Frame      :", item_row[26])
+
+                if item_row[27].strip():
+                    print("Category   :", item_row[27])
+
+                if (
+                    item_row[28].strip()
+                    and item_row[28].strip().lower() != "non-brand"
+                ):
+                    print("Frame Brand:", item_row[28])
+
+                if (
+                    item_row[29].strip()
+                    and item_row[29].strip() not in ["0", "0.0"]
+                ):
+                    print("Frame Price: ₹", item_row[29])
+
+                if item_row[30].strip():
+                    print("Frame Offer:", item_row[30])
+
+                if (
+                    item_row[31].strip()
+                    and item_row[31].strip() not in ["0", "0.0"]
+                ):
+                    print("Frame Less : ₹", item_row[31])
+
+            if item_row[32].strip():
+                print("Lens Type  :", item_row[32])
+
+                if item_row[33].strip():
+                    print("Features   :", item_row[33])
+
+                if (
+                    item_row[34].strip()
+                    and item_row[34].strip().lower() != "non-brand"
+                ):
+                    print("Lens Brand :", item_row[34])
+
+                if (
+                    item_row[35].strip()
+                    and item_row[35].strip() not in ["0", "0.0"]
+                ):
+                    print("Lens Price : ₹", item_row[35])
+
+                if item_row[36].strip():
+                    print("Lens Offer :", item_row[36])
+
+                if (
+                    item_row[37].strip()
+                    and item_row[37].strip() not in ["0", "0.0"]
+                ):
+                    print("Lens Less  : ₹", item_row[37])
+
+            if (
+                item_row[38].strip()
+                and item_row[38].strip() not in ["0", "0.0"]
+            ):
+                print("Item Amount: ₹", item_row[38])
+
+    else:
+        # Legacy orders saved before multi-order support.
+        if selected_order[20].strip():
+            print("--- Frame Details ---")
+            print("Frame      :", selected_order[20])
+
+            if selected_order[21].strip():
+                print("Brand      :", selected_order[21])
+
+            if (
+                selected_order[22].strip()
+                and selected_order[22].strip() not in ["0", "0.0"]
+            ):
+                print("Offer      :", selected_order[22])
+
+            if (
+                selected_order[23].strip()
+                and selected_order[23].strip() not in ["0", "0.0"]
+            ):
+                print("Price      : ₹", selected_order[23])
+
+        if selected_order[24].strip():
+            print("--- Lens Details ---")
+            print("Lens Type  :", selected_order[24])
+
+        if selected_order[25].strip():
+            print("Brand      :", selected_order[25])
+
+        if (
+            selected_order[26].strip()
+            and selected_order[26].strip() not in ["0", "0.0"]
+        ):
+            print("Offer      :", selected_order[26])
+
+        if (
+            selected_order[27].strip()
+            and selected_order[27].strip() not in ["0", "0.0"]
+        ):
+            print("Price      : ₹", selected_order[27])
+
+        if (
+            len(selected_order) > 45
+            and selected_order[45].strip()
+        ):
+            print("Features   :", selected_order[45])
     if selected_order[24].strip() and len(selected_order) > 49 and selected_order[49].strip():
         print("--- Eye Surgery / IOL History ---")
         print("Eye Surgery :", selected_order[49])
@@ -5345,7 +6030,7 @@ if customer_type == "2" and order_type == "5":
     # SEND OLD PRESCRIPTION ON WHATSAPP
     # --------------------------------------------------
 
-    old_prescription_available = (
+    legacy_old_prescription_available = (
         selected_order[24].strip()
         and any(
             selected_order[index].strip()
@@ -5353,19 +6038,256 @@ if customer_type == "2" and order_type == "5":
         )
     )
 
+    child_old_prescription_available = any(
+        item_row[13].strip() in ["2", "3"]
+        and any(
+            item_row[index].strip()
+            for index in range(16, 24)
+        )
+        for item_row in selected_order_items
+    )
+
+    old_prescription_available = (
+        legacy_old_prescription_available
+        or child_old_prescription_available
+    )
+
     if old_prescription_available:
 
-        while True:
-            resend_choice = input(
-                "\nSend this old prescription on WhatsApp? (y/n): "
-            ).strip().lower()
+        if (
+            len(selected_order) > 53
+            and selected_order[53].strip()
+        ):
+            old_prescription_date = selected_order[53]
 
-            if resend_choice in ["y", "yes", "n", "no"]:
+            old_right_sph = selected_order[12]
+            old_right_cyl = selected_order[13]
+            old_right_axis = selected_order[14]
+            old_right_add = selected_order[15]
+
+            old_left_sph = selected_order[16]
+            old_left_cyl = selected_order[17]
+            old_left_axis = selected_order[18]
+            old_left_add = selected_order[19]
+
+        else:
+            old_prescription_date = selected_order[0]
+
+            old_right_sph = selected_order[28]
+            old_right_cyl = selected_order[29]
+            old_right_axis = selected_order[30]
+            old_right_add = selected_order[31]
+
+            old_left_sph = selected_order[32]
+            old_left_cyl = selected_order[33]
+            old_left_axis = selected_order[34]
+            old_left_add = selected_order[35]
+
+        while True:
+            print("\n--- Old Prescription Options ---")
+            print("1. Use This Prescription for New Order")
+            print("2. Send This Prescription on WhatsApp")
+            print("3. Back")
+
+            old_prescription_choice = input(
+                "Select Option (1/2/3): "
+            ).strip()
+
+            if old_prescription_choice in ["1", "2", "3"]:
                 break
 
-            print("Please enter y for Yes or n for No.")
+            print("Please select 1, 2, or 3.")
 
-        if resend_choice in ["y", "yes"]:
+        if old_prescription_choice == "1":
+
+            if license_access_status != "ACTIVE":
+                print(
+                    "\n"
+                    + get_license_access_message(
+                        license_access_status
+                    )
+                )
+                print(
+                    "Creating a new order from the old "
+                    "prescription is not available until "
+                    "the license is active."
+                )
+                raise SystemExit
+
+            use_selected_old_prescription = True
+            previous_prescription_action = "use_same"
+
+            usable_old_prescription_items = []
+
+            for item_row in selected_order_items:
+                item_order_type = item_row[13].strip()
+
+                has_item_prescription = any(
+                    item_row[index].strip()
+                    for index in range(16, 24)
+                )
+
+                if (
+                    item_order_type in ["2", "3"]
+                    and has_item_prescription
+                ):
+                    usable_old_prescription_items.append(
+                        item_row
+                    )
+
+            selected_prescription_item = None
+
+            if len(usable_old_prescription_items) == 1:
+                selected_prescription_item = (
+                    usable_old_prescription_items[0]
+                )
+
+            elif len(usable_old_prescription_items) > 1:
+                print(
+                    "\n--- Select Prescription Item ---"
+                )
+
+                for menu_number, item_row in enumerate(
+                    usable_old_prescription_items,
+                    start=1
+                ):
+                    actual_item_number = (
+                        item_row[7].strip()
+                        if item_row[7].strip()
+                        else str(menu_number)
+                    )
+
+                    if item_row[13].strip() == "2":
+                        item_type_text = "Lenses Only"
+                    else:
+                        item_type_text = "Frame + Lenses"
+
+                    lens_type_text = (
+                        item_row[32].strip()
+                        if item_row[32].strip()
+                        else "Lens Type Not Recorded"
+                    )
+
+                    person_text = item_row[9].strip()
+
+                    item_label = (
+                        f"{menu_number}. "
+                        f"Item {actual_item_number} - "
+                        f"{item_type_text} - "
+                        f"{lens_type_text}"
+                    )
+
+                    if person_text:
+                        item_label += (
+                            f" - {person_text}"
+                        )
+
+                    print(item_label)
+
+                while True:
+                    prescription_item_choice = input(
+                        "Select Prescription Item: "
+                    ).strip()
+
+                    if (
+                        prescription_item_choice.isdigit()
+                        and 1
+                        <= int(prescription_item_choice)
+                        <= len(
+                            usable_old_prescription_items
+                        )
+                    ):
+                        selected_prescription_item = (
+                            usable_old_prescription_items[
+                                int(
+                                    prescription_item_choice
+                                ) - 1
+                            ]
+                        )
+                        break
+
+                    print(
+                        "Please select a valid "
+                        "Prescription Item."
+                    )
+
+            if selected_prescription_item is not None:
+                previous_prescription_date = (
+                    selected_prescription_item[1].strip()
+                    or old_prescription_date
+                )
+
+                previous_right_sph = (
+                    selected_prescription_item[16]
+                )
+                previous_right_cyl = (
+                    selected_prescription_item[17]
+                )
+                previous_right_axis = (
+                    selected_prescription_item[18]
+                )
+                previous_right_add = (
+                    selected_prescription_item[19]
+                )
+
+                previous_left_sph = (
+                    selected_prescription_item[20]
+                )
+                previous_left_cyl = (
+                    selected_prescription_item[21]
+                )
+                previous_left_axis = (
+                    selected_prescription_item[22]
+                )
+                previous_left_add = (
+                    selected_prescription_item[23]
+                )
+
+                selected_old_distance_pd = (
+                    selected_prescription_item[24]
+                )
+                selected_old_near_pd = (
+                    selected_prescription_item[25]
+                )
+
+            else:
+                previous_prescription_date = (
+                    old_prescription_date
+                )
+
+                previous_right_sph = old_right_sph
+                previous_right_cyl = old_right_cyl
+                previous_right_axis = old_right_axis
+                previous_right_add = old_right_add
+
+                previous_left_sph = old_left_sph
+                previous_left_cyl = old_left_cyl
+                previous_left_axis = old_left_axis
+                previous_left_add = old_left_add
+
+                selected_old_distance_pd = ""
+                selected_old_near_pd = ""
+
+            print("\n--- New Order ---")
+            print("1. Lenses Only")
+            print("2. Frame + Lenses")
+
+            while True:
+                new_order_choice = input(
+                    "Select New Order (1/2): "
+                ).strip()
+
+                if new_order_choice == "1":
+                    order_type = "2"
+                    break
+
+                if new_order_choice == "2":
+                    order_type = "3"
+                    break
+
+                print("Please select 1 or 2.")
+
+        elif old_prescription_choice == "2":
 
             if not phone:
                 print(
@@ -5376,35 +6298,6 @@ if customer_type == "2" and order_type == "5":
             else:
                 import urllib.parse
                 import webbrowser
-
-                if (
-                    len(selected_order) > 53
-                    and selected_order[53].strip()
-                ):
-                    old_prescription_date = selected_order[53]
-
-                    old_right_sph = selected_order[12]
-                    old_right_cyl = selected_order[13]
-                    old_right_axis = selected_order[14]
-                    old_right_add = selected_order[15]
-
-                    old_left_sph = selected_order[16]
-                    old_left_cyl = selected_order[17]
-                    old_left_axis = selected_order[18]
-                    old_left_add = selected_order[19]
-
-                else:
-                    old_prescription_date = selected_order[0]
-
-                    old_right_sph = selected_order[28]
-                    old_right_cyl = selected_order[29]
-                    old_right_axis = selected_order[30]
-                    old_right_add = selected_order[31]
-
-                    old_left_sph = selected_order[32]
-                    old_left_cyl = selected_order[33]
-                    old_left_axis = selected_order[34]
-                    old_left_add = selected_order[35]
 
                 old_prescription_message = f"""
 {store_name}
@@ -5443,7 +6336,14 @@ Please keep this prescription for your reference.
                 print(
                     "Opening WhatsApp Old Prescription..."
                 )
-    raise SystemExit
+
+            raise SystemExit
+
+        else:
+            raise SystemExit
+
+    else:
+        raise SystemExit
 # ==================================================
 # PAYMENT / DELIVERY UPDATE
 # ==================================================
@@ -5974,9 +6874,6 @@ if order_type in ["1", "3"]:
     else:
         frame_brand = "Non-Brand"
 
-    frame_offer = normalize_offer(
-        input("Enter Frame Offer (Example: 10 or 10%): ")
-    )
     while True:
         try:
             frame_price = float(
@@ -5995,12 +6892,46 @@ if order_type in ["1", "3"]:
             print(
                 "Please enter Frame Price using numbers only."
             )
+
+    frame_offer = normalize_offer(
+        input(
+            "Enter Frame Offer "
+            "(Optional - Example: 10 or 10%): "
+        )
+    )
+    while True:
+        frame_less_input = input(
+            "Enter Frame Less Amount "
+            "(Optional - press Enter for 0): "
+        ).strip()
+
+        if frame_less_input == "":
+            frame_less_amount = 0.0
+            break
+
+        try:
+            frame_less_amount = float(frame_less_input)
+
+            if frame_less_amount < 0:
+                print(
+                    "Frame Less Amount cannot be negative."
+                )
+                continue
+
+            break
+
+        except ValueError:
+            print(
+                "Please enter Frame Less Amount "
+                "using numbers only."
+            )
 else:
     frame_details = ""
     frame_category = ""
     frame_brand = ""
     frame_offer = ""
     frame_price = 0.0
+    frame_less_amount = 0.0
 
 # ==================================================
 # 4. PRESCRIPTION SOURCE
@@ -6248,8 +7179,8 @@ elif (
     else:
         lens_type_choice = "2"
 
-        previous_od_add = right_add.strip()
-        previous_os_add = left_add.strip()
+        previous_od_add = previous_right_add.strip()
+        previous_os_add = previous_left_add.strip()
 
         if (
             previous_od_add not in ["", "0"]
@@ -6277,6 +7208,7 @@ else:
     lens_brand = ""
     lens_offer = ""
     lens_price = 0.0
+    lens_less_amount = 0.0
 # ==================================================
 # 3. SPECTACLE HISTORY
 # ==================================================
@@ -6287,21 +7219,25 @@ if customer_type == "2" and order_type in ["2", "3"]:
 
     years_using_glasses = selected_customer[11]
 
-    previous_prescription_date = (
-        selected_customer[53]
-        if len(selected_customer) > 53
-        else ""
-    )
+    if not (
+        "use_selected_old_prescription" in globals()
+        and use_selected_old_prescription
+    ):
+        previous_prescription_date = (
+            selected_customer[53]
+            if len(selected_customer) > 53
+            else ""
+        )
 
-    previous_right_sph = selected_customer[12]
-    previous_right_cyl = selected_customer[13]
-    previous_right_axis = selected_customer[14]
-    previous_right_add = selected_customer[15]
+        previous_right_sph = selected_customer[12]
+        previous_right_cyl = selected_customer[13]
+        previous_right_axis = selected_customer[14]
+        previous_right_add = selected_customer[15]
 
-    previous_left_sph = selected_customer[16]
-    previous_left_cyl = selected_customer[17]
-    previous_left_axis = selected_customer[18]
-    previous_left_add = selected_customer[19]
+        previous_left_sph = selected_customer[16]
+        previous_left_cyl = selected_customer[17]
+        previous_left_axis = selected_customer[18]
+        previous_left_add = selected_customer[19]
 
     print(
         "Existing customer - "
@@ -6404,43 +7340,38 @@ elif order_type in ["2", "3"]:
             print("\n--- Previous Prescription ---")
             print("Enter power with + or - sign.")
             print("Example: -1.00, +2.00")
-            print("Leave ADD blank if not required.")
+            if lens_type != "Single Vision":
+                print("Leave ADD blank if not required.")
 
             print("\nPrevious Right Eye (OD)")
 
-            previous_right_sph = input(
-                "Previous Right Eye SPH: "
-            )
+            previous_right_sph = get_old_sph("Previous Right Eye")
+            previous_right_cyl = get_old_cyl("Previous Right Eye")
+            previous_right_axis = get_old_axis("Previous Right Eye")
 
-            previous_right_cyl = input(
-                "Previous Right Eye CYL: "
-            )
-
-            previous_right_axis = input(
-                "Previous Right Eye AXIS (0-180): "
-            )
-
-            previous_right_add = input(
-                "Previous Right Eye ADD / Near Power: "
-            )
+            if lens_type == "Single Vision":
+                previous_right_add = ""
+            elif add_requirement in ("1", "2"):
+                previous_right_add = get_old_add(
+                    "Previous Right Eye"
+                )
+            else:
+                previous_right_add = ""
 
             print("\nPrevious Left Eye (OS)")
 
-            previous_left_sph = input(
-                "Previous Left Eye SPH: "
-            )
+            previous_left_sph = get_old_sph("Previous Left Eye")
+            previous_left_cyl = get_old_cyl("Previous Left Eye")
+            previous_left_axis = get_old_axis("Previous Left Eye")
 
-            previous_left_cyl = input(
-                "Previous Left Eye CYL: "
-            )
-
-            previous_left_axis = input(
-                "Previous Left Eye AXIS (0-180): "
-            )
-
-            previous_left_add = input(
-                "Previous Left Eye ADD / Near Power: "
-            )
+            if lens_type == "Single Vision":
+                previous_left_add = ""
+            elif add_requirement in ("1", "3"):
+                previous_left_add = get_old_add(
+                    "Previous Left Eye"
+                )
+            else:
+                previous_left_add = ""
 
         else:
             previous_right_sph = ""
@@ -6714,9 +7645,11 @@ elif order_type in ["2", "3"]:
                     and parts[0].isdigit()
                     and len(parts[1]) == 2
                     and parts[1] in ["00", "25", "50", "75"]
-                    and float(number_part) <= 5
+                    and 0.75 <= float(number_part) <= 5
                 ):
-                    break
+                    if confirm_high_add(right_add):
+                        break
+                    continue
 
             print(
                 "Invalid ADD. Enter like +1.00, +1.25, +1.50 or +2.00."
@@ -6812,9 +7745,11 @@ elif order_type in ["2", "3"]:
                     and parts[0].isdigit()
                     and len(parts[1]) == 2
                     and parts[1] in ["00", "25", "50", "75"]
-                    and float(number_part) <= 5
+                    and 0.75 <= float(number_part) <= 5
                 ):
-                    break
+                    if confirm_high_add(left_add):
+                        break
+                    continue
 
             print(
                 "Invalid ADD. Enter like +1.00, +1.25, +1.50 or +2.00."
@@ -6838,8 +7773,16 @@ else:
     left_va = ""
     right_pinhole = ""
     left_pinhole = ""
-distance_pd = ""
-near_pd = ""
+if (
+    "use_selected_old_prescription" in globals()
+    and use_selected_old_prescription
+):
+    distance_pd = selected_old_distance_pd
+    near_pd = selected_old_near_pd
+else:
+    distance_pd = ""
+    near_pd = ""
+
 right_va = ""
 left_va = ""
 right_pinhole = ""
@@ -6850,31 +7793,30 @@ if order_type in ["2", "3"]:
         and previous_prescription_action == "use_same"
     ):
         print("\n--- Pupillary Distance (PD) (Optional) ---")
-        distance_pd = input(
-            "Enter Distance PD in mm (Example: 62): "
-        ).strip()
+        distance_pd = get_valid_pd("Distance PD")
 
-        near_pd = input(
-            "Enter Near PD in mm (Example: 59): "
-        ).strip()
+        if lens_type_choice == "2":
+            near_pd = get_valid_pd("Near PD")
+        else:
+            near_pd = ""
 
         print("\n--- Visual Acuity Test (Optional) ---")
 
-        right_va = input(
-            "Right Eye Visual Acuity (Example: 6/6): "
-        ).strip()
+        right_va = get_valid_visual_acuity(
+            "Right Eye Visual Acuity"
+        )
 
-        left_va = input(
-            "Left Eye Visual Acuity (Example: 6/6): "
-        ).strip()
+        left_va = get_valid_visual_acuity(
+            "Left Eye Visual Acuity"
+        )
 
-        right_pinhole = input(
-            "Right Eye Pinhole (Example: 6/6): "
-        ).strip()
+        right_pinhole = get_valid_visual_acuity(
+            "Right Eye Pinhole"
+        )
 
-        left_pinhole = input(
-            "Left Eye Pinhole (Example: 6/6): "
-        ).strip()
+        left_pinhole = get_valid_visual_acuity(
+            "Left Eye Pinhole"
+        )
     # ==================================================
     # LENS FEATURES / COATING VALIDATION
     # ==================================================
@@ -6986,38 +7928,1465 @@ if order_type in ["2", "3"]:
         "Enter Lens Brand (Optional): "
     ).strip().title()
 
-    lens_offer = normalize_offer(
-        input("Enter Lens Offer (Example: 10 or 10%): ")
-    )
     while True:
-        lens_price_input = input("Enter Lens Price: ").strip()
+        lens_price_input = input(
+            "Enter Lens Price: "
+        ).strip()
 
         try:
             lens_price = float(lens_price_input)
 
             if lens_price < 0:
-                print("Lens Price cannot be negative.")
+                print(
+                    "Lens Price cannot be negative."
+                )
                 continue
 
             break
 
         except ValueError:
-            print("Please enter Lens Price using numbers only.")
+            print(
+                "Please enter Lens Price using numbers only."
+            )
+
+    lens_offer = normalize_offer(
+        input(
+            "Enter Lens Offer "
+            "(Optional - Example: 10 or 10%): "
+        )
+    )
+    while True:
+        lens_less_input = input(
+            "Enter Lens Less Amount "
+            "(Optional - press Enter for 0): "
+        ).strip()
+
+        if lens_less_input == "":
+            lens_less_amount = 0.0
+            break
+
+        try:
+            lens_less_amount = float(lens_less_input)
+
+            if lens_less_amount < 0:
+                print(
+                    "Lens Less Amount cannot be negative."
+                )
+                continue
+
+            break
+
+        except ValueError:
+            print(
+                "Please enter Lens Less Amount "
+                "using numbers only."
+            )
+# ==================================================
+# CAPTURE CURRENT ORDER ITEM
+# ==================================================
+
+order_items.append({
+    "person_type": "same",
+    "person_name": "",
+    "person_relation": "",
+    "person_gender": "",
+    "person_age": "",
+    "order_type": order_type,
+    "prescription_mode": "main",
+    "add_requirement": add_requirement,
+    "right_sph": right_sph,
+    "right_cyl": right_cyl,
+    "right_axis": right_axis,
+    "right_add": right_add,
+    "left_sph": left_sph,
+    "left_cyl": left_cyl,
+    "left_axis": left_axis,
+    "left_add": left_add,
+    "distance_pd": distance_pd,
+    "near_pd": near_pd,
+    "frame_details": frame_details,
+    "frame_category": frame_category,
+    "frame_brand": frame_brand,
+    "frame_offer": frame_offer,
+    "frame_price": frame_price,
+    "frame_less_amount": frame_less_amount,
+    "lens_type": lens_type,
+    "lens_features": lens_features,
+    "lens_brand": lens_brand,
+    "lens_offer": lens_offer,
+    "lens_price": lens_price,
+    "lens_less_amount": lens_less_amount,
+})
+# ==================================================
+# ADD ANOTHER ORDER ITEM
+# ==================================================
+
+add_another_item = ""
+while True:
+    print("\n--- Order Options ---")
+    print("1. Edit Current Order Item")
+    print("2. Add Another Order Item")
+    print("3. Continue to Payment")
+
+    add_another_item = input(
+        "Select Order Option (1/2/3): "
+    ).strip()
+
+    if add_another_item == "3":
+        break
+
+    if add_another_item not in ["1", "2"]:
+        print("Please select 1, 2 or 3.")
+        continue
+    if add_another_item == "1":
+        current_item = order_items[-1]
+
+        print("\n--- Edit Current Order Item ---")
+
+        if current_item["order_type"] == "1":
+            print("1. Frame Details")
+            print("2. Back")
+
+        elif current_item["order_type"] == "2":
+            print("1. Prescription / Lenses")
+            print("2. Back")
+
+        else:
+            print("1. Frame Details")
+            print("2. Prescription / Lenses")
+            print("3. Back")
+
+        while True:
+            current_edit_choice = input(
+                "Select Edit Option: "
+            ).strip()
+
+            if current_item["order_type"] == "1":
+                if current_edit_choice in ["1", "2"]:
+                    break
+
+                print("Please select 1 or 2.")
+                continue
+
+            if current_item["order_type"] == "2":
+                if current_edit_choice in ["1", "2"]:
+                    break
+
+                print("Please select 1 or 2.")
+                continue
+
+            if current_edit_choice in ["1", "2", "3"]:
+                break
+
+            print("Please select 1, 2 or 3.")
+
+        if (
+            current_item["order_type"] == "1"
+            and current_edit_choice == "2"
+        ):
+            continue
+
+        if (
+            current_item["order_type"] == "2"
+            and current_edit_choice == "2"
+        ):
+            continue
+
+        if (
+            current_item["order_type"] == "3"
+            and current_edit_choice == "3"
+        ):
+            continue
+        prescription_lens_edit_selected = (
+            (
+                current_item["order_type"] == "2"
+                and current_edit_choice == "1"
+            )
+            or (
+                current_item["order_type"] == "3"
+                and current_edit_choice == "2"
+            )
+        )
+        frame_edit_selected = (
+            (
+                current_item["order_type"] == "1"
+                and current_edit_choice == "1"
+            )
+            or (
+                current_item["order_type"] == "3"
+                and current_edit_choice == "1"
+            )
+        )
+
+        if frame_edit_selected:
+            print("\n--- Edit Frame Details ---")
+            print("1. Frame Details / Model")
+            print("2. Frame Category")
+            print("3. Frame Brand")
+            print("4. Frame Price")
+            print("5. Frame Offer")
+            print("6. Frame Less Amount")
+            print("7. Back")
+            while True:
+                current_frame_choice = input(
+                    "Select Frame Edit Option (1/2/3/4/5/6/7): "
+                ).strip()
+
+                if current_frame_choice in [
+                    "1", "2", "3", "4", "5", "6", "7"
+                ]:
+                    break
+
+                print("Please select 1, 2, 3, 4, 5, 6 or 7.")
+            if current_frame_choice == "7":
+                continue
+            if current_frame_choice == "1":
+                print(
+                    "Current Frame Details: "
+                    f"{current_item['frame_details']}"
+                )
+
+                new_frame_details = input(
+                    "Enter New Frame Details: "
+                ).strip()
+
+                if not new_frame_details:
+                    print(
+                        "Frame Details cannot be blank."
+                    )
+                    continue
+
+                current_item[
+                    "frame_details"
+                ] = new_frame_details
+
+                if current_item is order_items[0]:
+                    frame_details = new_frame_details
+
+                print(
+                    "Frame Details updated successfully."
+                )
+                continue
+            if current_frame_choice == "2":
+                print(
+                    "Current Frame Category: "
+                    f"{current_item['frame_category']}"
+                )
+
+                print("\n--- New Frame Category ---")
+                print("1. Brand")
+                print("2. Non-Brand")
+
+                while True:
+                    new_frame_category_choice = input(
+                        "Select Frame Category (1/2): "
+                    ).strip()
+
+                    if new_frame_category_choice in ["1", "2"]:
+                        break
+
+                    print("Please select 1 or 2.")
+
+                if new_frame_category_choice == "1":
+                    new_frame_category = "Brand"
+                else:
+                    new_frame_category = "Non-Brand"
+
+                current_item[
+                    "frame_category"
+                ] = new_frame_category
+
+                if new_frame_category == "Non-Brand":
+                    current_item[
+                        "frame_brand"
+                    ] = "Non-Brand"
+
+                if current_item is order_items[0]:
+                    frame_category = new_frame_category
+
+                    if new_frame_category == "Non-Brand":
+                        frame_brand = "Non-Brand"
+
+                print(
+                    "Frame Category updated successfully."
+                )
+                continue
+            if current_frame_choice == "3":
+                if (
+                    current_item["frame_category"]
+                    == "Non-Brand"
+                ):
+                    print(
+                        "Frame Brand is not required "
+                        "for Non-Brand frame."
+                    )
+                    continue
+
+                print(
+                    "Current Frame Brand: "
+                    f"{current_item['frame_brand']}"
+                )
+
+                new_frame_brand = input(
+                    "Enter New Frame Brand: "
+                ).strip()
+
+                if not new_frame_brand:
+                    print(
+                        "Frame Brand cannot be blank."
+                    )
+                    continue
+
+                current_item[
+                    "frame_brand"
+                ] = new_frame_brand
+
+                if current_item is order_items[0]:
+                    frame_brand = new_frame_brand
+
+                print(
+                    "Frame Brand updated successfully."
+                )
+                continue
+            if current_frame_choice == "5":
+                print(
+                    "Current Frame Offer: "
+                    f"{current_item['frame_offer']}"
+                )
+
+                new_frame_offer = normalize_offer(
+                    input(
+                        "Enter New Frame Offer "
+                        "(Example: 10 or 10%): "
+                    ).strip()
+                )
+
+                current_item[
+                    "frame_offer"
+                ] = new_frame_offer
+
+                if current_item is order_items[0]:
+                    frame_offer = new_frame_offer
+
+                print(
+                    "Frame Offer updated successfully."
+                )
+                continue
+            if current_frame_choice == "4":
+                print(
+                    "Current Frame Price: "
+                    f"₹{current_item['frame_price']:.2f}"
+                )
+
+                while True:
+                    try:
+                        new_frame_price = float(
+                            input(
+                                "Enter New Frame Price: "
+                            ).strip()
+                        )
+
+                        if new_frame_price < 0:
+                            print(
+                                "Frame Price cannot be negative."
+                            )
+                            continue
+
+                        break
+
+                    except ValueError:
+                        print(
+                            "Please enter Frame Price "
+                            "using numbers only."
+                        )
+
+                current_frame_offer = current_item.get(
+                    "frame_offer", ""
+                )
+                print(
+                    "Current Frame Offer: "
+                    f"{current_frame_offer or 'None'}"
+                )
+
+                new_frame_offer_input = input(
+                    "Enter New Frame Offer "
+                    "(Press Enter to keep current): "
+                ).strip()
+
+                if new_frame_offer_input == "":
+                    new_frame_offer = current_frame_offer
+                else:
+                    new_frame_offer = normalize_offer(
+                        new_frame_offer_input
+                    )
+
+                current_frame_less = current_item.get(
+                    "frame_less_amount", 0.0
+                )
+                print(
+                    "Current Frame Less Amount: "
+                    f"₹{current_frame_less:.2f}"
+                )
+
+                while True:
+                    new_frame_less_input = input(
+                        "Enter New Frame Less Amount "
+                        "(Press Enter to keep current): "
+                    ).strip()
+
+                    if new_frame_less_input == "":
+                        new_frame_less_amount = (
+                            current_frame_less
+                        )
+                        break
+
+                    try:
+                        new_frame_less_amount = float(
+                            new_frame_less_input
+                        )
+
+                        if new_frame_less_amount < 0:
+                            print(
+                                "Frame Less Amount cannot "
+                                "be negative."
+                            )
+                            continue
+
+                        break
+
+                    except ValueError:
+                        print(
+                            "Please enter Frame Less Amount "
+                            "using numbers only."
+                        )
+
+                current_item[
+                    "frame_price"
+                ] = new_frame_price
+                current_item[
+                    "frame_offer"
+                ] = new_frame_offer
+                current_item[
+                    "frame_less_amount"
+                ] = new_frame_less_amount
+
+                if current_item is order_items[0]:
+                    frame_price = new_frame_price
+                    frame_offer = new_frame_offer
+                    frame_less_amount = (
+                        new_frame_less_amount
+                    )
+
+                new_frame_amount = calculate_item_amount(
+                    new_frame_price,
+                    new_frame_offer,
+                    new_frame_less_amount
+                )
+
+                print(
+                    "Frame Pricing updated successfully."
+                )
+                print(
+                    f"New Frame Amount: "
+                    f"₹{new_frame_amount:.2f}"
+                )
+                continue
+            if current_frame_choice == "6":
+                print(
+                    "Current Frame Less Amount: "
+                    f"₹{current_item.get('frame_less_amount', 0.0):.2f}"
+                )
+
+                while True:
+                    new_frame_less_input = input(
+                        "Enter New Frame Less Amount "
+                        "(Optional - press Enter for 0): "
+                    ).strip()
+
+                    if new_frame_less_input == "":
+                        new_frame_less_amount = 0.0
+                        break
+
+                    try:
+                        new_frame_less_amount = float(
+                            new_frame_less_input
+                        )
+
+                        if new_frame_less_amount < 0:
+                            print(
+                                "Frame Less Amount cannot be negative."
+                            )
+                            continue
+
+                        break
+
+                    except ValueError:
+                        print(
+                            "Please enter Frame Less Amount "
+                            "using numbers only."
+                        )
+
+                current_item[
+                    "frame_less_amount"
+                ] = new_frame_less_amount
+
+                if current_item is order_items[0]:
+                    frame_less_amount = new_frame_less_amount
+
+                print(
+                    "Frame Less Amount updated successfully."
+                )
+                continue
+
+        if prescription_lens_edit_selected:
+            print("\n--- Edit Prescription / Lenses ---")
+            print("1. Lens Type / Prescription")
+            print("2. Lens Features / Coating")
+            print("3. Lens Brand")
+            print("4. Lens Price")
+            print("5. Lens Offer")
+            print("6. Lens Less Amount")
+            print("7. Back")
+            while True:
+                current_lens_choice = input(
+                    "Select Prescription / Lens Edit Option "
+                    "(1/2/3/4/5/6/7): "
+                ).strip()
+
+                if current_lens_choice in [
+                    "1", "2", "3", "4", "5", "6", "7"
+                ]:
+                    break
+
+                print("Please select 1, 2, 3, 4, 5, 6 or 7.")
+            if current_lens_choice == "7":
+                continue
+            if current_lens_choice == "1":
+                print(
+                    "Current Lens Type: "
+                    f"{current_item['lens_type']}"
+                )
+
+                print("\n--- Lens Type ---")
+                print("1. Single Vision")
+                print("2. Bifocal")
+
+                while True:
+                    new_lens_type_choice = input(
+                        "Select Lens Type (1/2): "
+                    ).strip()
+
+                    if new_lens_type_choice in ["1", "2"]:
+                        break
+
+                    print("Please select 1 or 2.")
+
+                if new_lens_type_choice == "1":
+                    new_lens_type = "Single Vision"
+                    new_add_requirement = ""
+
+                else:
+                    print("\n--- Bifocal Type ---")
+                    print("1. Kryptok")
+                    print("2. D Bifocal")
+                    print("3. Progressive Bifocal")
+                    print("4. Other")
+
+                    while True:
+                        new_bifocal_choice = input(
+                            "Select Bifocal Type (1/2/3/4): "
+                        ).strip()
+
+                        if new_bifocal_choice == "1":
+                            new_lens_type = "Kryptok"
+                            break
+
+                        if new_bifocal_choice == "2":
+                            new_lens_type = "D Bifocal"
+                            break
+
+                        if new_bifocal_choice == "3":
+                            new_lens_type = (
+                                "Progressive Bifocal"
+                            )
+                            break
+
+                        if new_bifocal_choice == "4":
+                            new_lens_type = input(
+                                "Enter Bifocal Type: "
+                            ).strip()
+
+                            if new_lens_type:
+                                break
+
+                            print(
+                                "Bifocal Type cannot be blank."
+                            )
+                            continue
+
+                        print(
+                            "Please select 1, 2, 3 or 4."
+                        )
+
+                    print("\n--- ADD Requirement ---")
+                    print("1. Both Eyes")
+                    print("2. Right Eye Only")
+                    print("3. Left Eye Only")
+
+                    while True:
+                        new_add_requirement = input(
+                            "Select ADD Requirement (1/2/3): "
+                        ).strip()
+
+                        if new_add_requirement in [
+                            "1", "2", "3"
+                        ]:
+                            break
+
+                        print("Please select 1, 2 or 3.")
+
+                edited_prescription = (
+                    edit_item_prescription_keep_current(
+                        current_item,
+                        new_lens_type_choice,
+                        new_add_requirement,
+                    )
+                )
+
+                current_item.update(
+                    edited_prescription
+                )
+
+                current_item["lens_type"] = new_lens_type
+                current_item[
+                    "add_requirement"
+                ] = new_add_requirement
+
+                if current_item is order_items[0]:
+                    lens_type = new_lens_type
+                    add_requirement = new_add_requirement
+
+                    right_sph = current_item["right_sph"]
+                    right_cyl = current_item["right_cyl"]
+                    right_axis = current_item["right_axis"]
+                    right_add = current_item["right_add"]
+
+                    left_sph = current_item["left_sph"]
+                    left_cyl = current_item["left_cyl"]
+                    left_axis = current_item["left_axis"]
+                    left_add = current_item["left_add"]
+
+                    distance_pd = current_item["distance_pd"]
+                    near_pd = current_item["near_pd"]
+
+                print(
+                    "Lens Type / Prescription updated "
+                    "successfully."
+                )
+                continue
+            if current_lens_choice == "2":
+                print(
+                    "Current Lens Features / Coating: "
+                    f"{current_item['lens_features']}"
+                )
+
+                new_lens_features = input(
+                    "Enter New Lens Features / Coating "
+                    "(Optional): "
+                ).strip()
+
+                current_item[
+                    "lens_features"
+                ] = new_lens_features
+
+                if current_item is order_items[0]:
+                    lens_features = new_lens_features
+
+                print(
+                    "Lens Features / Coating updated "
+                    "successfully."
+                )
+                continue
+            if current_lens_choice == "3":
+                print(
+                    "Current Lens Brand: "
+                    f"{current_item['lens_brand']}"
+                )
+
+                new_lens_brand = input(
+                    "Enter New Lens Brand (Optional): "
+                ).strip()
+
+                current_item[
+                    "lens_brand"
+                ] = new_lens_brand
+
+                if current_item is order_items[0]:
+                    lens_brand = new_lens_brand
+
+                print(
+                    "Lens Brand updated successfully."
+                )
+                continue
+            if current_lens_choice == "5":
+                print(
+                    "Current Lens Offer: "
+                    f"{current_item['lens_offer']}"
+                )
+
+                new_lens_offer = normalize_offer(
+                    input(
+                        "Enter New Lens Offer "
+                        "(Example: 10 or 10%): "
+                    ).strip()
+                )
+
+                current_item[
+                    "lens_offer"
+                ] = new_lens_offer
+
+                if current_item is order_items[0]:
+                    lens_offer = new_lens_offer
+
+                print(
+                    "Lens Offer updated successfully."
+                )
+                continue
+            if current_lens_choice == "4":
+                print(
+                    "Current Lens Price: "
+                    f"₹{current_item['lens_price']:.2f}"
+                )
+
+                while True:
+                    try:
+                        new_lens_price = float(
+                            input(
+                                "Enter New Lens Price: "
+                            ).strip()
+                        )
+
+                        if new_lens_price < 0:
+                            print(
+                                "Lens Price cannot be negative."
+                            )
+                            continue
+
+                        break
+
+                    except ValueError:
+                        print(
+                            "Please enter Lens Price "
+                            "using numbers only."
+                        )
+
+                current_lens_offer = current_item.get(
+                    "lens_offer", ""
+                )
+                print(
+                    "Current Lens Offer: "
+                    f"{current_lens_offer or 'None'}"
+                )
+
+                new_lens_offer_input = input(
+                    "Enter New Lens Offer "
+                    "(Press Enter to keep current): "
+                ).strip()
+
+                if new_lens_offer_input == "":
+                    new_lens_offer = current_lens_offer
+                else:
+                    new_lens_offer = normalize_offer(
+                        new_lens_offer_input
+                    )
+
+                current_lens_less = current_item.get(
+                    "lens_less_amount", 0.0
+                )
+                print(
+                    "Current Lens Less Amount: "
+                    f"₹{current_lens_less:.2f}"
+                )
+
+                while True:
+                    new_lens_less_input = input(
+                        "Enter New Lens Less Amount "
+                        "(Press Enter to keep current): "
+                    ).strip()
+
+                    if new_lens_less_input == "":
+                        new_lens_less_amount = (
+                            current_lens_less
+                        )
+                        break
+
+                    try:
+                        new_lens_less_amount = float(
+                            new_lens_less_input
+                        )
+
+                        if new_lens_less_amount < 0:
+                            print(
+                                "Lens Less Amount cannot "
+                                "be negative."
+                            )
+                            continue
+
+                        break
+
+                    except ValueError:
+                        print(
+                            "Please enter Lens Less Amount "
+                            "using numbers only."
+                        )
+
+                current_item[
+                    "lens_price"
+                ] = new_lens_price
+                current_item[
+                    "lens_offer"
+                ] = new_lens_offer
+                current_item[
+                    "lens_less_amount"
+                ] = new_lens_less_amount
+
+                if current_item is order_items[0]:
+                    lens_price = new_lens_price
+                    lens_offer = new_lens_offer
+                    lens_less_amount = (
+                        new_lens_less_amount
+                    )
+
+                new_lens_amount = calculate_item_amount(
+                    new_lens_price,
+                    new_lens_offer,
+                    new_lens_less_amount
+                )
+
+                print(
+                    "Lens Pricing updated successfully."
+                )
+                print(
+                    f"New Lens Amount: "
+                    f"₹{new_lens_amount:.2f}"
+                )
+                continue
+            if current_lens_choice == "6":
+                print(
+                    "Current Lens Less Amount: "
+                    f"₹{current_item.get('lens_less_amount', 0.0):.2f}"
+                )
+
+                while True:
+                    new_lens_less_input = input(
+                        "Enter New Lens Less Amount "
+                        "(Optional - press Enter for 0): "
+                    ).strip()
+
+                    if new_lens_less_input == "":
+                        new_lens_less_amount = 0.0
+                        break
+
+                    try:
+                        new_lens_less_amount = float(
+                            new_lens_less_input
+                        )
+
+                        if new_lens_less_amount < 0:
+                            print(
+                                "Lens Less Amount cannot be negative."
+                            )
+                            continue
+
+                        break
+
+                    except ValueError:
+                        print(
+                            "Please enter Lens Less Amount "
+                            "using numbers only."
+                        )
+
+                current_item[
+                    "lens_less_amount"
+                ] = new_lens_less_amount
+
+                if current_item is order_items[0]:
+                    lens_less_amount = new_lens_less_amount
+
+                print(
+                    "Lens Less Amount updated successfully."
+                )
+                continue
+    if add_another_item == "2":
+        print("\n--- Additional Order For ---")
+        print("1. Same Person")
+        print("2. Different Person")
+
+        while True:
+            additional_person_choice = input(
+                "Select Person (1/2): "
+            ).strip()
+
+            if additional_person_choice in ["1", "2"]:
+                break
+
+            print("Please select 1 or 2.")
+        if additional_person_choice == "2":
+            while True:
+                print("\n--- Different Person Details ---")
+
+                while True:
+                    additional_person_name = input(
+                        "Enter Person Name: "
+                    ).strip()
+
+                    if additional_person_name:
+                        break
+
+                    print("Person Name cannot be blank.")
+
+                additional_person_relation = input(
+                    "Enter Relationship / C/O "
+                    "(Example: Wife / Son / Daughter): "
+                ).strip()
+
+                print("\n--- Gender ---")
+                print("1. Male")
+                print("2. Female")
+
+                while True:
+                    additional_person_gender_choice = input(
+                        "Select Gender (1/2): "
+                    ).strip()
+
+                    if additional_person_gender_choice == "1":
+                        additional_person_gender = "Male"
+                        break
+
+                    if additional_person_gender_choice == "2":
+                        additional_person_gender = "Female"
+                        break
+
+                    print("Please select 1 or 2.")
+
+                while True:
+                    additional_person_age = input(
+                        "Enter Age "
+                        "(Optional - press Enter if unknown): "
+                    ).strip()
+
+                    if not additional_person_age:
+                        break
+
+                    if (
+                        additional_person_age.isdigit()
+                        and int(additional_person_age) > 0
+                    ):
+                        break
+
+                    print(
+                        "Please enter a valid age using "
+                        "numbers only."
+                    )
+
+                print("\n--- Additional Person Review ---")
+                print(
+                    f"Name         : "
+                    f"{additional_person_name}"
+                )
+                print(
+                    f"Relationship : "
+                    f"{additional_person_relation or 'Not Entered'}"
+                )
+                print(
+                    f"Gender       : "
+                    f"{additional_person_gender}"
+                )
+                print(
+                    f"Age          : "
+                    f"{additional_person_age or 'Not Entered'}"
+                )
+
+                print("\n1. Confirm")
+                print("2. Edit Person Details")
+
+                while True:
+                    additional_person_review = input(
+                        "Select Option (1/2): "
+                    ).strip()
+
+                    if additional_person_review in ["1", "2"]:
+                        break
+
+                    print("Please select 1 or 2.")
+
+                if additional_person_review == "1":
+                    break
+
+                print(
+                    "\nPlease re-enter the "
+                    "person details."
+                )
+
+        else:
+            additional_person_name = ""
+            additional_person_relation = ""
+            additional_person_gender = ""
+            additional_person_age = ""
+        while True:
+            print("\n--- Additional Order Item ---")
+            print("1. Frame Only")
+            print("2. Lenses Only")
+            print("3. Frame + Lenses")
+
+            additional_order_type = input(
+                "Select Additional Order Type (1/2/3): "
+            ).strip()
+
+            if additional_order_type in ["1", "2", "3"]:
+                break
+
+            print("Please select 1, 2 or 3.")
+
+        # ----------------------------------------------
+        # ADDITIONAL FRAME DETAILS
+        # ----------------------------------------------
+
+        if additional_order_type in ["1", "3"]:
+            print("\n--- Additional Frame Details ---")
+
+            additional_frame_details = input(
+                "Enter Frame Details: "
+            ).strip()
+
+            print("\n--- Frame Category ---")
+            print("1. Brand")
+            print("2. Non-Brand")
+
+            while True:
+                additional_frame_category = input(
+                    "Select Frame Category (1/2): "
+                ).strip()
+
+                if additional_frame_category in ["1", "2"]:
+                    break
+
+                print("Please enter 1 or 2 only.")
+
+            if additional_frame_category == "1":
+                additional_frame_brand = input(
+                    "Enter Frame Brand: "
+                ).strip()
+            else:
+                additional_frame_brand = "Non-Brand"
+
+            while True:
+                try:
+                    additional_frame_price = float(
+                        input(
+                            "Enter Frame Price: "
+                        ).strip()
+                    )
+
+                    if additional_frame_price < 0:
+                        print(
+                            "Frame Price cannot be negative."
+                        )
+                        continue
+
+                    break
+
+                except ValueError:
+                    print(
+                        "Please enter Frame Price "
+                        "using numbers only."
+                    )
+
+            additional_frame_offer = normalize_offer(
+                input(
+                    "Enter Frame Offer "
+                    "(Optional - Example: 10 or 10%): "
+                )
+            )
+            while True:
+                additional_frame_less_input = input(
+                    "Enter Frame Less Amount "
+                    "(Optional - press Enter for 0): "
+                ).strip()
+
+                if additional_frame_less_input == "":
+                    additional_frame_less_amount = 0.0
+                    break
+
+                try:
+                    additional_frame_less_amount = float(
+                        additional_frame_less_input
+                    )
+
+                    if additional_frame_less_amount < 0:
+                        print(
+                            "Frame Less Amount cannot be negative."
+                        )
+                        continue
+
+                    break
+
+                except ValueError:
+                    print(
+                        "Please enter Frame Less Amount "
+                        "using numbers only."
+                    )
+        else:
+            additional_frame_details = ""
+            additional_frame_category = ""
+            additional_frame_brand = ""
+            additional_frame_offer = ""
+            additional_frame_price = 0.0
+            additional_frame_less_amount = 0.0
+
+        # ----------------------------------------------
+        # ADDITIONAL LENS DETAILS
+        # ----------------------------------------------
+
+        if additional_order_type in ["2", "3"]:
+            print("\n--- Additional Lens Details ---")
+            if additional_person_choice == "1" and order_type != "1":
+                print(
+                    "\n--- Prescription for This Item ---"
+                )
+                print("1. Use Same Prescription")
+                print("2. Enter Different Prescription")
+
+                while True:
+                    additional_prescription_choice = input(
+                        "Select Prescription Option (1/2): "
+                    ).strip()
+
+                    if additional_prescription_choice == "1":
+                        additional_prescription_mode = "same"
+                        break
+
+                    if additional_prescription_choice == "2":
+                        additional_prescription_mode = (
+                            "different"
+                        )
+                        break
+
+                    print("Please select 1 or 2.")
+
+            else:
+                additional_prescription_mode = "different"
+
+                if additional_person_choice == "1":
+                    print(
+                        "\nMain order has no prescription. "
+                        "Enter Separate Prescription."
+                    )
+                else:
+                    print(
+                        "\nDifferent Person - "
+                        "Enter Separate Prescription."
+                    )
+            if additional_prescription_mode == "same":
+                additional_lens_type = lens_type
+                additional_lens_type_choice = lens_type_choice
+                additional_add_requirement = add_requirement
+
+                additional_right_sph = right_sph
+                additional_right_cyl = right_cyl
+                additional_right_axis = right_axis
+                additional_right_add = right_add
+
+                additional_left_sph = left_sph
+                additional_left_cyl = left_cyl
+                additional_left_axis = left_axis
+                additional_left_add = left_add
+
+                additional_distance_pd = distance_pd
+                additional_near_pd = near_pd
+
+                print(
+                    "Using same Lens Type and Prescription."
+                )
+
+            else:
+                print("\n--- Lens Type ---")
+                print("1. Single Vision")
+                print("2. Bifocal")
+
+                while True:
+                    additional_lens_type_choice = input(
+                        "Select Lens Type (1/2): "
+                    ).strip()
+
+                    if additional_lens_type_choice == "1":
+                        additional_lens_type = "Single Vision"
+                        additional_add_requirement = ""
+                        break
+
+                    if additional_lens_type_choice == "2":
+                        print("\n--- Bifocal Type ---")
+                        print("1. Kryptok Bifocal")
+                        print("2. D Bifocal")
+                        print("3. Progressive Bifocal")
+                        print("4. Other")
+
+                        while True:
+                            additional_bifocal_choice = input(
+                                "Select Bifocal Type "
+                                "(1/2/3/4): "
+                            ).strip()
+
+                            if additional_bifocal_choice == "1":
+                                additional_lens_type = (
+                                    "Kryptok Bifocal"
+                                )
+                                break
+
+                            if additional_bifocal_choice == "2":
+                                additional_lens_type = (
+                                    "D Bifocal"
+                                )
+                                break
+
+                            if additional_bifocal_choice == "3":
+                                additional_lens_type = (
+                                    "Progressive Bifocal"
+                                )
+                                break
+
+                            if additional_bifocal_choice == "4":
+                                additional_lens_type = "Other"
+                                break
+
+                            print(
+                                "Invalid option. Please select "
+                                "1, 2, 3 or 4."
+                            )
+
+                        print("\n--- ADD Requirement ---")
+                        print("1. Both Eyes")
+                        print("2. Right Eye (OD) Only")
+                        print("3. Left Eye (OS) Only")
+
+                        while True:
+                            additional_add_requirement = input(
+                                "Select ADD Requirement "
+                                "(1/2/3): "
+                            ).strip()
+
+                            if additional_add_requirement in [
+                                "1",
+                                "2",
+                                "3",
+                            ]:
+                                break
+
+                            print(
+                                "Invalid option. Please select "
+                                "1, 2 or 3."
+                            )
+
+                        break
+
+                    print(
+                        "Invalid option. Please select 1 or 2."
+                    )
+
+                additional_prescription = (
+                    get_item_prescription_details(
+                        additional_lens_type_choice,
+                        additional_add_requirement,
+                    )
+                )
+
+                additional_right_sph = (
+                    additional_prescription["right_sph"]
+                )
+                additional_right_cyl = (
+                    additional_prescription["right_cyl"]
+                )
+                additional_right_axis = (
+                    additional_prescription["right_axis"]
+                )
+                additional_right_add = (
+                    additional_prescription["right_add"]
+                )
+
+                additional_left_sph = (
+                    additional_prescription["left_sph"]
+                )
+                additional_left_cyl = (
+                    additional_prescription["left_cyl"]
+                )
+                additional_left_axis = (
+                    additional_prescription["left_axis"]
+                )
+                additional_left_add = (
+                    additional_prescription["left_add"]
+                )
+
+                additional_distance_pd = (
+                    additional_prescription["distance_pd"]
+                )
+                additional_near_pd = (
+                    additional_prescription["near_pd"]
+                )
+            additional_lens_features = input(
+                "Enter Lens Features / Coating "
+                "(Optional): "
+            ).strip().title()
+
+            additional_lens_brand = input(
+                "Enter Lens Brand (Optional): "
+            ).strip().title()
+
+            while True:
+                additional_lens_price_input = input(
+                    "Enter Lens Price: "
+                ).strip()
+
+                try:
+                    additional_lens_price = float(
+                        additional_lens_price_input
+                    )
+
+                    if additional_lens_price < 0:
+                        print(
+                            "Lens Price cannot be negative."
+                        )
+                        continue
+
+                    break
+
+                except ValueError:
+                    print(
+                        "Please enter Lens Price "
+                        "using numbers only."
+                    )
+
+            additional_lens_offer = normalize_offer(
+                input(
+                    "Enter Lens Offer "
+                    "(Optional - Example: 10 or 10%): "
+                )
+            )
+            while True:
+                additional_lens_less_input = input(
+                    "Enter Lens Less Amount "
+                    "(Optional - press Enter for 0): "
+                ).strip()
+
+                if additional_lens_less_input == "":
+                    additional_lens_less_amount = 0.0
+                    break
+
+                try:
+                    additional_lens_less_amount = float(
+                        additional_lens_less_input
+                    )
+
+                    if additional_lens_less_amount < 0:
+                        print(
+                            "Lens Less Amount cannot be negative."
+                        )
+                        continue
+
+                    break
+
+                except ValueError:
+                    print(
+                        "Please enter Lens Less Amount "
+                        "using numbers only."
+                    )
+        else:
+            additional_lens_type = ""
+            additional_lens_features = ""
+            additional_lens_brand = ""
+            additional_lens_offer = ""
+            additional_lens_price = 0.0
+            additional_lens_less_amount = 0.0
+
+        if additional_order_type == "1":
+            additional_add_requirement = ""
+            additional_prescription_mode = ""
+            additional_right_sph = ""
+            additional_right_cyl = ""
+            additional_right_axis = ""
+            additional_right_add = ""
+            additional_left_sph = ""
+            additional_left_cyl = ""
+            additional_left_axis = ""
+            additional_left_add = ""
+            additional_distance_pd = ""
+            additional_near_pd = ""        
+        # ----------------------------------------------
+        # SAVE ADDITIONAL ORDER ITEM
+        # ----------------------------------------------
+
+        order_items.append({
+            "person_type": (
+                "same"
+                if additional_person_choice == "1"
+                else "different"
+            ),
+            "person_name": additional_person_name,
+            "person_relation": additional_person_relation,
+            "person_gender": additional_person_gender,
+            "person_age": additional_person_age,
+            "order_type": additional_order_type,
+            "add_requirement": additional_add_requirement,
+            "prescription_mode": additional_prescription_mode,
+            "right_sph": additional_right_sph,
+            "right_cyl": additional_right_cyl,
+            "right_axis": additional_right_axis,
+            "right_add": additional_right_add,
+            "left_sph": additional_left_sph,
+            "left_cyl": additional_left_cyl,
+            "left_axis": additional_left_axis,
+            "left_add": additional_left_add,
+            "distance_pd": additional_distance_pd,
+            "near_pd": additional_near_pd,    
+            "frame_details": additional_frame_details,
+            "frame_category": additional_frame_category,
+            "frame_brand": additional_frame_brand,
+            "frame_offer": additional_frame_offer,
+            "frame_less_amount": additional_frame_less_amount,
+            "frame_price": additional_frame_price,
+            "lens_type": additional_lens_type,
+            "lens_features": additional_lens_features,
+            "lens_brand": additional_lens_brand,
+            "lens_offer": additional_lens_offer,
+            "lens_price": additional_lens_price,
+            "lens_less_amount": additional_lens_less_amount,
+        })
 # ==================================================
 # 11. PAYMENT DETAILS
 # ==================================================
 
-    print("\n--- Payment Details ---")
+print("\n--- Payment Details ---")
 
 
 # Order Total
-order_total = frame_price + lens_price
+order_total = sum(
+    calculate_item_amount(
+        item["frame_price"],
+        item.get("frame_offer", ""),
+        item.get("frame_less_amount", 0.0)
+    )
+    + calculate_item_amount(
+        item["lens_price"],
+        item.get("lens_offer", ""),
+        item.get("lens_less_amount", 0.0)
+    )
+    for item in order_items
+)
 print(f"Order Total: ₹{order_total:.2f}")
 
 # Less Amount Validation
 while True:
     less_amount_input = input(
-        "Enter Less Amount "
+        "Enter Overall Bill Discount "
         "(Optional - press Enter for 0): "
     ).strip()
 
@@ -7042,7 +9411,7 @@ while True:
 
     except ValueError:
         print(
-            "Please enter Less Amount "
+            "Please enter Overall Bill Discount "
             "using numbers only."
         )
 
@@ -7138,7 +9507,19 @@ if customer_type in ["1", "2"] and order_type == "1":
     while True:
 
         # Always recalculate payment values
-        order_total = frame_price + lens_price
+        order_total = sum(
+            calculate_item_amount(
+                item["frame_price"],
+                item.get("frame_offer", ""),
+                item.get("frame_less_amount", 0.0)
+            )
+            + calculate_item_amount(
+                item["lens_price"],
+                item.get("lens_offer", ""),
+                item.get("lens_less_amount", 0.0)
+            )
+            for item in order_items
+        )
         total_amount = order_total - less_amount
         balance = total_amount - advance_amount
 
@@ -7177,32 +9558,116 @@ if customer_type in ["1", "2"] and order_type == "1":
             f"{full_address if full_address else 'Not Provided'}"
         )
 
-        print("\n2. Frame Details")
-        print(
-            f"   Frame Details : "
-            f"{frame_details if frame_details else 'Not Provided'}"
-        )
-        print(
-            f"   Category      : "
-            f"{'Brand' if frame_category == '1' else 'Non-Brand'}"
-        )
-        print(
-            f"   Frame Brand   : {frame_brand}"
-        )
-        print(
-            f"   Frame Offer   : "
-            f"{frame_offer if frame_offer else 'None'}"
-        )
-        print(
-            f"   Frame Price   : ₹{frame_price:.2f}"
-        )
+        print("\n2. Order Items Summary")
 
+        for item_number, item in enumerate(
+            order_items, start=1
+        ):
+            item_type = item["order_type"]
+
+            if item_type == "1":
+                item_type_name = "Frame Only"
+            elif item_type == "2":
+                item_type_name = "Lenses Only"
+            else:
+                item_type_name = "Frame + Lenses"
+
+            print(
+                f"\n   Item {item_number} - "
+                f"{item_type_name}"
+            )
+
+            if item_type in ["1", "3"]:
+                print(
+                    f"   Frame Details : "
+                    f"{item['frame_details'] or 'Not Provided'}"
+                )
+                if item["frame_category"] == "1":
+                    print(
+                        f"   Frame Brand   : "
+                        f"{item['frame_brand'] or 'Not Provided'}"
+                    )
+                print(
+                    f"   Frame Price   : "
+                    f"₹{item['frame_price']:.2f}"
+                )
+                if item["frame_offer"]:
+                    print(
+                        f"   Frame Offer   : "
+                        f"{item['frame_offer']}"
+                    )
+                if item.get("frame_less_amount", 0.0) > 0:
+                    print(
+                        f"   Frame Less    : "
+                        f"₹{item.get('frame_less_amount', 0.0):.2f}"
+                    )
+                frame_final_amount = calculate_item_amount(
+                    item["frame_price"],
+                    item.get("frame_offer", ""),
+                    item.get("frame_less_amount", 0.0)
+                )
+                print(
+                    f"   Frame Amount  : "
+                    f"₹{frame_final_amount:.2f}"
+                )
+            if item_type in ["2", "3"]:
+                print(
+                    f"   Lens Type     : "
+                    f"{item['lens_type'] or 'Not Provided'}"
+                )
+                print(
+                    f"   Lens Features : "
+                    f"{item['lens_features'] or 'Not Provided'}"
+                )
+                print(
+                    f"   Lens Brand    : "
+                    f"{item['lens_brand'] or 'Not Provided'}"
+                )
+                print(
+                    f"   Lens Price    : "
+                    f"₹{item['lens_price']:.2f}"
+                )
+                if item["lens_offer"]:
+                    print(
+                        f"   Lens Offer    : "
+                        f"{item['lens_offer']}"
+                    )
+                if item.get("lens_less_amount", 0.0) > 0:
+                    print(
+                        f"   Lens Less     : "
+                        f"₹{item.get('lens_less_amount', 0.0):.2f}"
+                    )
+                lens_final_amount = calculate_item_amount(
+                    item["lens_price"],
+                    item.get("lens_offer", ""),
+                    item.get("lens_less_amount", 0.0)
+                )
+                print(
+                    f"   Lens Amount   : "
+                    f"₹{lens_final_amount:.2f}"
+                )
+
+            item_total = (
+                calculate_item_amount(
+                    item["frame_price"],
+                    item.get("frame_offer", ""),
+                    item.get("frame_less_amount", 0.0)
+                )
+                + calculate_item_amount(
+                    item["lens_price"],
+                    item.get("lens_offer", ""),
+                    item.get("lens_less_amount", 0.0)
+                )
+            )
+            print(
+                f"   Item Total    : ₹{item_total:.2f}"
+            )
         print("\n3. Payment Details")
         print(
             f"   Order Total    : ₹{order_total:.2f}"
         )
         print(
-            f"   Less Amount    : ₹{less_amount:.2f}"
+            f"   Overall Bill Discount : ₹{less_amount:.2f}"
         )
         print(
             f"   Final Total    : ₹{total_amount:.2f}"
@@ -7235,7 +9700,7 @@ if customer_type in ["1", "2"] and order_type == "1":
         print("\n--------------------------------------------------")
         print("--- Review / Edit Options ---")
         print("1. Customer Details")
-        print("2. Frame Details")
+        print("2. Order Items")
         print("3. Payment Details")
         print("4. Delivery Details")
         print("5. Confirm & Save")
@@ -7478,158 +9943,532 @@ if customer_type in ["1", "2"] and order_type == "1":
                     "Please select a number from 1 to 8."
                 )
             continue
-
         if review_choice == "2":
             while True:
+                print("\n--- Select Order Item to Edit ---")
 
-                print("\n--- Edit Frame Details ---")
-                print("1. Frame Details")
-                print("2. Frame Category")
+                for item_number, item in enumerate(
+                    order_items,
+                    start=1,
+                ):
+                    item_type = item["order_type"]
 
-                if frame_category == "1":
-                    print("3. Frame Brand")
-                    print("4. Frame Offer")
-                    print("5. Frame Price")
-                    print("6. Back")
-                else:
-                    print("3. Frame Offer")
-                    print("4. Frame Price")
-                    print("5. Back")
+                    if item_type == "1":
+                        item_type_name = "Frame Only"
+                    elif item_type == "2":
+                        item_type_name = "Lenses Only"
+                    else:
+                        item_type_name = "Frame + Lenses"
 
-                frame_edit_choice = input(
-                    "Select Field / Back: "
+                    item_total = (
+                        calculate_item_amount(
+                            item["frame_price"],
+                            item.get("frame_offer", ""),
+                            item.get("frame_less_amount", 0.0)
+                        )
+                        + calculate_item_amount(
+                            item["lens_price"],
+                            item.get("lens_offer", ""),
+                            item.get("lens_less_amount", 0.0)
+                        )
+                    )
+                    print(
+                        f"{item_number}. "
+                        f"{item_type_name} - "
+                        f"₹{item_total:.2f}"
+                    )
+
+                print(
+                    f"{len(order_items) + 1}. Back"
+                )
+
+                item_edit_input = input(
+                    "Select Order Item / Back: "
                 ).strip()
 
-                if (
-                    frame_category == "1"
-                    and frame_edit_choice == "6"
-                ):
-                    break
-
-                if (
-                    frame_category == "2"
-                    and frame_edit_choice == "5"
-                ):
-                    break
-
-                if frame_edit_choice == "1":
-
-                    frame_details = input(
-                        "Enter Frame Details: "
-                    ).strip()
-
-                    print(
-                        "Frame Details updated successfully."
+                try:
+                    item_edit_choice = int(
+                        item_edit_input
                     )
-
+                except ValueError:
+                    print(
+                        "Please enter a valid item number."
+                    )
                     continue
 
-                if frame_edit_choice == "2":
+                if item_edit_choice == len(order_items) + 1:
+                    break
 
-                    print("\n--- Frame Category ---")
-                    print("1. Brand")
-                    print("2. Non-Brand")
+                if not (
+                    1 <= item_edit_choice <= len(order_items)
+                ):
+                    print(
+                        "Please select a valid order item."
+                    )
+                    continue
 
+                selected_item_index = (
+                    item_edit_choice - 1
+                )
+                selected_item = order_items[
+                    selected_item_index
+                ]
+
+                print(
+                    f"\nSelected Item: "
+                    f"{item_edit_choice}"
+                )
+
+                selected_item_type = selected_item[
+                    "order_type"
+                ]
+
+                print("\n--- Edit Selected Order Item ---")
+
+                if selected_item_type == "1":
+                    print("1. Frame Details")
+                    print("2. Back")
+
+                elif selected_item_type == "2":
+                    print("1. Prescription / Lenses")
+                    print("2. Back")
+
+                else:
+                    print("1. Frame Details")
+                    print("2. Prescription / Lenses")
+                    print("3. Back")
+                selected_edit_choice = input(
+                    "Select Edit Option: "
+                ).strip()
+
+                if selected_item_type in ["1", "2"]:
+                    if selected_edit_choice == "2":
+                        continue
+
+                    if selected_edit_choice != "1":
+                        print(
+                            "Please select 1 or 2."
+                        )
+                        continue
+
+                else:
+                    if selected_edit_choice == "3":
+                        continue
+
+                    if selected_edit_choice not in ["1", "2"]:
+                        print(
+                            "Please select 1, 2 or 3."
+                        )
+                        continue
+                frame_edit_selected = (
+                    selected_item_type in ["1", "3"]
+                    and selected_edit_choice == "1"
+                )
+                lens_edit_selected = (
+                    (
+                        selected_item_type == "2"
+                        and selected_edit_choice == "1"
+                    )
+                    or (
+                        selected_item_type == "3"
+                        and selected_edit_choice == "2"
+                    )
+                )
+
+                if frame_edit_selected:
                     while True:
-
-                        new_frame_category = input(
-                            "Select Frame Category (1/2): "
+                        print("\n--- Edit Frame Details ---")
+                        print("1. Frame Details / Model")
+                        print("2. Frame Category")
+                        print("3. Frame Brand")
+                        print("4. Frame Price")
+                        print("5. Frame Offer")
+                        print("6. Frame Less Amount")
+                        print("7. Back")
+                        frame_field_choice = input(
+                            "Select Frame Edit Option "
+                            "(1/2/3/4/5/6/7): "
                         ).strip()
 
-                        if new_frame_category == "1":
-                            frame_category = "1"
-
-                            frame_brand = input(
-                                "Enter Frame Brand: "
-                            ).strip()
-
+                        if frame_field_choice == "7":
                             break
 
-                        if new_frame_category == "2":
-                            frame_category = "2"
-                            frame_brand = "Non-Brand"
-                            break
+                        if frame_field_choice not in [
+                            "1", "2", "3", "4", "5", "6"
+                        ]:
+                            print(
+                                "Please select "
+                                "1, 2, 3, 4, 5, 6 or 7."
+                            )
+                            continue
 
-                        print(
-                            "Please enter 1 or 2 only."
-                        )
-
-                    print(
-                        "Frame Category updated successfully."
-                    )
-
-                    continue
-
-                if (
-                    frame_category == "1"
-                    and frame_edit_choice == "3"
-                ):
-
-                    frame_brand = input(
-                        "Enter Frame Brand: "
-                    ).strip()
-
-                    print(
-                        "Frame Brand updated successfully."
-                    )
-
-                    continue
-
-                if (
-                    (
-                        frame_category == "1"
-                        and frame_edit_choice == "4"
-                    )
-                    or (
-                        frame_category == "2"
-                        and frame_edit_choice == "3"
-                    )
-                ):
-
-                    frame_offer = normalize_offer(
-                        input("Enter Frame Offer (Example: 10 or 10%): ")
-                    )
-                    print(
-                        "Frame Offer updated successfully."
-                    )
-
-                    continue
-
-                if (
-                    (
-                        frame_category == "1"
-                        and frame_edit_choice == "5"
-                    )
-                    or (
-                        frame_category == "2"
-                        and frame_edit_choice == "4"
-                    )
-                ):
-
-                    while True:
-
-                        try:
-                            new_frame_price = float(
-                                input(
-                                    "Enter Frame Price: "
-                                ).strip()
+                        if frame_field_choice == "1":
+                            print(
+                                "Current Frame Details: "
+                                f"{selected_item['frame_details'] or 'Not Provided'}"
                             )
 
-                            if new_frame_price < 0:
+                            new_frame_details = input(
+                                "Enter New Frame Details: "
+                            ).strip()
+
+                            if not new_frame_details:
                                 print(
-                                    "Frame Price cannot be negative."
+                                    "Frame Details "
+                                    "cannot be blank."
                                 )
                                 continue
 
+                            selected_item[
+                                "frame_details"
+                            ] = new_frame_details
+
+                            if selected_item_index == 0:
+                                frame_details = (
+                                    new_frame_details
+                                )
+
+                            print(
+                                "Frame Details updated "
+                                "successfully."
+                            )
+                            continue
+                        if frame_field_choice == "2":
+                            print(
+                                "Current Frame Category: "
+                                f"{'Brand' if selected_item['frame_category'] == '1' else 'Non-Brand'}"
+                            )
+
+                            print("\n--- New Frame Category ---")
+                            print("1. Brand")
+                            print("2. Non-Brand")
+
+                            new_frame_category = input(
+                                "Select Frame Category (1/2): "
+                            ).strip()
+
+                            if new_frame_category not in [
+                                "1", "2"
+                            ]:
+                                print(
+                                    "Please select 1 or 2."
+                                )
+                                continue
+
+                            selected_item[
+                                "frame_category"
+                            ] = new_frame_category
+
+                            if new_frame_category == "2":
+                                selected_item[
+                                    "frame_brand"
+                                ] = "Non-Brand"
+
+                            if selected_item_index == 0:
+                                frame_category = (
+                                    new_frame_category
+                                )
+
+                                if new_frame_category == "2":
+                                    frame_brand = "Non-Brand"
+
+                            print(
+                                "Frame Category updated "
+                                "successfully."
+                            )
+                            continue
+                        if frame_field_choice == "3":
+                            if (
+                                selected_item[
+                                    "frame_category"
+                                ] == "2"
+                            ):
+                                print(
+                                    "Frame Category is Non-Brand. "
+                                    "Frame Brand remains Non-Brand."
+                                )
+                                continue
+
+                            print(
+                                "Current Frame Brand: "
+                                f"{selected_item['frame_brand'] or 'Not Provided'}"
+                            )
+
+                            new_frame_brand = input(
+                                "Enter New Frame Brand: "
+                            ).strip()
+
+                            if not new_frame_brand:
+                                print(
+                                    "Frame Brand cannot be blank."
+                                )
+                                continue
+
+                            selected_item[
+                                "frame_brand"
+                            ] = new_frame_brand
+
+                            if selected_item_index == 0:
+                                frame_brand = new_frame_brand
+
+                            print(
+                                "Frame Brand updated "
+                                "successfully."
+                            )
+                            continue
+                        if frame_field_choice == "5":
+                            print(
+                                "Current Frame Offer: "
+                                f"{selected_item['frame_offer'] or 'None'}"
+                            )
+
+                            new_frame_offer = input(
+                                "Enter New Frame Offer "
+                                "(Optional - press Enter for none): "
+                            ).strip()
+
+                            new_frame_offer = normalize_offer(
+                                new_frame_offer
+                            )
+
+                            current_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            proposed_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    new_frame_offer,
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
                             new_order_total = (
-                                new_frame_price + lens_price
+                                order_total
+                                - current_item_total
+                                + proposed_item_total
                             )
 
                             if less_amount > new_order_total:
                                 print(
-                                    "Frame Price cannot be reduced "
-                                    "to this amount because the current "
-                                    "Less Amount would be greater than "
+                                    "Frame Offer cannot be changed "
+                                    "to this amount because the "
+                                    "current Less Amount would be "
+                                    "greater than Order Total."
+                                )
+                                continue
+
+                            new_total_amount = (
+                                new_order_total - less_amount
+                            )
+
+                            if advance_amount > new_total_amount:
+                                print(
+                                    "Frame Offer cannot be changed "
+                                    "to this amount because the "
+                                    "current Advance Amount would be "
+                                    "greater than Final Total Amount."
+                                )
+                                continue
+
+                            selected_item[
+                                "frame_offer"
+                            ] = new_frame_offer
+
+                            if selected_item_index == 0:
+                                frame_offer = new_frame_offer
+
+                            order_total = new_order_total
+                            total_amount = new_total_amount
+                            balance = (
+                                total_amount - advance_amount
+                            )
+
+                            print(
+                                "Frame Offer updated "
+                                "successfully."
+                            )
+                            print(
+                                f"New Order Total: "
+                                f"₹{order_total:.2f}"
+                            )
+                            print(
+                                f"New Final Amount: "
+                                f"₹{total_amount:.2f}"
+                            )
+                            print(
+                                f"New Balance: "
+                                f"₹{balance:.2f}"
+                            )
+                            continue
+                        if frame_field_choice == "4":
+                            print(
+                                "Current Frame Price: "
+                                f"₹{selected_item['frame_price']:.2f}"
+                            )
+
+                            while True:
+                                new_frame_price_input = input(
+                                    "Enter New Frame Price: "
+                                ).strip()
+
+                                try:
+                                    new_frame_price = float(
+                                        new_frame_price_input
+                                    )
+                                except ValueError:
+                                    print(
+                                        "Please enter a valid "
+                                        "Frame Price."
+                                    )
+                                    continue
+
+                                if new_frame_price < 0:
+                                    print(
+                                        "Frame Price cannot be "
+                                        "negative."
+                                    )
+                                    continue
+
+                                break
+
+                            current_frame_offer = selected_item.get(
+                                "frame_offer", ""
+                            )
+                            print(
+                                "Current Frame Offer: "
+                                f"{current_frame_offer or 'None'}"
+                            )
+
+                            new_frame_offer_input = input(
+                                "Enter New Frame Offer "
+                                "(Press Enter to keep current): "
+                            ).strip()
+
+                            if new_frame_offer_input == "":
+                                new_frame_offer = current_frame_offer
+                            else:
+                                new_frame_offer = normalize_offer(
+                                    new_frame_offer_input
+                                )
+
+                            current_frame_less = selected_item.get(
+                                "frame_less_amount", 0.0
+                            )
+                            print(
+                                "Current Frame Less Amount: "
+                                f"₹{current_frame_less:.2f}"
+                            )
+
+                            while True:
+                                new_frame_less_input = input(
+                                    "Enter New Frame Less Amount "
+                                    "(Press Enter to keep current): "
+                                ).strip()
+
+                                if new_frame_less_input == "":
+                                    new_frame_less_amount = (
+                                        current_frame_less
+                                    )
+                                    break
+
+                                try:
+                                    new_frame_less_amount = float(
+                                        new_frame_less_input
+                                    )
+                                except ValueError:
+                                    print(
+                                        "Please enter a valid "
+                                        "Frame Less Amount."
+                                    )
+                                    continue
+
+                                if new_frame_less_amount < 0:
+                                    print(
+                                        "Frame Less Amount cannot "
+                                        "be negative."
+                                    )
+                                    continue
+
+                                break
+
+                            current_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            proposed_item_total = (
+                                calculate_item_amount(
+                                    new_frame_price,
+                                    new_frame_offer,
+                                    new_frame_less_amount
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            new_order_total = (
+                                order_total
+                                - current_item_total
+                                + proposed_item_total
+                            )
+
+                            if less_amount > new_order_total:
+                                print(
+                                    "Frame Pricing cannot be changed "
+                                    "because the current Overall Bill "
+                                    "Discount would be greater than "
                                     "Order Total."
                                 )
                                 continue
@@ -7640,33 +10479,874 @@ if customer_type in ["1", "2"] and order_type == "1":
 
                             if advance_amount > new_total_amount:
                                 print(
-                                    "Frame Price cannot be reduced "
-                                    "to this amount because the current "
-                                    "Advance Amount would be greater than "
-                                    "Final Total Amount."
+                                    "Frame Pricing cannot be changed "
+                                    "because the current Advance Amount "
+                                    "would be greater than Final Total."
                                 )
                                 continue
 
-                            frame_price = new_frame_price
-                            break
+                            selected_item[
+                                "frame_price"
+                            ] = new_frame_price
+                            selected_item[
+                                "frame_offer"
+                            ] = new_frame_offer
+                            selected_item[
+                                "frame_less_amount"
+                            ] = new_frame_less_amount
 
-                        except ValueError:
-                            print(
-                                "Please enter Frame Price "
-                                "using numbers only."
+                            if selected_item_index == 0:
+                                frame_price = new_frame_price
+                                frame_offer = new_frame_offer
+                                frame_less_amount = (
+                                    new_frame_less_amount
+                                )
+
+                            order_total = new_order_total
+                            total_amount = new_total_amount
+                            balance = (
+                                total_amount - advance_amount
                             )
 
-                    print(
-                        "Frame Price updated successfully."
-                    )
+                            new_frame_amount = (
+                                calculate_item_amount(
+                                    new_frame_price,
+                                    new_frame_offer,
+                                    new_frame_less_amount
+                                )
+                            )
 
-                    continue
+                            print(
+                                "Frame Pricing updated successfully."
+                            )
+                            print(
+                                f"New Frame Amount: "
+                                f"₹{new_frame_amount:.2f}"
+                            )
+                            print(
+                                f"New Order Total: "
+                                f"₹{order_total:.2f}"
+                            )
+                            print(
+                                f"New Final Amount: "
+                                f"₹{total_amount:.2f}"
+                            )
+                            print(
+                                f"New Balance: "
+                                f"₹{balance:.2f}"
+                            )
+                            continue
+                        if frame_field_choice == "6":
+                            print(
+                                "Current Frame Less Amount: "
+                                f"₹{selected_item.get('frame_less_amount', 0.0):.2f}"
+                            )
 
-                print(
-                    "Please select a valid Frame Details option."
-                )
+                            try:
+                                new_frame_less_amount = float(
+                                    input(
+                                        "Enter New Frame Less Amount "
+                                        "(0 for none): "
+                                    ).strip()
+                                )
+                            except ValueError:
+                                print(
+                                    "Please enter Frame Less Amount "
+                                    "using numbers only."
+                                )
+                                continue
+
+                            if new_frame_less_amount < 0:
+                                print(
+                                    "Frame Less Amount cannot be "
+                                    "negative."
+                                )
+                                continue
+
+                            current_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            proposed_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    new_frame_less_amount
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            new_order_total = (
+                                order_total
+                                - current_item_total
+                                + proposed_item_total
+                            )
+
+                            if less_amount > new_order_total:
+                                print(
+                                    "Frame Less Amount cannot be "
+                                    "changed to this amount because "
+                                    "the current overall Less Amount "
+                                    "would be greater than Order Total."
+                                )
+                                continue
+
+                            new_total_amount = (
+                                new_order_total - less_amount
+                            )
+
+                            if advance_amount > new_total_amount:
+                                print(
+                                    "Frame Less Amount cannot be "
+                                    "changed to this amount because "
+                                    "the current Advance Amount would "
+                                    "be greater than Final Total Amount."
+                                )
+                                continue
+
+                            selected_item[
+                                "frame_less_amount"
+                            ] = new_frame_less_amount
+
+                            if selected_item_index == 0:
+                                frame_less_amount = (
+                                    new_frame_less_amount
+                                )
+
+                            order_total = new_order_total
+                            total_amount = new_total_amount
+                            balance = (
+                                total_amount - advance_amount
+                            )
+
+                            print(
+                                "Frame Less Amount updated "
+                                "successfully."
+                            )
+                            print(
+                                f"New Order Total: "
+                                f"₹{order_total:.2f}"
+                            )
+                            print(
+                                f"New Final Amount: "
+                                f"₹{total_amount:.2f}"
+                            )
+                            print(
+                                f"New Balance: "
+                                f"₹{balance:.2f}"
+                            )
+                            continue
+                if lens_edit_selected:
+                    while True:
+                        print(
+                            "\n--- Edit Prescription / Lenses ---"
+                        )
+                        print("1. Lens Type / Prescription")
+                        print("2. Lens Features / Coating")
+                        print("3. Lens Brand")
+                        print("4. Lens Price")
+                        print("5. Lens Offer")
+                        print("6. Lens Less Amount")
+                        print("7. Back")
+
+                        lens_field_choice = input(
+                            "Select Prescription / Lens Edit Option "
+                            "(1/2/3/4/5/6/7): "
+                        ).strip()
+
+                        if lens_field_choice == "7":
+                            break
+
+                        if lens_field_choice not in [
+                            "1", "2", "3", "4", "5", "6"
+                        ]:
+                            print(
+                                "Please select "
+                                "1, 2, 3, 4, 5, 6 or 7."
+                            )
+                            continue
+                        if lens_field_choice == "1":
+                            print(
+                                "Current Lens Type: "
+                                f"{selected_item['lens_type']}"
+                            )
+
+                            print("\n--- Lens Type ---")
+                            print("1. Single Vision")
+                            print("2. Bifocal")
+
+                            while True:
+                                new_lens_type_choice = input(
+                                    "Select Lens Type (1/2): "
+                                ).strip()
+
+                                if new_lens_type_choice in ["1", "2"]:
+                                    break
+
+                                print("Please select 1 or 2.")
+
+                            if new_lens_type_choice == "1":
+                                new_lens_type = "Single Vision"
+                                new_add_requirement = ""
+
+                            else:
+                                print("\n--- Bifocal Type ---")
+                                print("1. Kryptok")
+                                print("2. D Bifocal")
+                                print("3. Progressive Bifocal")
+                                print("4. Other")
+
+                                while True:
+                                    new_bifocal_choice = input(
+                                        "Select Bifocal Type "
+                                        "(1/2/3/4): "
+                                    ).strip()
+
+                                    if new_bifocal_choice == "1":
+                                        new_lens_type = "Kryptok"
+                                        break
+
+                                    if new_bifocal_choice == "2":
+                                        new_lens_type = "D Bifocal"
+                                        break
+
+                                    if new_bifocal_choice == "3":
+                                        new_lens_type = (
+                                            "Progressive Bifocal"
+                                        )
+                                        break
+
+                                    if new_bifocal_choice == "4":
+                                        new_lens_type = input(
+                                            "Enter Bifocal Type: "
+                                        ).strip()
+
+                                        if new_lens_type:
+                                            break
+
+                                        print(
+                                            "Bifocal Type cannot "
+                                            "be blank."
+                                        )
+                                        continue
+
+                                    print(
+                                        "Please select "
+                                        "1, 2, 3 or 4."
+                                    )
+
+                                print("\n--- ADD Requirement ---")
+                                print("1. Both Eyes")
+                                print("2. Right Eye Only")
+                                print("3. Left Eye Only")
+
+                                while True:
+                                    new_add_requirement = input(
+                                        "Select ADD Requirement "
+                                        "(1/2/3): "
+                                    ).strip()
+
+                                    if new_add_requirement in [
+                                        "1", "2", "3"
+                                    ]:
+                                        break
+
+                                    print(
+                                        "Please select 1, 2 or 3."
+                                    )
+
+                            edited_prescription = (
+                                edit_item_prescription_keep_current(
+                                    selected_item,
+                                    new_lens_type_choice,
+                                    new_add_requirement,
+                                )
+                            )
+
+                            selected_item.update(
+                                edited_prescription
+                            )
+
+                            selected_item[
+                                "lens_type"
+                            ] = new_lens_type
+
+                            selected_item[
+                                "add_requirement"
+                            ] = new_add_requirement
+
+                            if selected_item_index == 0:
+                                lens_type = new_lens_type
+                                add_requirement = (
+                                    new_add_requirement
+                                )
+
+                                right_sph = selected_item[
+                                    "right_sph"
+                                ]
+                                right_cyl = selected_item[
+                                    "right_cyl"
+                                ]
+                                right_axis = selected_item[
+                                    "right_axis"
+                                ]
+                                right_add = selected_item[
+                                    "right_add"
+                                ]
+
+                                left_sph = selected_item[
+                                    "left_sph"
+                                ]
+                                left_cyl = selected_item[
+                                    "left_cyl"
+                                ]
+                                left_axis = selected_item[
+                                    "left_axis"
+                                ]
+                                left_add = selected_item[
+                                    "left_add"
+                                ]
+
+                                distance_pd = selected_item[
+                                    "distance_pd"
+                                ]
+                                near_pd = selected_item[
+                                    "near_pd"
+                                ]
+
+                            if selected_item_index != 0:
+                                selected_item[
+                                    "prescription_mode"
+                                ] = "different"
+
+                            print(
+                                "Lens Type / Prescription updated "
+                                "successfully."
+                            )
+                            continue
+                        if lens_field_choice == "2":
+                            print(
+                                "Current Lens Features / Coating: "
+                                f"{selected_item['lens_features'] or 'Not Provided'}"
+                            )
+
+                            new_lens_features = input(
+                                "Enter New Lens Features / Coating "
+                                "(Optional - press Enter for none): "
+                            ).strip()
+
+                            selected_item[
+                                "lens_features"
+                            ] = new_lens_features
+
+                            if selected_item_index == 0:
+                                lens_features = new_lens_features
+
+                            print(
+                                "Lens Features / Coating updated "
+                                "successfully."
+                            )
+                            continue
+                        if lens_field_choice == "3":
+                            print(
+                                "Current Lens Brand: "
+                                f"{selected_item['lens_brand'] or 'Not Provided'}"
+                            )
+
+                            new_lens_brand = input(
+                                "Enter New Lens Brand "
+                                "(Optional - press Enter for none): "
+                            ).strip()
+
+                            selected_item[
+                                "lens_brand"
+                            ] = new_lens_brand
+
+                            if selected_item_index == 0:
+                                lens_brand = new_lens_brand
+
+                            print(
+                                "Lens Brand updated "
+                                "successfully."
+                            )
+                            continue
+                        if lens_field_choice == "5":
+                            print(
+                                "Current Lens Offer: "
+                                f"{selected_item['lens_offer'] or 'No Offer'}"
+                            )
+
+                            new_lens_offer_input = input(
+                                "Enter New Lens Offer "
+                                "(Optional - press Enter for none): "
+                            ).strip()
+
+                            new_lens_offer = normalize_offer(
+                                new_lens_offer_input
+                            )
+
+                            current_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            proposed_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    new_lens_offer,
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            new_order_total = (
+                                order_total
+                                - current_item_total
+                                + proposed_item_total
+                            )
+
+                            if less_amount > new_order_total:
+                                print(
+                                    "Lens Offer cannot be changed "
+                                    "to this amount because the "
+                                    "current Less Amount would be "
+                                    "greater than Order Total."
+                                )
+                                continue
+
+                            new_total_amount = (
+                                new_order_total - less_amount
+                            )
+
+                            if advance_amount > new_total_amount:
+                                print(
+                                    "Lens Offer cannot be changed "
+                                    "to this amount because the "
+                                    "current Advance Amount would be "
+                                    "greater than Final Total Amount."
+                                )
+                                continue
+
+                            selected_item[
+                                "lens_offer"
+                            ] = new_lens_offer
+
+                            if selected_item_index == 0:
+                                lens_offer = new_lens_offer
+
+                            order_total = new_order_total
+                            total_amount = new_total_amount
+                            balance = (
+                                total_amount - advance_amount
+                            )
+
+                            print(
+                                "Lens Offer updated "
+                                "successfully."
+                            )
+                            print(
+                                f"New Order Total: "
+                                f"₹{order_total:.2f}"
+                            )
+                            print(
+                                f"New Final Amount: "
+                                f"₹{total_amount:.2f}"
+                            )
+                            print(
+                                f"New Balance: "
+                                f"₹{balance:.2f}"
+                            )
+                            continue
+                        if lens_field_choice == "4":
+                            print(
+                                "Current Lens Price: "
+                                f"₹{selected_item['lens_price']:.2f}"
+                            )
+
+                            while True:
+                                new_lens_price_input = input(
+                                    "Enter New Lens Price: "
+                                ).strip()
+
+                                try:
+                                    new_lens_price = float(
+                                        new_lens_price_input
+                                    )
+                                except ValueError:
+                                    print(
+                                        "Please enter a valid "
+                                        "Lens Price."
+                                    )
+                                    continue
+
+                                if new_lens_price < 0:
+                                    print(
+                                        "Lens Price cannot be "
+                                        "negative."
+                                    )
+                                    continue
+
+                                break
+
+                            current_lens_offer = selected_item.get(
+                                "lens_offer", ""
+                            )
+                            print(
+                                "Current Lens Offer: "
+                                f"{current_lens_offer or 'None'}"
+                            )
+                            new_lens_offer_input = input(
+                                "Enter New Lens Offer "
+                                "(Press Enter to keep current): "
+                            ).strip()
+
+                            if new_lens_offer_input == "":
+                                new_lens_offer = current_lens_offer
+                            else:
+                                new_lens_offer = normalize_offer(
+                                    new_lens_offer_input
+                                )
+
+                            current_lens_less = selected_item.get(
+                                "lens_less_amount", 0.0
+                            )
+                            print(
+                                "Current Lens Less Amount: "
+                                f"₹{current_lens_less:.2f}"
+                            )
+
+                            while True:
+                                new_lens_less_input = input(
+                                    "Enter New Lens Less Amount "
+                                    "(Press Enter to keep current): "
+                                ).strip()
+
+                                if new_lens_less_input == "":
+                                    new_lens_less_amount = (
+                                        current_lens_less
+                                    )
+                                    break
+
+                                try:
+                                    new_lens_less_amount = float(
+                                        new_lens_less_input
+                                    )
+                                except ValueError:
+                                    print(
+                                        "Please enter a valid "
+                                        "Lens Less Amount."
+                                    )
+                                    continue
+
+                                if new_lens_less_amount < 0:
+                                    print(
+                                        "Lens Less Amount cannot "
+                                        "be negative."
+                                    )
+                                    continue
+
+                                break
+
+                            current_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            proposed_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    new_lens_price,
+                                    new_lens_offer,
+                                    new_lens_less_amount
+                                )
+                            )
+
+                            new_order_total = (
+                                order_total
+                                - current_item_total
+                                + proposed_item_total
+                            )
+
+                            if less_amount > new_order_total:
+                                print(
+                                    "Lens Pricing cannot be changed "
+                                    "because the current Overall Bill "
+                                    "Discount would be greater than "
+                                    "Order Total."
+                                )
+                                continue
+
+                            new_total_amount = (
+                                new_order_total - less_amount
+                            )
+
+                            if advance_amount > new_total_amount:
+                                print(
+                                    "Lens Pricing cannot be changed "
+                                    "because the current Advance Amount "
+                                    "would be greater than Final Total."
+                                )
+                                continue
+
+                            selected_item[
+                                "lens_price"
+                            ] = new_lens_price
+                            selected_item[
+                                "lens_offer"
+                            ] = new_lens_offer
+                            selected_item[
+                                "lens_less_amount"
+                            ] = new_lens_less_amount
+
+                            if selected_item_index == 0:
+                                lens_price = new_lens_price
+                                lens_offer = new_lens_offer
+                                lens_less_amount = (
+                                    new_lens_less_amount
+                                )
+
+                            order_total = new_order_total
+                            total_amount = new_total_amount
+                            balance = (
+                                total_amount - advance_amount
+                            )
+
+                            new_lens_amount = (
+                                calculate_item_amount(
+                                    new_lens_price,
+                                    new_lens_offer,
+                                    new_lens_less_amount
+                                )
+                            )
+
+                            print(
+                                "Lens Pricing updated successfully."
+                            )
+                            print(
+                                f"New Lens Amount: "
+                                f"₹{new_lens_amount:.2f}"
+                            )
+                            print(
+                                f"New Order Total: "
+                                f"₹{order_total:.2f}"
+                            )
+                            print(
+                                f"New Final Amount: "
+                                f"₹{total_amount:.2f}"
+                            )
+                            print(
+                                f"New Balance: "
+                                f"₹{balance:.2f}"
+                            )
+                            continue
+                        if lens_field_choice == "6":
+                            print(
+                                "Current Lens Less Amount: "
+                                f"₹{selected_item.get(
+                                    'lens_less_amount', 0.0
+                                ):.2f}"
+                            )
+
+                            try:
+                                new_lens_less_amount = float(
+                                    input(
+                                        "Enter New Lens Less Amount "
+                                        "(Optional - enter 0 for none): "
+                                    ).strip() or "0"
+                                )
+                            except ValueError:
+                                print(
+                                    "Please enter a valid "
+                                    "Lens Less Amount."
+                                )
+                                continue
+
+                            if new_lens_less_amount < 0:
+                                print(
+                                    "Lens Less Amount cannot "
+                                    "be negative."
+                                )
+                                continue
+
+                            current_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            proposed_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    new_lens_less_amount
+                                )
+                            )
+
+                            new_order_total = (
+                                order_total
+                                - current_item_total
+                                + proposed_item_total
+                            )
+
+                            if less_amount > new_order_total:
+                                print(
+                                    "Lens Less Amount cannot be "
+                                    "changed to this amount because "
+                                    "the current overall Less Amount "
+                                    "would be greater than Order Total."
+                                )
+                                continue
+
+                            new_total_amount = (
+                                new_order_total - less_amount
+                            )
+
+                            if advance_amount > new_total_amount:
+                                print(
+                                    "Lens Less Amount cannot be "
+                                    "changed to this amount because "
+                                    "the current Advance Amount would "
+                                    "be greater than Final Total Amount."
+                                )
+                                continue
+
+                            selected_item[
+                                "lens_less_amount"
+                            ] = new_lens_less_amount
+
+                            if selected_item_index == 0:
+                                lens_less_amount = (
+                                    new_lens_less_amount
+                                )
+
+                            order_total = new_order_total
+                            total_amount = new_total_amount
+                            balance = (
+                                total_amount - advance_amount
+                            )
+
+                            print(
+                                "Lens Less Amount updated "
+                                "successfully."
+                            )
+                            print(
+                                f"New Order Total: "
+                                f"₹{order_total:.2f}"
+                            )
+                            print(
+                                f"New Final Amount: "
+                                f"₹{total_amount:.2f}"
+                            )
+                            print(
+                                f"New Balance: "
+                                f"₹{balance:.2f}"
+                            )
+                            continue
+
             continue
-
         if review_choice in ["3", "4"]:
           if review_choice == "3":
 
@@ -7674,7 +11354,7 @@ if customer_type in ["1", "2"] and order_type == "1":
 
                 print("\n--- Edit Payment Details ---")
                 print(f"Order Total    : ₹{order_total:.2f}")
-                print(f"Less Amount    : ₹{less_amount:.2f}")
+                print(f"Overall Bill Discount : ₹{less_amount:.2f}")
                 print(f"Final Total    : ₹{total_amount:.2f}")
                 print(f"Advance Amount : ₹{advance_amount:.2f}")
                 print(f"Balance        : ₹{balance:.2f}")
@@ -7695,7 +11375,7 @@ if customer_type in ["1", "2"] and order_type == "1":
                     while True:
 
                         new_less_input = input(
-                            "Enter Less Amount "
+                            "Enter Overall Bill Discount "
                             "(Optional - press Enter for 0): "
                         ).strip()
 
@@ -7708,7 +11388,7 @@ if customer_type in ["1", "2"] and order_type == "1":
                                 )
                             except ValueError:
                                 print(
-                                    "Please enter Less Amount "
+                                    "Please enter Overall Bill Discount "
                                     "using numbers only."
                                 )
                                 continue
@@ -7944,10 +11624,21 @@ if customer_type in ["1", "2"] and order_type == "2":
     while True:
 
         # Always recalculate payment values
-        order_total = frame_price + lens_price
+        order_total = sum(
+            calculate_item_amount(
+                item["frame_price"],
+                item.get("frame_offer", ""),
+                item.get("frame_less_amount", 0.0)
+            )
+            + calculate_item_amount(
+                item["lens_price"],
+                item.get("lens_offer", ""),
+                item.get("lens_less_amount", 0.0)
+            )
+            for item in order_items
+        )
         total_amount = order_total - less_amount
         balance = total_amount - advance_amount
-
         print("\n")
         print("==================================================")
         print("              FINAL REVIEW BEFORE SAVE")
@@ -8022,38 +11713,111 @@ if customer_type in ["1", "2"] and order_type == "2":
             f"ADD {left_add if left_add else 'Not Required'}"
         )
 
-        print("\n3. Lens Details")
-        print(f"   Lens Type    : {lens_type}")
+        print("\n3. Order Items Summary")
 
-        if lens_type != "Single Vision":
-            if add_requirement == "1":
-                add_display = "Both Eyes"
-            elif add_requirement == "2":
-                add_display = "Right Eye (OD) Only"
-            elif add_requirement == "3":
-                add_display = "Left Eye (OS) Only"
+        for item_number, item in enumerate(
+            order_items, start=1
+        ):
+            item_type = item["order_type"]
+
+            if item_type == "1":
+                item_type_name = "Frame Only"
+            elif item_type == "2":
+                item_type_name = "Lenses Only"
             else:
-                add_display = "Not Recorded"
+                item_type_name = "Frame + Lenses"
 
-            print(f"   ADD Required : {add_display}")
-
-        print(
-            f"   Features     : "
-            f"{lens_features if lens_features else 'Not Provided'}"
-        )
-        print(
-            f"   Brand        : "
-            f"{lens_brand if lens_brand else 'Not Provided'}"
-        )
-        print(
-            f"   Offer        : "
-            f"{lens_offer if lens_offer else 'Not Provided'}"
-        )
-        print(f"   Lens Price   : ₹{lens_price:.2f}")
-
+            print(
+                f"\n   Item {item_number} - "
+                f"{item_type_name}"
+            )
+            if item_type in ["1", "3"]:
+                print(
+                    f"   Frame Details : "
+                    f"{item['frame_details'] or 'Not Provided'}"
+                )
+                if item["frame_category"] == "1":
+                    print(
+                        f"   Frame Brand   : "
+                        f"{item['frame_brand'] or 'Not Provided'}"
+                    )
+                print(
+                    f"   Frame Price   : "
+                    f"₹{item['frame_price']:.2f}"
+                )
+                if item["frame_offer"]:
+                    print(
+                        f"   Frame Offer   : "
+                        f"{item['frame_offer']}"
+                    )
+                if item.get("frame_less_amount", 0.0) > 0:
+                    print(
+                        f"   Frame Less    : "
+                        f"₹{item.get('frame_less_amount', 0.0):.2f}"
+                    )
+                frame_final_amount = calculate_item_amount(
+                    item["frame_price"],
+                    item.get("frame_offer", ""),
+                    item.get("frame_less_amount", 0.0)
+                )
+                print(
+                    f"   Frame Amount  : "
+                    f"₹{frame_final_amount:.2f}"
+                )
+            if item_type in ["2", "3"]:
+                print(
+                    f"   Lens Type     : "
+                    f"{item['lens_type'] or 'Not Provided'}"
+                )
+                print(
+                    f"   Lens Features : "
+                    f"{item['lens_features'] or 'Not Provided'}"
+                )
+                print(
+                    f"   Lens Brand    : "
+                    f"{item['lens_brand'] or 'Not Provided'}"
+                )
+                print(
+                    f"   Lens Price    : "
+                    f"₹{item['lens_price']:.2f}"
+                )
+                if item["lens_offer"]:
+                    print(
+                        f"   Lens Offer    : "
+                        f"{item['lens_offer']}"
+                    )
+                if item.get("lens_less_amount", 0.0) > 0:
+                    print(
+                        f"   Lens Less     : "
+                        f"₹{item.get('lens_less_amount', 0.0):.2f}"
+                    )
+                lens_final_amount = calculate_item_amount(
+                    item["lens_price"],
+                    item.get("lens_offer", ""),
+                    item.get("lens_less_amount", 0.0)
+                )
+                print(
+                    f"   Lens Amount   : "
+                    f"₹{lens_final_amount:.2f}"
+                )
+            item_total = (
+                calculate_item_amount(
+                    item["frame_price"],
+                    item.get("frame_offer", ""),
+                    item.get("frame_less_amount", 0.0)
+                )
+                + calculate_item_amount(
+                    item["lens_price"],
+                    item.get("lens_offer", ""),
+                    item.get("lens_less_amount", 0.0)
+                )
+            )
+            print(
+                f"   Item Total    : ₹{item_total:.2f}"
+            )
         print("\n4. Payment Details")
         print(f"   Order Total  : ₹{order_total:.2f}")
-        print(f"   Less Amount  : ₹{less_amount:.2f}")
+        print(f"   Overall Bill Discount : ₹{less_amount:.2f}")
         print(f"   Final Total  : ₹{total_amount:.2f}")
         print(f"   Advance      : ₹{advance_amount:.2f}")
         print(f"   Balance      : ₹{balance:.2f}")
@@ -8073,8 +11837,8 @@ if customer_type in ["1", "2"] and order_type == "2":
         print("\n--------------------------------------------------")
         print("--- Review / Edit Options ---")
         print("1. Customer Details")
-        print("2. Prescription & Eye Details")
-        print("3. Lens Details")
+        print("2. Order Items")
+        print("3. Prescription & Eye Details")
         print("4. Payment Details")
         print("5. Delivery Details")
         print("6. Confirm & Save")
@@ -8121,6 +11885,7 @@ if customer_type in ["1", "2"] and order_type == "2":
                 "Saving customer/order record..."
             )
             break
+
         if review_choice == "7":
             print(
                 "\nOrder cancelled. "
@@ -8148,7 +11913,6 @@ if customer_type in ["1", "2"] and order_type == "2":
 
                 if customer_edit_choice == "8":
                     break
-
                 if customer_edit_choice not in [
                     "1", "2", "3", "4",
                     "5", "6", "7"
@@ -8338,1508 +12102,1411 @@ if customer_type in ["1", "2"] and order_type == "2":
 
             continue
 
+        # ==================================================
         if review_choice == "2":
-
             while True:
 
-                has_previous_rx = (
-                    spectacle_history == "Existing"
-                    and "has_previous_prescription" in globals()
-                    and has_previous_prescription == "y"
-                )
+                print("\n--- Edit Order Items ---")
 
-                print("\n--- Prescription & Eye Details ---")
-                print("1. Prescription Source")
-                print("2. Spectacle History")
-
-                if has_previous_rx:
-                    print("3. Previous Prescription")
-                    print("4. Eye Surgery / IOL History")
-                    print("5. Current Prescription")
-                    print("6. PD / Vision Details")
-                    print("7. Back")
-                else:
-                    print("3. Eye Surgery / IOL History")
-                    print("4. Current Prescription")
-                    print("5. PD / Vision Details")
-                    print("6. Back")
-
-                prescription_edit_choice = input(
-                    "Select Field / Section: "
-                ).strip()
-
-                if (
-                    has_previous_rx
-                    and prescription_edit_choice == "7"
+                for item_number, item in enumerate(
+                    order_items, start=1
                 ):
-                    break
+                    item_type = item["order_type"]
 
-                if (
-                    not has_previous_rx
-                    and prescription_edit_choice == "6"
-                ):
-                    break
+                    if item_type == "1":
+                        item_type_name = "Frame Only"
+                    elif item_type == "2":
+                        item_type_name = "Lenses Only"
+                    else:
+                        item_type_name = "Frame + Lenses"
 
-                # ------------------------------------------
-                # 1. PRESCRIPTION SOURCE
-                # ------------------------------------------
-                if prescription_edit_choice == "1":
-
-                    print("\n--- Edit Prescription Source ---")
-                    print("1. In-Store Refraction")
-                    print("2. External Prescription")
-
-                    while True:
-
-                        new_source_choice = input(
-                            "Select Prescription Source (1/2): "
-                        ).strip()
-
-                        if new_source_choice == "1":
-                            prescription_source = (
-                                "In-Store Refraction"
-                            )
-                            prescription_from = ""
-                            break
-
-                        if new_source_choice == "2":
-                            prescription_source = (
-                                "External Prescription"
-                            )
-
-                            prescription_from = input(
-                                "Prescription From "
-                                "(Optional - Hospital / Doctor / "
-                                "Optical Shop): "
-                            ).strip()
-
-                            break
-
-                        print("Please select 1 or 2.")
-
+                    item_total = (
+                        calculate_item_amount(
+                            item["frame_price"],
+                            item.get("frame_offer", ""),
+                            item.get("frame_less_amount", 0.0)
+                        )
+                        + calculate_item_amount(
+                            item["lens_price"],
+                            item.get("lens_offer", ""),
+                            item.get("lens_less_amount", 0.0)
+                        )
+                    )
                     print(
-                        "Prescription Source updated successfully."
+                        f"{item_number}. "
+                        f"{item_type_name} - "
+                        f"₹{item_total:.2f}"
                     )
-                    continue
-
-                # ------------------------------------------
-                # 2. SPECTACLE HISTORY
-                # ------------------------------------------
-                if prescription_edit_choice == "2":
-
-                    print("\n--- Edit Spectacle History ---")
-                    print("1. First-time Spectacle User")
-                    print("2. Existing Spectacle User")
-
-                    while True:
-
-                        new_history_choice = input(
-                            "Select Spectacle History (1/2): "
-                        ).strip()
-
-                        if new_history_choice == "1":
-
-                            spectacle_history = "First-time"
-                            years_using_glasses = ""
-                            has_previous_prescription = "n"
-
-                            previous_prescription_date = ""
-
-                            previous_right_sph = ""
-                            previous_right_cyl = ""
-                            previous_right_axis = ""
-                            previous_right_add = ""
-
-                            previous_left_sph = ""
-                            previous_left_cyl = ""
-                            previous_left_axis = ""
-                            previous_left_add = ""
-
-                            print(
-                                "Spectacle History updated to "
-                                "First-time."
-                            )
-                            break
-
-                        if new_history_choice == "2":
-
-                            spectacle_history = "Existing"
-
-                            years_using_glasses = input(
-                                "How long have you been "
-                                "using glasses?: "
-                            ).strip()
-
-                            print(
-                                "\nDo you have previous "
-                                "prescription details?"
-                            )
-                            print("1. Yes")
-                            print("2. No")
-
-                            while True:
-
-                                previous_rx_choice = input(
-                                    "Select (1/2): "
-                                ).strip()
-
-                                if previous_rx_choice == "1":
-                                    has_previous_prescription = "y"
-                                    break
-
-                                if previous_rx_choice == "2":
-                                    has_previous_prescription = "n"
-
-                                    previous_prescription_date = ""
-
-                                    previous_right_sph = ""
-                                    previous_right_cyl = ""
-                                    previous_right_axis = ""
-                                    previous_right_add = ""
-
-                                    previous_left_sph = ""
-                                    previous_left_cyl = ""
-                                    previous_left_axis = ""
-                                    previous_left_add = ""
-
-                                    break
-
-                                print(
-                                    "Please select 1 for Yes "
-                                    "or 2 for No."
-                                )
-
-                            print(
-                                "Spectacle History updated "
-                                "successfully."
-                            )
-                            break
-
-                        print("Please select 1 or 2.")
-
-                    continue
-
-                # ------------------------------------------
-                # 3. PREVIOUS PRESCRIPTION
-                # Only shown when previous Rx is available
-                # ------------------------------------------
-                if (
-                    has_previous_rx
-                    and prescription_edit_choice == "3"
-                ):
-
-                    while True:
-
-                        print("\n--- Edit Previous Prescription ---")
-                        print(
-                            "1. Previous Prescription Date"
-                        )
-                        print("2. Right Eye (OD) SPH")
-                        print("3. Right Eye (OD) CYL")
-                        print("4. Right Eye (OD) AXIS")
-                        print("5. Right Eye (OD) ADD")
-                        print("6. Left Eye (OS) SPH")
-                        print("7. Left Eye (OS) CYL")
-                        print("8. Left Eye (OS) AXIS")
-                        print("9. Left Eye (OS) ADD")
-                        print("10. Back")
-
-                        previous_edit_choice = input(
-                            "Select Field (1-10): "
-                        ).strip()
-
-                        if previous_edit_choice == "10":
-                            break
-
-                        if previous_edit_choice == "1":
-
-                            while True:
-
-                                new_previous_date = input(
-                                    "Enter Previous Prescription Date "
-                                    "(DD-MM-YYYY, Optional - "
-                                    "press Enter if unknown): "
-                                ).strip()
-
-                                if new_previous_date == "":
-                                    previous_prescription_date = ""
-                                    break
-
-                                try:
-                                    parsed_previous_date = (
-                                        datetime.strptime(
-                                            new_previous_date,
-                                            "%d-%m-%Y"
-                                        )
-                                    )
-
-                                    previous_prescription_date = (
-                                        parsed_previous_date.strftime(
-                                            "%d-%m-%Y"
-                                        )
-                                    )
-                                    break
-
-                                except ValueError:
-                                    print(
-                                        "Invalid date. Please enter "
-                                        "date as DD-MM-YYYY "
-                                        "or leave blank."
-                                    )
-
-                            print(
-                                "Previous Prescription Date "
-                                "updated successfully."
-                            )
-                            continue
-
-                        if previous_edit_choice == "2":
-                            previous_right_sph = get_old_sph(
-                                "Right Eye"
-                            )
-                            print(
-                                "Right Eye SPH updated successfully."
-                            )
-                            continue
-
-                        if previous_edit_choice == "3":
-                            previous_right_cyl = get_old_cyl(
-                                "Right Eye"
-                            )
-                            print(
-                                "Right Eye CYL updated successfully."
-                            )
-                            continue
-
-                        if previous_edit_choice == "4":
-                            previous_right_axis = get_old_axis(
-                                "Right Eye"
-                            )
-                            print(
-                                "Right Eye AXIS updated successfully."
-                            )
-                            continue
-
-                        if previous_edit_choice == "5":
-
-                            while True:
-
-                                new_right_add = input(
-                                    "Enter Right Eye ADD / "
-                                    "Near Power "
-                                    "(Optional - press Enter "
-                                    "if not required): "
-                                ).strip()
-
-                                if new_right_add in ("", "0"):
-                                    previous_right_add = ""
-                                    break
-
-                                if new_right_add.startswith("+"):
-                                    number_part = new_right_add[1:]
-                                    parts = number_part.split(".")
-
-                                    if (
-                                        len(parts) == 2
-                                        and parts[0].isdigit()
-                                        and len(parts[1]) == 2
-                                        and parts[1] in [
-                                            "00", "25", "50", "75"
-                                        ]
-                                        and float(number_part) <= 5
-                                    ):
-                                        previous_right_add = (
-                                            new_right_add
-                                        )
-                                        break
-
-                                print(
-                                    "Invalid ADD. Enter like "
-                                    "+1.00, +1.25, +1.50, "
-                                    "+2.00 or leave blank."
-                                )
-
-                            print(
-                                "Right Eye ADD updated successfully."
-                            )
-                            continue
-
-                        if previous_edit_choice == "6":
-                            previous_left_sph = get_old_sph(
-                                "Left Eye"
-                            )
-                            print(
-                                "Left Eye SPH updated successfully."
-                            )
-                            continue
-
-                        if previous_edit_choice == "7":
-                            previous_left_cyl = get_old_cyl(
-                                "Left Eye"
-                            )
-                            print(
-                                "Left Eye CYL updated successfully."
-                            )
-                            continue
-
-                        if previous_edit_choice == "8":
-                            previous_left_axis = get_old_axis(
-                                "Left Eye"
-                            )
-                            print(
-                                "Left Eye AXIS updated successfully."
-                            )
-                            continue
-
-                        if previous_edit_choice == "9":
-
-                            while True:
-
-                                new_left_add = input(
-                                    "Enter Left Eye ADD / "
-                                    "Near Power "
-                                    "(Optional - press Enter "
-                                    "if not required): "
-                                ).strip()
-
-                                if new_left_add in ("", "0"):
-                                    previous_left_add = ""
-                                    break
-
-                                if new_left_add.startswith("+"):
-                                    number_part = new_left_add[1:]
-                                    parts = number_part.split(".")
-
-                                    if (
-                                        len(parts) == 2
-                                        and parts[0].isdigit()
-                                        and len(parts[1]) == 2
-                                        and parts[1] in [
-                                            "00", "25", "50", "75"
-                                        ]
-                                        and float(number_part) <= 5
-                                    ):
-                                        previous_left_add = (
-                                            new_left_add
-                                        )
-                                        break
-
-                                print(
-                                    "Invalid ADD. Enter like "
-                                    "+1.00, +1.25, +1.50, "
-                                    "+2.00 or leave blank."
-                                )
-
-                            print(
-                                "Left Eye ADD updated successfully."
-                            )
-                            continue
-
-                        print(
-                            "Please select a number from 1 to 10."
-                        )
-
-                    continue
-
-                # ------------------------------------------
-                # EYE SURGERY / IOL HISTORY
-                # Previous Rx available  -> Option 4
-                # Previous Rx unavailable -> Option 3
-                # ------------------------------------------
-                eye_surgery_selected = (
-                    (
-                        has_previous_rx
-                        and prescription_edit_choice == "4"
-                    )
-                    or (
-                        not has_previous_rx
-                        and prescription_edit_choice == "3"
-                    )
-                )
-
-                if eye_surgery_selected:
-
-                    print("\n--- Edit Eye Surgery / IOL History ---")
-                    print("1. No Eye Surgery")
-                    print("2. Right Eye (OD)")
-                    print("3. Left Eye (OS)")
-                    print("4. Both Eyes")
-
-                    while True:
-
-                        new_surgery_choice = input(
-                            "Select Eye Surgery Status "
-                            "(1/2/3/4): "
-                        ).strip()
-
-                        if new_surgery_choice == "1":
-
-                            eye_surgery = "No"
-                            surgery_eye = ""
-                            right_iol = "No"
-                            left_iol = "No"
-
-                            break
-
-                        if new_surgery_choice == "2":
-
-                            eye_surgery = "Yes"
-                            surgery_eye = "Right Eye (OD)"
-                            left_iol = "No"
-
-                            print(
-                                "\nRight Eye IOL implanted?"
-                            )
-                            print("1. Yes")
-                            print("2. No")
-
-                            while True:
-
-                                new_right_iol_choice = input(
-                                    "Select (1/2): "
-                                ).strip()
-
-                                if new_right_iol_choice == "1":
-                                    right_iol = "Yes"
-                                    break
-
-                                if new_right_iol_choice == "2":
-                                    right_iol = "No"
-                                    break
-
-                                print(
-                                    "Please select 1 for Yes "
-                                    "or 2 for No."
-                                )
-
-                            break
-
-                        if new_surgery_choice == "3":
-
-                            eye_surgery = "Yes"
-                            surgery_eye = "Left Eye (OS)"
-                            right_iol = "No"
-
-                            print(
-                                "\nLeft Eye IOL implanted?"
-                            )
-                            print("1. Yes")
-                            print("2. No")
-
-                            while True:
-
-                                new_left_iol_choice = input(
-                                    "Select (1/2): "
-                                ).strip()
-
-                                if new_left_iol_choice == "1":
-                                    left_iol = "Yes"
-                                    break
-
-                                if new_left_iol_choice == "2":
-                                    left_iol = "No"
-                                    break
-
-                                print(
-                                    "Please select 1 for Yes "
-                                    "or 2 for No."
-                                )
-
-                            break
-
-                        if new_surgery_choice == "4":
-
-                            eye_surgery = "Yes"
-                            surgery_eye = "Both Eyes"
-
-                            print(
-                                "\nRight Eye IOL implanted?"
-                            )
-                            print("1. Yes")
-                            print("2. No")
-
-                            while True:
-
-                                new_right_iol_choice = input(
-                                    "Select (1/2): "
-                                ).strip()
-
-                                if new_right_iol_choice == "1":
-                                    right_iol = "Yes"
-                                    break
-
-                                if new_right_iol_choice == "2":
-                                    right_iol = "No"
-                                    break
-
-                                print(
-                                    "Please select 1 for Yes "
-                                    "or 2 for No."
-                                )
-
-                            print(
-                                "\nLeft Eye IOL implanted?"
-                            )
-                            print("1. Yes")
-                            print("2. No")
-
-                            while True:
-
-                                new_left_iol_choice = input(
-                                    "Select (1/2): "
-                                ).strip()
-
-                                if new_left_iol_choice == "1":
-                                    left_iol = "Yes"
-                                    break
-
-                                if new_left_iol_choice == "2":
-                                    left_iol = "No"
-                                    break
-
-                                print(
-                                    "Please select 1 for Yes "
-                                    "or 2 for No."
-                                )
-
-                            break
-
-                        print(
-                            "Please select 1, 2, 3 or 4."
-                        )
-
-                    print(
-                        "Eye Surgery / IOL History "
-                        "updated successfully."
-                    )
-                    continue
-
-                # ------------------------------------------
-                # CURRENT PRESCRIPTION
-                # Previous Rx available  -> Option 5
-                # Previous Rx unavailable -> Option 4
-                # ------------------------------------------
-                current_rx_selected = (
-                    (
-                        has_previous_rx
-                        and prescription_edit_choice == "5"
-                    )
-                    or (
-                        not has_previous_rx
-                        and prescription_edit_choice == "4"
-                    )
-                )
-
-                if current_rx_selected:
-
-                    while True:
-
-                        print("\n--- Edit Current Prescription ---")
-                        print("1. Right Eye (OD) SPH")
-                        print("2. Right Eye (OD) CYL")
-                        print("3. Right Eye (OD) AXIS")
-
-                        if (
-                            lens_type_choice != "1"
-                            and add_requirement != "3"
-                        ):
-                            print("4. Right Eye (OD) ADD")
-                        else:
-                            print("4. Right Eye (OD) ADD - Not Required")
-
-                        print("5. Left Eye (OS) SPH")
-                        print("6. Left Eye (OS) CYL")
-                        print("7. Left Eye (OS) AXIS")
-
-                        if (
-                            lens_type_choice != "1"
-                            and add_requirement != "2"
-                        ):
-                            print("8. Left Eye (OS) ADD")
-                        else:
-                            print("8. Left Eye (OS) ADD - Not Required")
-
-                        print("9. Back")
-
-                        current_rx_edit_choice = input(
-                            "Select Field (1-9): "
-                        ).strip()
-
-                        if current_rx_edit_choice == "9":
-                            break
-
-                        # ----------------------------------
-                        # 1. RIGHT EYE (OD) SPH
-                        # ----------------------------------
-                        if current_rx_edit_choice == "1":
-
-                            while True:
-
-                                new_right_sph = input(
-                                    "Enter Right Eye SPH (+/-): "
-                                ).strip()
-
-                                if new_right_sph.lower() == "plano":
-                                    right_sph = "Plano"
-                                    break
-
-                                if new_right_sph == "0":
-                                    right_sph = "0"
-                                    break
-
-                                if new_right_sph.startswith(("+", "-")):
-                                    number_part = new_right_sph[1:]
-                                    parts = number_part.split(".")
-
-                                    if (
-                                        len(parts) == 2
-                                        and parts[0].isdigit()
-                                        and len(parts[1]) == 2
-                                        and parts[1]
-                                        in ["00", "25", "50", "75"]
-                                        and float(number_part) <= 30
-                                    ):
-                                        right_sph = new_right_sph
-                                        break
-
-                                print(
-                                    "Invalid SPH. Enter like "
-                                    "-1.00, +1.25, 0 or Plano."
-                                )
-
-                            print(
-                                "Right Eye SPH updated successfully."
-                            )
-                            continue
-
-                        # ----------------------------------
-                        # 2. RIGHT EYE (OD) CYL
-                        # ----------------------------------
-                        if current_rx_edit_choice == "2":
-
-                            while True:
-
-                                new_right_cyl = input(
-                                    "Enter Right Eye CYL (+/-): "
-                                ).strip()
-
-                                if new_right_cyl == "":
-                                    right_cyl = ""
-                                    break
-
-                                if new_right_cyl == "0":
-                                    right_cyl = "0"
-                                    break
-
-                                if new_right_cyl.startswith(("+", "-")):
-                                    number_part = new_right_cyl[1:]
-                                    parts = number_part.split(".")
-
-                                    if (
-                                        len(parts) == 2
-                                        and parts[0].isdigit()
-                                        and len(parts[1]) == 2
-                                        and parts[1]
-                                        in ["00", "25", "50", "75"]
-                                        and float(number_part) <= 10
-                                    ):
-                                        right_cyl = new_right_cyl
-                                        break
-
-                                print(
-                                    "Invalid CYL. Enter like "
-                                    "-0.50, +1.25, 0 or leave blank."
-                                )
-
-                            print(
-                                "Right Eye CYL updated successfully."
-                            )
-                            continue
-
-                        # ----------------------------------
-                        # 3. RIGHT EYE (OD) AXIS
-                        # ----------------------------------
-                        if current_rx_edit_choice == "3":
-
-                            while True:
-
-                                new_right_axis = input(
-                                    "Enter Right Eye AXIS (0-180): "
-                                ).strip()
-
-                                if new_right_axis == "":
-                                    right_axis = ""
-                                    break
-
-                                if new_right_axis.isdigit():
-                                    axis_value = int(new_right_axis)
-
-                                    if 0 <= axis_value <= 180:
-                                        right_axis = new_right_axis
-                                        break
-
-                                print(
-                                    "Invalid AXIS. Enter a number "
-                                    "from 0 to 180 or leave blank."
-                                )
-
-                            print(
-                                "Right Eye AXIS updated successfully."
-                            )
-                            continue
-
-                        # ----------------------------------
-                        # 4. RIGHT EYE (OD) ADD
-                        # ----------------------------------
-                        if current_rx_edit_choice == "4":
-
-                            if (
-                                lens_type_choice == "1"
-                                or add_requirement == "3"
-                            ):
-                                right_add = ""
-                                print(
-                                    "Right Eye ADD is Not Required."
-                                )
-                                continue
-
-                            while True:
-
-                                new_right_add = input(
-                                    "Enter Right Eye ADD / "
-                                    "Near Power (+): "
-                                ).strip()
-
-                                if new_right_add in ["", "0"]:
-                                    print(
-                                        "ADD is required for Right Eye."
-                                    )
-                                    continue
-
-                                if new_right_add.startswith("+"):
-                                    number_part = new_right_add[1:]
-                                    parts = number_part.split(".")
-
-                                    if (
-                                        len(parts) == 2
-                                        and parts[0].isdigit()
-                                        and len(parts[1]) == 2
-                                        and parts[1]
-                                        in ["00", "25", "50", "75"]
-                                        and float(number_part) <= 5
-                                    ):
-                                        right_add = new_right_add
-                                        break
-
-                                print(
-                                    "Invalid ADD. Enter like "
-                                    "+1.00, +1.25, +1.50 or +2.00."
-                                )
-
-                            print(
-                                "Right Eye ADD updated successfully."
-                            )
-                            continue
-
-                        # ----------------------------------
-                        # 5. LEFT EYE (OS) SPH
-                        # ----------------------------------
-                        if current_rx_edit_choice == "5":
-
-                            while True:
-
-                                new_left_sph = input(
-                                    "Enter Left Eye SPH (+/-): "
-                                ).strip()
-
-                                if new_left_sph.lower() == "plano":
-                                    left_sph = "Plano"
-                                    break
-
-                                if new_left_sph == "0":
-                                    left_sph = "0"
-                                    break
-
-                                if new_left_sph.startswith(("+", "-")):
-                                    number_part = new_left_sph[1:]
-                                    parts = number_part.split(".")
-
-                                    if (
-                                        len(parts) == 2
-                                        and parts[0].isdigit()
-                                        and len(parts[1]) == 2
-                                        and parts[1]
-                                        in ["00", "25", "50", "75"]
-                                        and float(number_part) <= 30
-                                    ):
-                                        left_sph = new_left_sph
-                                        break
-
-                                print(
-                                    "Invalid SPH. Enter like "
-                                    "-1.00, +1.25, 0 or Plano."
-                                )
-
-                            print(
-                                "Left Eye SPH updated successfully."
-                            )
-                            continue
-
-                        # ----------------------------------
-                        # 6. LEFT EYE (OS) CYL
-                        # ----------------------------------
-                        if current_rx_edit_choice == "6":
-
-                            while True:
-
-                                new_left_cyl = input(
-                                    "Enter Left Eye CYL (+/-): "
-                                ).strip()
-
-                                if new_left_cyl == "":
-                                    left_cyl = ""
-                                    break
-
-                                if new_left_cyl == "0":
-                                    left_cyl = "0"
-                                    break
-
-                                if new_left_cyl.startswith(("+", "-")):
-                                    number_part = new_left_cyl[1:]
-                                    parts = number_part.split(".")
-
-                                    if (
-                                        len(parts) == 2
-                                        and parts[0].isdigit()
-                                        and len(parts[1]) == 2
-                                        and parts[1]
-                                        in ["00", "25", "50", "75"]
-                                        and float(number_part) <= 10
-                                    ):
-                                        left_cyl = new_left_cyl
-                                        break
-
-                                print(
-                                    "Invalid CYL. Enter like "
-                                    "-1.00, +0.50, 0 or leave blank."
-                                )
-
-                            print(
-                                "Left Eye CYL updated successfully."
-                            )
-                            continue
-
-                        # ----------------------------------
-                        # 7. LEFT EYE (OS) AXIS
-                        # ----------------------------------
-                        if current_rx_edit_choice == "7":
-
-                            while True:
-
-                                new_left_axis = input(
-                                    "Enter Left Eye AXIS (0-180): "
-                                ).strip()
-
-                                if new_left_axis == "":
-                                    left_axis = ""
-                                    break
-
-                                if new_left_axis.isdigit():
-                                    axis_value = int(new_left_axis)
-
-                                    if 0 <= axis_value <= 180:
-                                        left_axis = new_left_axis
-                                        break
-
-                                print(
-                                    "Invalid AXIS. Enter a number "
-                                    "from 0 to 180 or leave blank."
-                                )
-
-                            print(
-                                "Left Eye AXIS updated successfully."
-                            )
-                            continue
-
-                        # ----------------------------------
-                        # 8. LEFT EYE (OS) ADD
-                        # ----------------------------------
-                        if current_rx_edit_choice == "8":
-
-                            if (
-                                lens_type_choice == "1"
-                                or add_requirement == "2"
-                            ):
-                                left_add = ""
-                                print(
-                                    "Left Eye ADD is Not Required."
-                                )
-                                continue
-
-                            while True:
-
-                                new_left_add = input(
-                                    "Enter Left Eye ADD / "
-                                    "Near Power (+): "
-                                ).strip()
-
-                                if new_left_add in ["", "0"]:
-                                    print(
-                                        "ADD is required for Left Eye."
-                                    )
-                                    continue
-
-                                if new_left_add.startswith("+"):
-                                    number_part = new_left_add[1:]
-                                    parts = number_part.split(".")
-
-                                    if (
-                                        len(parts) == 2
-                                        and parts[0].isdigit()
-                                        and len(parts[1]) == 2
-                                        and parts[1]
-                                        in ["00", "25", "50", "75"]
-                                        and float(number_part) <= 5
-                                    ):
-                                        left_add = new_left_add
-                                        break
-
-                                print(
-                                    "Invalid ADD. Enter like "
-                                    "+1.00, +1.25, +1.50 or +2.00."
-                                )
-
-                            print(
-                                "Left Eye ADD updated successfully."
-                            )
-                            continue
-
-                        print(
-                            "Please select a number from 1 to 9."
-                        )
-                    continue
-
-                # ------------------------------------------
-                # PD / VISION DETAILS
-                # Previous Rx available  -> Option 6
-                # Previous Rx unavailable -> Option 5
-                # ------------------------------------------
-                pd_vision_selected = (
-                    (
-                        has_previous_rx
-                        and prescription_edit_choice == "6"
-                    )
-                    or (
-                        not has_previous_rx
-                        and prescription_edit_choice == "5"
-                    )
-                )
-
-                if pd_vision_selected:
-
-                    while True:
-
-                        print("\n--- Edit PD / Vision Details ---")
-                        print("1. Distance PD")
-                        print("2. Near PD")
-                        print("3. Right Eye Visual Acuity")
-                        print("4. Left Eye Visual Acuity")
-                        print("5. Right Eye Pinhole")
-                        print("6. Left Eye Pinhole")
-                        print("7. Back")
-
-                        pd_vision_edit_choice = input(
-                            "Select Field (1-7): "
-                        ).strip()
-
-                        if pd_vision_edit_choice == "1":
-                            distance_pd = input(
-                                "Enter Distance PD in mm "
-                                "(Example: 62, press Enter "
-                                "if not measured): "
-                            ).strip()
-
-                            print(
-                                "Distance PD updated successfully."
-                            )
-                            continue
-
-                        if pd_vision_edit_choice == "2":
-                            near_pd = input(
-                                "Enter Near PD in mm "
-                                "(Example: 59, press Enter "
-                                "if not measured): "
-                            ).strip()
-
-                            print(
-                                "Near PD updated successfully."
-                            )
-                            continue
-
-                        if pd_vision_edit_choice == "3":
-                            right_va = input(
-                                "Right Eye Visual Acuity "
-                                "(Example: 6/6, press Enter "
-                                "if not measured): "
-                            ).strip()
-
-                            print(
-                                "Right Eye Visual Acuity "
-                                "updated successfully."
-                            )
-                            continue
-
-                        if pd_vision_edit_choice == "4":
-                            left_va = input(
-                                "Left Eye Visual Acuity "
-                                "(Example: 6/6, press Enter "
-                                "if not measured): "
-                            ).strip()
-
-                            print(
-                                "Left Eye Visual Acuity "
-                                "updated successfully."
-                            )
-                            continue
-
-                        if pd_vision_edit_choice == "5":
-                            right_pinhole = input(
-                                "Right Eye Pinhole "
-                                "(Example: 6/6, press Enter "
-                                "if not measured): "
-                            ).strip()
-
-                            print(
-                                "Right Eye Pinhole "
-                                "updated successfully."
-                            )
-                            continue
-
-                        if pd_vision_edit_choice == "6":
-                            left_pinhole = input(
-                                "Left Eye Pinhole "
-                                "(Example: 6/6, press Enter "
-                                "if not measured): "
-                            ).strip()
-
-                            print(
-                                "Left Eye Pinhole "
-                                "updated successfully."
-                            )
-                            continue
-
-                        if pd_vision_edit_choice == "7":
-                            break
-
-                        print(
-                            "Please select a number from 1 to 7."
-                        )
-
-                    continue
 
                 print(
-                    "Please select a valid "
-                    "Prescription / Eye Details option."
+                    f"{len(order_items) + 1}. Back"
                 )
-            continue
 
-        # ==================================================
-        # 3. LENS DETAILS
-        # ==================================================
-        if review_choice == "3":
-
-            while True:
-
-                print("\n--- Edit Lens Details ---")
-                print("1. Lens Type")
-
-                if lens_type != "Single Vision":
-                    print("2. ADD Requirement")
-                else:
-                    print("2. ADD Requirement - Not Required")
-
-                print("3. Lens Features / Coating")
-                print("4. Lens Brand")
-                print("5. Lens Offer")
-                print("6. Lens Price")
-                print("7. Back")
-
-                lens_edit_choice = input(
-                    "Select Field (1-7): "
+                item_edit_input = input(
+                    "Select Order Item / Back: "
                 ).strip()
 
-                # ------------------------------------------
-                # 1. LENS TYPE
-                # ------------------------------------------
-                if lens_edit_choice == "1":
-
-                    print("\n--- Edit Lens Type ---")
-                    print("1. Single Vision")
-                    print("2. Bifocal")
-
-                    while True:
-
-                        new_lens_type_choice = input(
-                            "Select Lens Type (1/2): "
-                        ).strip()
-
-                        if new_lens_type_choice == "1":
-
-                            lens_type_choice = "1"
-                            lens_type = "Single Vision"
-                            add_requirement = ""
-
-                            right_add = ""
-                            left_add = ""
-
-                            break
-
-                        if new_lens_type_choice == "2":
-
-                            lens_type_choice = "2"
-
-                            print("\n--- Bifocal Type ---")
-                            print("1. Kryptok Bifocal")
-                            print("2. D Bifocal")
-                            print("3. Progressive Bifocal")
-                            print("4. Other")
-
-                            while True:
-
-                                new_bifocal_choice = input(
-                                    "Select Bifocal Type "
-                                    "(1/2/3/4): "
-                                ).strip()
-
-                                if new_bifocal_choice == "1":
-                                    lens_type = "Kryptok Bifocal"
-                                    break
-
-                                if new_bifocal_choice == "2":
-                                    lens_type = "D Bifocal"
-                                    break
-
-                                if new_bifocal_choice == "3":
-                                    lens_type = (
-                                        "Progressive Bifocal"
-                                    )
-                                    break
-
-                                if new_bifocal_choice == "4":
-                                    lens_type = "Other"
-                                    break
-
-                                print(
-                                    "Invalid option. Please select "
-                                    "1, 2, 3 or 4."
-                                )
-
-                            print("\n--- ADD Requirement ---")
-                            print("1. Both Eyes")
-                            print("2. Right Eye (OD) Only")
-                            print("3. Left Eye (OS) Only")
-
-                            while True:
-
-                                add_requirement = input(
-                                    "Select ADD Requirement "
-                                    "(1/2/3): "
-                                ).strip()
-
-                                if add_requirement in [
-                                    "1", "2", "3"
-                                ]:
-                                    break
-
-                                print(
-                                    "Invalid option. Please select "
-                                    "1, 2 or 3."
-                                )
-
-                            if add_requirement == "2":
-                                left_add = ""
-
-                            elif add_requirement == "3":
-                                right_add = ""
-
-                            break
-
-                        print(
-                            "Invalid option. Please select 1 or 2."
-                        )
-
+                try:
+                    item_edit_choice = int(
+                        item_edit_input
+                    )
+                except ValueError:
                     print(
-                        "Lens Type updated successfully."
+                        "Please enter a valid item number."
                     )
                     continue
 
-                # ------------------------------------------
-                # 2. ADD REQUIREMENT
-                # ------------------------------------------
-                if lens_edit_choice == "2":
+                if item_edit_choice == len(order_items) + 1:
+                    break
 
-                    if lens_type == "Single Vision":
-                        add_requirement = ""
-                        right_add = ""
-                        left_add = ""
+                if not (
+                    1 <= item_edit_choice <= len(order_items)
+                ):
+                    print(
+                        "Please select a valid order item."
+                    )
+                    continue
 
+                selected_item_index = (
+                    item_edit_choice - 1
+                )
+                selected_item = order_items[
+                    selected_item_index
+                ]
+
+                print(
+                    f"\nSelected Item: "
+                    f"{item_edit_choice}"
+                )
+
+                selected_item_type = selected_item[
+                    "order_type"
+                ]
+
+                print("\n--- Edit Selected Order Item ---")
+
+                if selected_item_type == "1":
+                    print("1. Frame Details")
+                    print("2. Back")
+
+                elif selected_item_type == "2":
+                    print("1. Prescription / Lenses")
+                    print("2. Back")
+
+                else:
+                    print("1. Frame Details")
+                    print("2. Prescription / Lenses")
+                    print("3. Back")
+                selected_edit_choice = input(
+                    "Select Edit Option: "
+                ).strip()
+
+                if selected_item_type in ["1", "2"]:
+                    if selected_edit_choice == "2":
+                        continue
+
+                    if selected_edit_choice != "1":
                         print(
-                            "ADD Requirement is Not Required "
-                            "for Single Vision."
+                            "Please select 1 or 2."
                         )
                         continue
 
-                    print("\n--- Edit ADD Requirement ---")
-                    print("1. Both Eyes")
-                    print("2. Right Eye (OD) Only")
-                    print("3. Left Eye (OS) Only")
+                else:
+                    if selected_edit_choice == "3":
+                        continue
 
-                    while True:
-
-                        new_add_requirement = input(
-                            "Select ADD Requirement "
-                            "(1/2/3): "
-                        ).strip()
-
-                        if new_add_requirement in [
-                            "1", "2", "3"
-                        ]:
-                            add_requirement = (
-                                new_add_requirement
-                            )
-                            break
-
+                    if selected_edit_choice not in ["1", "2"]:
                         print(
-                            "Invalid option. Please select "
-                            "1, 2 or 3."
+                            "Please select 1, 2 or 3."
                         )
-
-                    if add_requirement == "2":
-                        left_add = ""
-
-                    elif add_requirement == "3":
-                        right_add = ""
-
-                    print(
-                        "ADD Requirement updated successfully."
+                        continue
+                frame_edit_selected = (
+                    selected_item_type in ["1", "3"]
+                    and selected_edit_choice == "1"
+                )
+                lens_edit_selected = (
+                    (
+                        selected_item_type == "2"
+                        and selected_edit_choice == "1"
                     )
-                    continue
-
-                # ------------------------------------------
-                # 3. LENS FEATURES / COATING
-                # ------------------------------------------
-                if lens_edit_choice == "3":
-
-                    while True:
-
-                        new_lens_features = input(
-                            "Enter Lens Features / Coating "
-                            "(Optional): "
-                        ).strip().title()
-
-                        normalized_features = (
-                            new_lens_features.lower()
-                            .replace(".", " ")
-                            .replace("-", " ")
-                            .replace("/", " ")
-                            .replace(",", " ")
-                            .replace("_", " ")
-                        )
-
-                        feature_words = (
-                            normalized_features.split()
-                        )
-
-                        has_kt = (
-                            "kt" in feature_words
-                            or "kryptok" in feature_words
-                        )
-
-                        has_progressive = (
-                            "progressive" in feature_words
-                        )
-
-                        has_d_bifocal = (
-                            "d bifocal"
-                            in normalized_features
-                            or "dbifocal"
-                            in normalized_features
-                        )
-
-                        if lens_type == "Single Vision":
-
-                            if has_kt:
-                                print(
-                                    "KT / Kryptok is a Bifocal "
-                                    "type and cannot be used "
-                                    "with Single Vision."
-                                )
-                                continue
-
-                            if has_progressive:
-                                print(
-                                    "Progressive cannot be used "
-                                    "with Single Vision."
-                                )
-                                continue
-
-                            if has_d_bifocal:
-                                print(
-                                    "D Bifocal cannot be used "
-                                    "with Single Vision."
-                                )
-                                continue
-
-                        elif lens_type == "Kryptok Bifocal":
-
-                            if has_progressive:
-                                print(
-                                    "Progressive cannot be used "
-                                    "with Kryptok Bifocal."
-                                )
-                                continue
-
-                            if has_d_bifocal:
-                                print(
-                                    "D Bifocal cannot be used "
-                                    "with Kryptok Bifocal."
-                                )
-                                continue
-
-                        elif lens_type == "D Bifocal":
-
-                            if has_kt:
-                                print(
-                                    "KT / Kryptok cannot be used "
-                                    "with D Bifocal."
-                                )
-                                continue
-
-                            if has_progressive:
-                                print(
-                                    "Progressive cannot be used "
-                                    "with D Bifocal."
-                                )
-                                continue
-
-                        elif lens_type == "Progressive Bifocal":
-
-                            if has_kt:
-                                print(
-                                    "KT / Kryptok cannot be used "
-                                    "with Progressive Bifocal."
-                                )
-                                continue
-
-                            if has_d_bifocal:
-                                print(
-                                    "D Bifocal cannot be used "
-                                    "with Progressive Bifocal."
-                                )
-                                continue
-
-                        lens_features = new_lens_features
-                        break
-
-                    print(
-                        "Lens Features / Coating "
-                        "updated successfully."
+                    or (
+                        selected_item_type == "3"
+                        and selected_edit_choice == "2"
                     )
-                    continue
-
-                # ------------------------------------------
-                # 4. LENS BRAND
-                # ------------------------------------------
-                if lens_edit_choice == "4":
-
-                    lens_brand = input(
-                        "Enter Lens Brand (Optional): "
-                    ).strip().title()
-
-                    print(
-                        "Lens Brand updated successfully."
-                    )
-                    continue
-
-                # ------------------------------------------
-                # 5. LENS OFFER
-                # ------------------------------------------
-                if lens_edit_choice == "5":
-
-                    lens_offer = normalize_offer(
-                        input("Enter Lens Offer (Example: 10 or 10%): ")
-                    )
-                    print(
-                        "Lens Offer updated successfully."
-                    )
-                    continue
-
-                # ------------------------------------------
-                # 6. LENS PRICE
-                # ------------------------------------------
-                if lens_edit_choice == "6":
-
-                    while True:
-
-                        new_lens_price_input = input(
-                            "Enter Lens Price: "
-                        ).strip()
-
-                        try:
-                            new_lens_price = float(
-                                new_lens_price_input
-                            )
-
-                            if new_lens_price < 0:
-                                print(
-                                    "Lens Price cannot be negative."
-                                )
-                                continue
-
-                            lens_price = new_lens_price
-                            break
-
-                        except ValueError:
-                            print(
-                                "Please enter Lens Price "
-                                "using numbers only."
-                            )
-
-                    # Recalculate all dependent payment values
-                    order_total = frame_price + lens_price
-
-                    if less_amount > order_total:
-                        less_amount = order_total
-
-                    total_amount = (
-                        order_total - less_amount
-                    )
-
-                    if advance_amount > total_amount:
-                        advance_amount = total_amount
-
-                    balance = (
-                        total_amount - advance_amount
-                    )
-
-                    print(
-                        "Lens Price updated successfully."
-                    )
-                    continue
-
-                # ------------------------------------------
-                # 7. BACK
-                # ------------------------------------------
-                if lens_edit_choice == "7":
-                    break
-
-                print(
-                    "Please select a number from 1 to 7."
                 )
 
+                if frame_edit_selected:
+                    while True:
+                        print("\n--- Edit Frame Details ---")
+                        print("1. Frame Details / Model")
+                        print("2. Frame Category")
+                        print("3. Frame Brand")
+                        print("4. Frame Price")
+                        print("5. Frame Offer")
+                        print("6. Frame Less Amount")
+                        print("7. Back")
+                        frame_field_choice = input(
+                            "Select Frame Edit Option "
+                            "(1/2/3/4/5/6/7): "
+                        ).strip()
+
+                        if frame_field_choice == "7":
+                            break
+
+                        if frame_field_choice not in [
+                            "1", "2", "3", "4", "5", "6"
+                        ]:
+                            print(
+                                "Please select "
+                                "1, 2, 3, 4, 5, 6 or 7."
+                            )
+                            continue
+
+                        if frame_field_choice == "1":
+                            print(
+                                "Current Frame Details: "
+                                f"{selected_item['frame_details'] or 'Not Provided'}"
+                            )
+
+                            new_frame_details = input(
+                                "Enter New Frame Details: "
+                            ).strip()
+
+                            if not new_frame_details:
+                                print(
+                                    "Frame Details "
+                                    "cannot be blank."
+                                )
+                                continue
+
+                            selected_item[
+                                "frame_details"
+                            ] = new_frame_details
+
+                            if selected_item_index == 0:
+                                frame_details = (
+                                    new_frame_details
+                                )
+
+                            print(
+                                "Frame Details updated "
+                                "successfully."
+                            )
+                            continue
+                        if frame_field_choice == "2":
+                            print(
+                                "Current Frame Category: "
+                                f"{'Brand' if selected_item['frame_category'] == '1' else 'Non-Brand'}"
+                            )
+
+                            print("\n--- New Frame Category ---")
+                            print("1. Brand")
+                            print("2. Non-Brand")
+
+                            new_frame_category = input(
+                                "Select Frame Category (1/2): "
+                            ).strip()
+
+                            if new_frame_category not in [
+                                "1", "2"
+                            ]:
+                                print(
+                                    "Please select 1 or 2."
+                                )
+                                continue
+
+                            selected_item[
+                                "frame_category"
+                            ] = new_frame_category
+
+                            if new_frame_category == "2":
+                                selected_item[
+                                    "frame_brand"
+                                ] = "Non-Brand"
+
+                            if selected_item_index == 0:
+                                frame_category = (
+                                    new_frame_category
+                                )
+
+                                if new_frame_category == "2":
+                                    frame_brand = "Non-Brand"
+
+                            print(
+                                "Frame Category updated "
+                                "successfully."
+                            )
+                            continue
+                        if frame_field_choice == "3":
+                            if (
+                                selected_item[
+                                    "frame_category"
+                                ] == "2"
+                            ):
+                                print(
+                                    "Frame Category is Non-Brand. "
+                                    "Frame Brand remains Non-Brand."
+                                )
+                                continue
+
+                            print(
+                                "Current Frame Brand: "
+                                f"{selected_item['frame_brand'] or 'Not Provided'}"
+                            )
+
+                            new_frame_brand = input(
+                                "Enter New Frame Brand: "
+                            ).strip()
+
+                            if not new_frame_brand:
+                                print(
+                                    "Frame Brand cannot be blank."
+                                )
+                                continue
+
+                            selected_item[
+                                "frame_brand"
+                            ] = new_frame_brand
+
+                            if selected_item_index == 0:
+                                frame_brand = new_frame_brand
+
+                            print(
+                                "Frame Brand updated "
+                                "successfully."
+                            )
+                            continue
+                        if frame_field_choice == "5":
+                            print(
+                                "Current Frame Offer: "
+                                f"{selected_item['frame_offer'] or 'None'}"
+                            )
+
+                            new_frame_offer = input(
+                                "Enter New Frame Offer "
+                                "(Optional - press Enter for none): "
+                            ).strip()
+
+                            new_frame_offer = normalize_offer(
+                                new_frame_offer
+                            )
+
+                            current_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            proposed_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    new_frame_offer,
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            new_order_total = (
+                                order_total
+                                - current_item_total
+                                + proposed_item_total
+                            )
+
+                            if less_amount > new_order_total:
+                                print(
+                                    "Frame Offer cannot be changed "
+                                    "to this amount because the "
+                                    "current Less Amount would be "
+                                    "greater than Order Total."
+                                )
+                                continue
+
+                            new_total_amount = (
+                                new_order_total - less_amount
+                            )
+
+                            if advance_amount > new_total_amount:
+                                print(
+                                    "Frame Offer cannot be changed "
+                                    "to this amount because the "
+                                    "current Advance Amount would be "
+                                    "greater than Final Total Amount."
+                                )
+                                continue
+
+                            selected_item[
+                                "frame_offer"
+                            ] = new_frame_offer
+
+                            if selected_item_index == 0:
+                                frame_offer = new_frame_offer
+
+                            order_total = new_order_total
+                            total_amount = new_total_amount
+                            balance = (
+                                total_amount - advance_amount
+                            )
+
+                            print(
+                                "Frame Offer updated "
+                                "successfully."
+                            )
+                            print(
+                                f"New Order Total: "
+                                f"₹{order_total:.2f}"
+                            )
+                            print(
+                                f"New Final Amount: "
+                                f"₹{total_amount:.2f}"
+                            )
+                            print(
+                                f"New Balance: "
+                                f"₹{balance:.2f}"
+                            )
+                            continue
+                        if frame_field_choice == "4":
+                            print(
+                                "Current Frame Price: "
+                                f"₹{selected_item['frame_price']:.2f}"
+                            )
+
+                            while True:
+                                new_frame_price_input = input(
+                                    "Enter New Frame Price: "
+                                ).strip()
+
+                                try:
+                                    new_frame_price = float(
+                                        new_frame_price_input
+                                    )
+                                except ValueError:
+                                    print(
+                                        "Please enter a valid "
+                                        "Frame Price."
+                                    )
+                                    continue
+
+                                if new_frame_price < 0:
+                                    print(
+                                        "Frame Price cannot be "
+                                        "negative."
+                                    )
+                                    continue
+
+                                break
+
+                            current_frame_offer = selected_item.get(
+                                "frame_offer", ""
+                            )
+                            print(
+                                "Current Frame Offer: "
+                                f"{current_frame_offer or 'None'}"
+                            )
+
+                            new_frame_offer_input = input(
+                                "Enter New Frame Offer "
+                                "(Press Enter to keep current): "
+                            ).strip()
+
+                            if new_frame_offer_input == "":
+                                new_frame_offer = current_frame_offer
+                            else:
+                                new_frame_offer = normalize_offer(
+                                    new_frame_offer_input
+                                )
+
+                            current_frame_less = selected_item.get(
+                                "frame_less_amount", 0.0
+                            )
+                            print(
+                                "Current Frame Less Amount: "
+                                f"₹{current_frame_less:.2f}"
+                            )
+
+                            while True:
+                                new_frame_less_input = input(
+                                    "Enter New Frame Less Amount "
+                                    "(Press Enter to keep current): "
+                                ).strip()
+
+                                if new_frame_less_input == "":
+                                    new_frame_less_amount = (
+                                        current_frame_less
+                                    )
+                                    break
+
+                                try:
+                                    new_frame_less_amount = float(
+                                        new_frame_less_input
+                                    )
+                                except ValueError:
+                                    print(
+                                        "Please enter a valid "
+                                        "Frame Less Amount."
+                                    )
+                                    continue
+
+                                if new_frame_less_amount < 0:
+                                    print(
+                                        "Frame Less Amount cannot "
+                                        "be negative."
+                                    )
+                                    continue
+
+                                break
+
+                            current_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            proposed_item_total = (
+                                calculate_item_amount(
+                                    new_frame_price,
+                                    new_frame_offer,
+                                    new_frame_less_amount
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            new_order_total = (
+                                order_total
+                                - current_item_total
+                                + proposed_item_total
+                            )
+
+                            if less_amount > new_order_total:
+                                print(
+                                    "Frame Pricing cannot be changed "
+                                    "because the current Overall Bill "
+                                    "Discount would be greater than "
+                                    "Order Total."
+                                )
+                                continue
+
+                            new_total_amount = (
+                                new_order_total - less_amount
+                            )
+
+                            if advance_amount > new_total_amount:
+                                print(
+                                    "Frame Pricing cannot be changed "
+                                    "because the current Advance Amount "
+                                    "would be greater than Final Total."
+                                )
+                                continue
+
+                            selected_item[
+                                "frame_price"
+                            ] = new_frame_price
+                            selected_item[
+                                "frame_offer"
+                            ] = new_frame_offer
+                            selected_item[
+                                "frame_less_amount"
+                            ] = new_frame_less_amount
+
+                            if selected_item_index == 0:
+                                frame_price = new_frame_price
+                                frame_offer = new_frame_offer
+                                frame_less_amount = (
+                                    new_frame_less_amount
+                                )
+
+                            order_total = new_order_total
+                            total_amount = new_total_amount
+                            balance = (
+                                total_amount - advance_amount
+                            )
+
+                            new_frame_amount = (
+                                calculate_item_amount(
+                                    new_frame_price,
+                                    new_frame_offer,
+                                    new_frame_less_amount
+                                )
+                            )
+
+                            print(
+                                "Frame Pricing updated successfully."
+                            )
+                            print(
+                                f"New Frame Amount: "
+                                f"₹{new_frame_amount:.2f}"
+                            )
+                            print(
+                                f"New Order Total: "
+                                f"₹{order_total:.2f}"
+                            )
+                            print(
+                                f"New Final Amount: "
+                                f"₹{total_amount:.2f}"
+                            )
+                            print(
+                                f"New Balance: "
+                                f"₹{balance:.2f}"
+                            )
+                            continue
+                        if frame_field_choice == "6":
+                            print(
+                                "Current Frame Less Amount: "
+                                f"₹{selected_item.get('frame_less_amount', 0.0):.2f}"
+                            )
+
+                            try:
+                                new_frame_less_amount = float(
+                                    input(
+                                        "Enter New Frame Less Amount "
+                                        "(0 for none): "
+                                    ).strip()
+                                )
+                            except ValueError:
+                                print(
+                                    "Please enter Frame Less Amount "
+                                    "using numbers only."
+                                )
+                                continue
+
+                            if new_frame_less_amount < 0:
+                                print(
+                                    "Frame Less Amount cannot be "
+                                    "negative."
+                                )
+                                continue
+
+                            current_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            proposed_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    new_frame_less_amount
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            new_order_total = (
+                                order_total
+                                - current_item_total
+                                + proposed_item_total
+                            )
+
+                            if less_amount > new_order_total:
+                                print(
+                                    "Frame Less Amount cannot be "
+                                    "changed to this amount because "
+                                    "the current overall Less Amount "
+                                    "would be greater than Order Total."
+                                )
+                                continue
+
+                            new_total_amount = (
+                                new_order_total - less_amount
+                            )
+
+                            if advance_amount > new_total_amount:
+                                print(
+                                    "Frame Less Amount cannot be "
+                                    "changed to this amount because "
+                                    "the current Advance Amount would "
+                                    "be greater than Final Total Amount."
+                                )
+                                continue
+
+                            selected_item[
+                                "frame_less_amount"
+                            ] = new_frame_less_amount
+
+                            if selected_item_index == 0:
+                                frame_less_amount = (
+                                    new_frame_less_amount
+                                )
+
+                            order_total = new_order_total
+                            total_amount = new_total_amount
+                            balance = (
+                                total_amount - advance_amount
+                            )
+
+                            print(
+                                "Frame Less Amount updated "
+                                "successfully."
+                            )
+                            print(
+                                f"New Order Total: "
+                                f"₹{order_total:.2f}"
+                            )
+                            print(
+                                f"New Final Amount: "
+                                f"₹{total_amount:.2f}"
+                            )
+                            print(
+                                f"New Balance: "
+                                f"₹{balance:.2f}"
+                            )
+                            continue
+                if lens_edit_selected:
+                    while True:
+                        print(
+                            "\n--- Edit Prescription / Lenses ---"
+                        )
+                        print("1. Lens Type / Prescription")
+                        print("2. Lens Features / Coating")
+                        print("3. Lens Brand")
+                        print("4. Lens Price")
+                        print("5. Lens Offer")
+                        print("6. Lens Less Amount")
+                        print("7. Back")
+
+                        lens_field_choice = input(
+                            "Select Prescription / Lens Edit Option "
+                            "(1/2/3/4/5/6/7): "
+                        ).strip()
+
+                        if lens_field_choice == "7":
+                            break
+
+                        if lens_field_choice not in [
+                            "1", "2", "3", "4", "5", "6"
+                        ]:
+                            print(
+                                "Please select "
+                                "1, 2, 3, 4, 5, 6 or 7."
+                            )
+                            continue
+                        if lens_field_choice == "1":
+                            print(
+                                "Current Lens Type: "
+                                f"{selected_item['lens_type']}"
+                            )
+
+                            print("\n--- Lens Type ---")
+                            print("1. Single Vision")
+                            print("2. Bifocal")
+
+                            while True:
+                                new_lens_type_choice = input(
+                                    "Select Lens Type (1/2): "
+                                ).strip()
+
+                                if new_lens_type_choice in ["1", "2"]:
+                                    break
+
+                                print("Please select 1 or 2.")
+
+                            if new_lens_type_choice == "1":
+                                new_lens_type = "Single Vision"
+                                new_add_requirement = ""
+
+                            else:
+                                print("\n--- Bifocal Type ---")
+                                print("1. Kryptok")
+                                print("2. D Bifocal")
+                                print("3. Progressive Bifocal")
+                                print("4. Other")
+
+                                while True:
+                                    new_bifocal_choice = input(
+                                        "Select Bifocal Type "
+                                        "(1/2/3/4): "
+                                    ).strip()
+
+                                    if new_bifocal_choice == "1":
+                                        new_lens_type = "Kryptok"
+                                        break
+
+                                    if new_bifocal_choice == "2":
+                                        new_lens_type = "D Bifocal"
+                                        break
+
+                                    if new_bifocal_choice == "3":
+                                        new_lens_type = (
+                                            "Progressive Bifocal"
+                                        )
+                                        break
+
+                                    if new_bifocal_choice == "4":
+                                        new_lens_type = input(
+                                            "Enter Bifocal Type: "
+                                        ).strip()
+
+                                        if new_lens_type:
+                                            break
+
+                                        print(
+                                            "Bifocal Type cannot "
+                                            "be blank."
+                                        )
+                                        continue
+
+                                    print(
+                                        "Please select "
+                                        "1, 2, 3 or 4."
+                                    )
+
+                                print("\n--- ADD Requirement ---")
+                                print("1. Both Eyes")
+                                print("2. Right Eye Only")
+                                print("3. Left Eye Only")
+
+                                while True:
+                                    new_add_requirement = input(
+                                        "Select ADD Requirement "
+                                        "(1/2/3): "
+                                    ).strip()
+
+                                    if new_add_requirement in [
+                                        "1", "2", "3"
+                                    ]:
+                                        break
+
+                                    print(
+                                        "Please select 1, 2 or 3."
+                                    )
+
+                            edited_prescription = (
+                                edit_item_prescription_keep_current(
+                                    selected_item,
+                                    new_lens_type_choice,
+                                    new_add_requirement,
+                                )
+                            )
+
+                            selected_item.update(
+                                edited_prescription
+                            )
+
+                            selected_item[
+                                "lens_type"
+                            ] = new_lens_type
+
+                            selected_item[
+                                "add_requirement"
+                            ] = new_add_requirement
+
+                            if selected_item_index == 0:
+                                lens_type = new_lens_type
+                                add_requirement = (
+                                    new_add_requirement
+                                )
+
+                                right_sph = selected_item[
+                                    "right_sph"
+                                ]
+                                right_cyl = selected_item[
+                                    "right_cyl"
+                                ]
+                                right_axis = selected_item[
+                                    "right_axis"
+                                ]
+                                right_add = selected_item[
+                                    "right_add"
+                                ]
+
+                                left_sph = selected_item[
+                                    "left_sph"
+                                ]
+                                left_cyl = selected_item[
+                                    "left_cyl"
+                                ]
+                                left_axis = selected_item[
+                                    "left_axis"
+                                ]
+                                left_add = selected_item[
+                                    "left_add"
+                                ]
+
+                                distance_pd = selected_item[
+                                    "distance_pd"
+                                ]
+                                near_pd = selected_item[
+                                    "near_pd"
+                                ]
+
+                            if selected_item_index != 0:
+                                selected_item[
+                                    "prescription_mode"
+                                ] = "different"
+
+                            print(
+                                "Lens Type / Prescription updated "
+                                "successfully."
+                            )
+                            continue
+                        if lens_field_choice == "2":
+                            print(
+                                "Current Lens Features / Coating: "
+                                f"{selected_item['lens_features'] or 'Not Provided'}"
+                            )
+
+                            new_lens_features = input(
+                                "Enter New Lens Features / Coating "
+                                "(Optional - press Enter for none): "
+                            ).strip()
+
+                            selected_item[
+                                "lens_features"
+                            ] = new_lens_features
+
+                            if selected_item_index == 0:
+                                lens_features = new_lens_features
+
+                            print(
+                                "Lens Features / Coating updated "
+                                "successfully."
+                            )
+                            continue
+                        if lens_field_choice == "3":
+                            print(
+                                "Current Lens Brand: "
+                                f"{selected_item['lens_brand'] or 'Not Provided'}"
+                            )
+
+                            new_lens_brand = input(
+                                "Enter New Lens Brand "
+                                "(Optional - press Enter for none): "
+                            ).strip()
+
+                            selected_item[
+                                "lens_brand"
+                            ] = new_lens_brand
+
+                            if selected_item_index == 0:
+                                lens_brand = new_lens_brand
+
+                            print(
+                                "Lens Brand updated "
+                                "successfully."
+                            )
+                            continue
+                        if lens_field_choice == "5":
+                            print(
+                                "Current Lens Offer: "
+                                f"{selected_item['lens_offer'] or 'No Offer'}"
+                            )
+
+                            new_lens_offer_input = input(
+                                "Enter New Lens Offer "
+                                "(Optional - press Enter for none): "
+                            ).strip()
+
+                            new_lens_offer = normalize_offer(
+                                new_lens_offer_input
+                            )
+
+                            current_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            proposed_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    new_lens_offer,
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            new_order_total = (
+                                order_total
+                                - current_item_total
+                                + proposed_item_total
+                            )
+
+                            if less_amount > new_order_total:
+                                print(
+                                    "Lens Offer cannot be changed "
+                                    "to this amount because the "
+                                    "current Less Amount would be "
+                                    "greater than Order Total."
+                                )
+                                continue
+
+                            new_total_amount = (
+                                new_order_total - less_amount
+                            )
+
+                            if advance_amount > new_total_amount:
+                                print(
+                                    "Lens Offer cannot be changed "
+                                    "to this amount because the "
+                                    "current Advance Amount would be "
+                                    "greater than Final Total Amount."
+                                )
+                                continue
+
+                            selected_item[
+                                "lens_offer"
+                            ] = new_lens_offer
+
+                            if selected_item_index == 0:
+                                lens_offer = new_lens_offer
+
+                            order_total = new_order_total
+                            total_amount = new_total_amount
+                            balance = (
+                                total_amount - advance_amount
+                            )
+
+                            print(
+                                "Lens Offer updated "
+                                "successfully."
+                            )
+                            print(
+                                f"New Order Total: "
+                                f"₹{order_total:.2f}"
+                            )
+                            print(
+                                f"New Final Amount: "
+                                f"₹{total_amount:.2f}"
+                            )
+                            print(
+                                f"New Balance: "
+                                f"₹{balance:.2f}"
+                            )
+                            continue
+                        if lens_field_choice == "4":
+                            print(
+                                "Current Lens Price: "
+                                f"₹{selected_item['lens_price']:.2f}"
+                            )
+
+                            while True:
+                                new_lens_price_input = input(
+                                    "Enter New Lens Price: "
+                                ).strip()
+
+                                try:
+                                    new_lens_price = float(
+                                        new_lens_price_input
+                                    )
+                                except ValueError:
+                                    print(
+                                        "Please enter a valid "
+                                        "Lens Price."
+                                    )
+                                    continue
+
+                                if new_lens_price < 0:
+                                    print(
+                                        "Lens Price cannot be "
+                                        "negative."
+                                    )
+                                    continue
+
+                                break
+
+                            current_lens_offer = selected_item.get(
+                                "lens_offer", ""
+                            )
+                            print(
+                                "Current Lens Offer: "
+                                f"{current_lens_offer or 'None'}"
+                            )
+                            new_lens_offer_input = input(
+                                "Enter New Lens Offer "
+                                "(Press Enter to keep current): "
+                            ).strip()
+
+                            if new_lens_offer_input == "":
+                                new_lens_offer = current_lens_offer
+                            else:
+                                new_lens_offer = normalize_offer(
+                                    new_lens_offer_input
+                                )
+
+                            current_lens_less = selected_item.get(
+                                "lens_less_amount", 0.0
+                            )
+                            print(
+                                "Current Lens Less Amount: "
+                                f"₹{current_lens_less:.2f}"
+                            )
+
+                            while True:
+                                new_lens_less_input = input(
+                                    "Enter New Lens Less Amount "
+                                    "(Press Enter to keep current): "
+                                ).strip()
+
+                                if new_lens_less_input == "":
+                                    new_lens_less_amount = (
+                                        current_lens_less
+                                    )
+                                    break
+
+                                try:
+                                    new_lens_less_amount = float(
+                                        new_lens_less_input
+                                    )
+                                except ValueError:
+                                    print(
+                                        "Please enter a valid "
+                                        "Lens Less Amount."
+                                    )
+                                    continue
+
+                                if new_lens_less_amount < 0:
+                                    print(
+                                        "Lens Less Amount cannot "
+                                        "be negative."
+                                    )
+                                    continue
+
+                                break
+
+                            current_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            proposed_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    new_lens_price,
+                                    new_lens_offer,
+                                    new_lens_less_amount
+                                )
+                            )
+
+                            new_order_total = (
+                                order_total
+                                - current_item_total
+                                + proposed_item_total
+                            )
+
+                            if less_amount > new_order_total:
+                                print(
+                                    "Lens Pricing cannot be changed "
+                                    "because the current Overall Bill "
+                                    "Discount would be greater than "
+                                    "Order Total."
+                                )
+                                continue
+
+                            new_total_amount = (
+                                new_order_total - less_amount
+                            )
+
+                            if advance_amount > new_total_amount:
+                                print(
+                                    "Lens Pricing cannot be changed "
+                                    "because the current Advance Amount "
+                                    "would be greater than Final Total."
+                                )
+                                continue
+
+                            selected_item[
+                                "lens_price"
+                            ] = new_lens_price
+                            selected_item[
+                                "lens_offer"
+                            ] = new_lens_offer
+                            selected_item[
+                                "lens_less_amount"
+                            ] = new_lens_less_amount
+
+                            if selected_item_index == 0:
+                                lens_price = new_lens_price
+                                lens_offer = new_lens_offer
+                                lens_less_amount = (
+                                    new_lens_less_amount
+                                )
+
+                            order_total = new_order_total
+                            total_amount = new_total_amount
+                            balance = (
+                                total_amount - advance_amount
+                            )
+
+                            new_lens_amount = (
+                                calculate_item_amount(
+                                    new_lens_price,
+                                    new_lens_offer,
+                                    new_lens_less_amount
+                                )
+                            )
+
+                            print(
+                                "Lens Pricing updated successfully."
+                            )
+                            print(
+                                f"New Lens Amount: "
+                                f"₹{new_lens_amount:.2f}"
+                            )
+                            print(
+                                f"New Order Total: "
+                                f"₹{order_total:.2f}"
+                            )
+                            print(
+                                f"New Final Amount: "
+                                f"₹{total_amount:.2f}"
+                            )
+                            print(
+                                f"New Balance: "
+                                f"₹{balance:.2f}"
+                            )
+                            continue
+                        if lens_field_choice == "6":
+                            print(
+                                "Current Lens Less Amount: "
+                                f"₹{selected_item.get(
+                                    'lens_less_amount', 0.0
+                                ):.2f}"
+                            )
+
+                            try:
+                                new_lens_less_amount = float(
+                                    input(
+                                        "Enter New Lens Less Amount "
+                                        "(Optional - enter 0 for none): "
+                                    ).strip() or "0"
+                                )
+                            except ValueError:
+                                print(
+                                    "Please enter a valid "
+                                    "Lens Less Amount."
+                                )
+                                continue
+
+                            if new_lens_less_amount < 0:
+                                print(
+                                    "Lens Less Amount cannot "
+                                    "be negative."
+                                )
+                                continue
+
+                            current_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            proposed_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    new_lens_less_amount
+                                )
+                            )
+
+                            new_order_total = (
+                                order_total
+                                - current_item_total
+                                + proposed_item_total
+                            )
+
+                            if less_amount > new_order_total:
+                                print(
+                                    "Lens Less Amount cannot be "
+                                    "changed to this amount because "
+                                    "the current overall Less Amount "
+                                    "would be greater than Order Total."
+                                )
+                                continue
+
+                            new_total_amount = (
+                                new_order_total - less_amount
+                            )
+
+                            if advance_amount > new_total_amount:
+                                print(
+                                    "Lens Less Amount cannot be "
+                                    "changed to this amount because "
+                                    "the current Advance Amount would "
+                                    "be greater than Final Total Amount."
+                                )
+                                continue
+
+                            selected_item[
+                                "lens_less_amount"
+                            ] = new_lens_less_amount
+
+                            if selected_item_index == 0:
+                                lens_less_amount = (
+                                    new_lens_less_amount
+                                )
+
+                            order_total = new_order_total
+                            total_amount = new_total_amount
+                            balance = (
+                                total_amount - advance_amount
+                            )
+
+                            print(
+                                "Lens Less Amount updated "
+                                "successfully."
+                            )
+                            print(
+                                f"New Order Total: "
+                                f"₹{order_total:.2f}"
+                            )
+                            print(
+                                f"New Final Amount: "
+                                f"₹{total_amount:.2f}"
+                            )
+                            print(
+                                f"New Balance: "
+                                f"₹{balance:.2f}"
+                            )
+                            continue
             continue
 
-        # ==================================================
         # 4. PAYMENT DETAILS
         # ==================================================
         if review_choice == "4":
@@ -9848,7 +13515,7 @@ if customer_type in ["1", "2"] and order_type == "2":
 
                 print("\n--- Edit Payment Details ---")
                 print(f"Order Total    : ₹{order_total:.2f}")
-                print(f"Less Amount    : ₹{less_amount:.2f}")
+                print(f"Overall Bill Discount : ₹{less_amount:.2f}")
                 print(f"Final Total    : ₹{total_amount:.2f}")
                 print(f"Advance Amount : ₹{advance_amount:.2f}")
                 print(f"Balance        : ₹{balance:.2f}")
@@ -9869,7 +13536,7 @@ if customer_type in ["1", "2"] and order_type == "2":
                     while True:
 
                         new_less_input = input(
-                            "Enter Less Amount "
+                            "Enter Overall Bill Discount "
                             "(Optional - press Enter for 0): "
                         ).strip()
 
@@ -9882,7 +13549,7 @@ if customer_type in ["1", "2"] and order_type == "2":
                                 )
                             except ValueError:
                                 print(
-                                    "Please enter Less Amount "
+                                    "Please enter Overall Bill Discount "
                                     "using numbers only."
                                 )
                                 continue
@@ -10124,10 +13791,21 @@ if customer_type in ["1", "2"] and order_type == "3":
     while True:
 
         # Always recalculate payment values
-        order_total = frame_price + lens_price
+        order_total = sum(
+            calculate_item_amount(
+                item["frame_price"],
+                item.get("frame_offer", ""),
+                item.get("frame_less_amount", 0.0)
+            )
+            + calculate_item_amount(
+                item["lens_price"],
+                item.get("lens_offer", ""),
+                item.get("lens_less_amount", 0.0)
+            )
+            for item in order_items
+        )
         total_amount = order_total - less_amount
         balance = total_amount - advance_amount
-
         print("\n")
         print("==================================================")
         print("              FINAL REVIEW BEFORE SAVE")
@@ -10157,27 +13835,6 @@ if customer_type in ["1", "2"] and order_type == "3":
             f"{full_address if full_address else 'Not Provided'}"
         )
 
-        print("\n2. Frame Details")
-        print(
-            f"   Frame Details : "
-            f"{frame_details if frame_details else 'Not Provided'}"
-        )
-        print(
-            f"   Category      : "
-            f"{'Brand' if frame_category == '1' else 'Non-Brand'}"
-        )
-
-        if frame_category == "1":
-            print(
-                f"   Frame Brand   : "
-                f"{frame_brand if frame_brand else 'Not Provided'}"
-            )
-
-        print(
-            f"   Frame Offer   : "
-            f"{frame_offer if frame_offer else 'None'}"
-        )
-        print(f"   Frame Price   : ₹{frame_price:.2f}")
 
         print("\n3. Prescription & Eye Details")
         print(f"   Source       : {prescription_source}")
@@ -10224,38 +13881,112 @@ if customer_type in ["1", "2"] and order_type == "3":
             f"ADD {left_add if left_add else 'Not Required'}"
         )
 
-        print("\n4. Lens Details")
-        print(f"   Lens Type    : {lens_type}")
+        print("\n4. Order Items Summary")
 
-        if lens_type != "Single Vision":
-            if add_requirement == "1":
-                add_display = "Both Eyes"
-            elif add_requirement == "2":
-                add_display = "Right Eye (OD) Only"
-            elif add_requirement == "3":
-                add_display = "Left Eye (OS) Only"
+        for item_number, item in enumerate(
+            order_items, start=1
+        ):
+            item_type = item["order_type"]
+
+            if item_type == "1":
+                item_type_name = "Frame Only"
+            elif item_type == "2":
+                item_type_name = "Lenses Only"
             else:
-                add_display = "Not Recorded"
+                item_type_name = "Frame + Lenses"
 
-            print(f"   ADD Required : {add_display}")
+            print(
+                f"\n   Item {item_number} - "
+                f"{item_type_name}"
+            )
 
-        print(
-            f"   Features     : "
-            f"{lens_features if lens_features else 'Not Provided'}"
-        )
-        print(
-            f"   Brand        : "
-            f"{lens_brand if lens_brand else 'Not Provided'}"
-        )
-        print(
-            f"   Offer        : "
-            f"{lens_offer if lens_offer else 'Not Provided'}"
-        )
-        print(f"   Lens Price   : ₹{lens_price:.2f}")
-
+            if item_type in ["1", "3"]:
+                print(
+                    f"   Frame Details : "
+                    f"{item['frame_details'] or 'Not Provided'}"
+                )
+                if item["frame_category"] == "1":
+                    print(
+                        f"   Frame Brand   : "
+                        f"{item['frame_brand'] or 'Not Provided'}"
+                    )
+                print(
+                    f"   Frame Price   : "
+                    f"₹{item['frame_price']:.2f}"
+                )
+                if item["frame_offer"]:
+                    print(
+                        f"   Frame Offer   : "
+                        f"{item['frame_offer']}"
+                    )
+                if item.get("frame_less_amount", 0.0) > 0:
+                    print(
+                        f"   Frame Less    : "
+                        f"₹{item.get('frame_less_amount', 0.0):.2f}"
+                    )
+                frame_final_amount = calculate_item_amount(
+                    item["frame_price"],
+                    item.get("frame_offer", ""),
+                    item.get("frame_less_amount", 0.0)
+                )
+                print(
+                    f"   Frame Amount  : "
+                    f"₹{frame_final_amount:.2f}"
+                )
+            if item_type in ["2", "3"]:
+                print(
+                    f"   Lens Type     : "
+                    f"{item['lens_type'] or 'Not Provided'}"
+                )
+                print(
+                    f"   Lens Features : "
+                    f"{item['lens_features'] or 'Not Provided'}"
+                )
+                print(
+                    f"   Lens Brand    : "
+                    f"{item['lens_brand'] or 'Not Provided'}"
+                )
+                print(
+                    f"   Lens Price    : "
+                    f"₹{item['lens_price']:.2f}"
+                )
+                if item["lens_offer"]:
+                    print(
+                        f"   Lens Offer    : "
+                        f"{item['lens_offer']}"
+                    )
+                if item.get("lens_less_amount", 0.0) > 0:
+                    print(
+                        f"   Lens Less     : "
+                        f"₹{item.get('lens_less_amount', 0.0):.2f}"
+                    )
+                lens_final_amount = calculate_item_amount(
+                    item["lens_price"],
+                    item.get("lens_offer", ""),
+                    item.get("lens_less_amount", 0.0)
+                )
+                print(
+                    f"   Lens Amount   : "
+                    f"₹{lens_final_amount:.2f}"
+                )
+            item_total = (
+                calculate_item_amount(
+                    item["frame_price"],
+                    item.get("frame_offer", ""),
+                    item.get("frame_less_amount", 0.0)
+                )
+                + calculate_item_amount(
+                    item["lens_price"],
+                    item.get("lens_offer", ""),
+                    item.get("lens_less_amount", 0.0)
+                )
+            )
+            print(
+                f"   Item Total    : ₹{item_total:.2f}"
+            )
         print("\n5. Payment Details")
         print(f"   Order Total  : ₹{order_total:.2f}")
-        print(f"   Less Amount  : ₹{less_amount:.2f}")
+        print(f"   Overall Bill Discount : ₹{less_amount:.2f}")
         print(f"   Final Total  : ₹{total_amount:.2f}")
         print(f"   Advance      : ₹{advance_amount:.2f}")
         print(f"   Balance      : ₹{balance:.2f}")
@@ -10275,21 +14006,81 @@ if customer_type in ["1", "2"] and order_type == "3":
         print("\n--------------------------------------------------")
         print("--- Review / Edit Options ---")
         print("1. Customer Details")
-        print("2. Frame Details")
+        print("2. Order Items")
         print("3. Prescription & Eye Details")
-        print("4. Lens Details")
-        print("5. Payment Details")
-        print("6. Delivery Details")
-        print("7. Confirm & Save")
-        print("8. Cancel / Exit Without Saving")
+        print("4. Payment Details")
+        print("5. Delivery Details")
+        print("6. Confirm & Save")
+        print("7. Cancel / Exit Without Saving")
         print("--------------------------------------------------")
 
         review_choice = input(
             "Select Review / Edit Option "
-            "(1/2/3/4/5/6/7/8): "
+            "(1/2/3/4/5/6/7): "
         ).strip()
 
-        if review_choice == "7":
+        if review_choice == "6":
+            add_missing = False
+
+            for item_number, item in enumerate(
+                order_items,
+                start=1,
+            ):
+                if item["order_type"] not in ["2", "3"]:
+                    continue
+
+                item_lens_type = item.get(
+                    "lens_type",
+                    "",
+                )
+
+                if item_lens_type == "Single Vision":
+                    continue
+
+                item_add_requirement = item.get(
+                    "add_requirement",
+                    "",
+                )
+
+                item_right_add = item.get(
+                    "right_add",
+                    "",
+                )
+
+                item_left_add = item.get(
+                    "left_add",
+                    "",
+                )
+
+                if (
+                    item_add_requirement in ["1", "2"]
+                    and item_right_add in ["", "0"]
+                ):
+                    print(
+                        f"\nItem {item_number}: "
+                        "Right Eye (OD) ADD is required "
+                        "for this Bifocal order."
+                    )
+                    add_missing = True
+
+                if (
+                    item_add_requirement in ["1", "3"]
+                    and item_left_add in ["", "0"]
+                ):
+                    print(
+                        f"\nItem {item_number}: "
+                        "Left Eye (OS) ADD is required "
+                        "for this Bifocal order."
+                    )
+                    add_missing = True
+
+            if add_missing:
+                print(
+                    "Please edit Order Items -> "
+                    "Prescription / Lenses and enter "
+                    "the required ADD power."
+                )
+                continue            
             add_missing = False
 
             if lens_type_choice == "2":
@@ -10325,7 +14116,7 @@ if customer_type in ["1", "2"] and order_type == "3":
                 "Saving customer/order record..."
             )
             break
-        if review_choice == "8":
+        if review_choice == "7":
             print(
                 "\nOrder cancelled. "
                 "No customer/order data was saved."
@@ -10544,154 +14335,529 @@ if customer_type in ["1", "2"] and order_type == "3":
         if review_choice == "2":
             while True:
 
-                print("\n--- Edit Frame Details ---")
-                print("1. Frame Details")
-                print("2. Frame Category")
+                print("\n--- Edit Order Items ---")
 
-                if frame_category == "1":
-                    print("3. Frame Brand")
-                    print("4. Frame Offer")
-                    print("5. Frame Price")
-                    print("6. Back")
-                else:
-                    print("3. Frame Offer")
-                    print("4. Frame Price")
-                    print("5. Back")
+                for item_number, item in enumerate(
+                    order_items, start=1
+                ):
+                    item_type = item["order_type"]
 
-                frame_edit_choice = input(
-                    "Select Field / Back: "
+                    if item_type == "1":
+                        item_type_name = "Frame Only"
+                    elif item_type == "2":
+                        item_type_name = "Lenses Only"
+                    else:
+                        item_type_name = "Frame + Lenses"
+
+                    item_total = (
+                        calculate_item_amount(
+                            item["frame_price"],
+                            item.get("frame_offer", ""),
+                            item.get("frame_less_amount", 0.0)
+                        )
+                        + calculate_item_amount(
+                            item["lens_price"],
+                            item.get("lens_offer", ""),
+                            item.get("lens_less_amount", 0.0)
+                        )
+                    )
+                    print(
+                        f"{item_number}. "
+                        f"{item_type_name} - "
+                        f"₹{item_total:.2f}"
+                    )
+
+                print(
+                    f"{len(order_items) + 1}. Back"
+                )
+
+                item_edit_input = input(
+                    "Select Order Item / Back: "
                 ).strip()
 
-                if (
-                    frame_category == "1"
-                    and frame_edit_choice == "6"
-                ):
-                    break
-
-                if (
-                    frame_category == "2"
-                    and frame_edit_choice == "5"
-                ):
-                    break
-
-                if frame_edit_choice == "1":
-
-                    frame_details = input(
-                        "Enter Frame Details: "
-                    ).strip()
-
-                    print(
-                        "Frame Details updated successfully."
+                try:
+                    item_edit_choice = int(
+                        item_edit_input
                     )
-
+                except ValueError:
+                    print(
+                        "Please enter a valid item number."
+                    )
                     continue
 
-                if frame_edit_choice == "2":
+                if item_edit_choice == len(order_items) + 1:
+                    break
 
-                    print("\n--- Frame Category ---")
-                    print("1. Brand")
-                    print("2. Non-Brand")
+                if not (
+                    1 <= item_edit_choice <= len(order_items)
+                ):
+                    print(
+                        "Please select a valid order item."
+                    )
+                    continue
 
+                selected_item_index = (
+                    item_edit_choice - 1
+                )
+                selected_item = order_items[
+                    selected_item_index
+                ]
+
+                print(
+                    f"\nSelected Item: "
+                    f"{item_edit_choice}"
+                )
+
+                selected_item_type = selected_item[
+                    "order_type"
+                ]
+
+                print("\n--- Edit Selected Order Item ---")
+
+                if selected_item_type == "1":
+                    print("1. Frame Details")
+                    print("2. Back")
+
+                elif selected_item_type == "2":
+                    print("1. Prescription / Lenses")
+                    print("2. Back")
+
+                else:
+                    print("1. Frame Details")
+                    print("2. Prescription / Lenses")
+                    print("3. Back")
+                selected_edit_choice = input(
+                    "Select Edit Option: "
+                ).strip()
+
+                if selected_item_type in ["1", "2"]:
+                    if selected_edit_choice == "2":
+                        continue
+
+                    if selected_edit_choice != "1":
+                        print(
+                            "Please select 1 or 2."
+                        )
+                        continue
+
+                else:
+                    if selected_edit_choice == "3":
+                        continue
+
+                    if selected_edit_choice not in ["1", "2"]:
+                        print(
+                            "Please select 1, 2 or 3."
+                        )
+                        continue
+                frame_edit_selected = (
+                    selected_item_type in ["1", "3"]
+                    and selected_edit_choice == "1"
+                )
+                lens_edit_selected = (
+                    (
+                        selected_item_type == "2"
+                        and selected_edit_choice == "1"
+                    )
+                    or (
+                        selected_item_type == "3"
+                        and selected_edit_choice == "2"
+                    )
+                )
+
+                if frame_edit_selected:
                     while True:
-
-                        new_frame_category = input(
-                            "Select Frame Category (1/2): "
+                        print("\n--- Edit Frame Details ---")
+                        print("1. Frame Details / Model")
+                        print("2. Frame Category")
+                        print("3. Frame Brand")
+                        print("4. Frame Price")
+                        print("5. Frame Offer")
+                        print("6. Frame Less Amount")
+                        print("7. Back")
+                        frame_field_choice = input(
+                            "Select Frame Edit Option "
+                            "(1/2/3/4/5/6/7): "
                         ).strip()
 
-                        if new_frame_category == "1":
-                            frame_category = "1"
-
-                            frame_brand = input(
-                                "Enter Frame Brand: "
-                            ).strip()
-
+                        if frame_field_choice == "7":
                             break
 
-                        if new_frame_category == "2":
-                            frame_category = "2"
-                            frame_brand = "Non-Brand"
-                            break
+                        if frame_field_choice not in [
+                            "1", "2", "3", "4", "5", "6"
+                        ]:
+                            print(
+                                "Please select "
+                                "1, 2, 3, 4, 5, 6 or 7."
+                            )
+                            continue
 
-                        print(
-                            "Please enter 1 or 2 only."
-                        )
-
-                    print(
-                        "Frame Category updated successfully."
-                    )
-
-                    continue
-
-                if (
-                    frame_category == "1"
-                    and frame_edit_choice == "3"
-                ):
-
-                    frame_brand = input(
-                        "Enter Frame Brand: "
-                    ).strip()
-
-                    print(
-                        "Frame Brand updated successfully."
-                    )
-
-                    continue
-
-                if (
-                    (
-                        frame_category == "1"
-                        and frame_edit_choice == "4"
-                    )
-                    or (
-                        frame_category == "2"
-                        and frame_edit_choice == "3"
-                    )
-                ):
-
-                    frame_offer = normalize_offer(
-                        input("Enter Frame Offer (Example: 10 or 10%): ")
-                    )
-                    print(
-                        "Frame Offer updated successfully."
-                    )
-
-                    continue
-
-                if (
-                    (
-                        frame_category == "1"
-                        and frame_edit_choice == "5"
-                    )
-                    or (
-                        frame_category == "2"
-                        and frame_edit_choice == "4"
-                    )
-                ):
-
-                    while True:
-
-                        try:
-                            new_frame_price = float(
-                                input(
-                                    "Enter Frame Price: "
-                                ).strip()
+                        if frame_field_choice == "1":
+                            print(
+                                "Current Frame Details: "
+                                f"{selected_item['frame_details'] or 'Not Provided'}"
                             )
 
-                            if new_frame_price < 0:
+                            new_frame_details = input(
+                                "Enter New Frame Details: "
+                            ).strip()
+
+                            if not new_frame_details:
                                 print(
-                                    "Frame Price cannot be negative."
+                                    "Frame Details "
+                                    "cannot be blank."
                                 )
                                 continue
 
+                            selected_item[
+                                "frame_details"
+                            ] = new_frame_details
+
+                            if selected_item_index == 0:
+                                frame_details = (
+                                    new_frame_details
+                                )
+
+                            print(
+                                "Frame Details updated "
+                                "successfully."
+                            )
+                            continue
+                        if frame_field_choice == "2":
+                            print(
+                                "Current Frame Category: "
+                                f"{'Brand' if selected_item['frame_category'] == '1' else 'Non-Brand'}"
+                            )
+
+                            print("\n--- New Frame Category ---")
+                            print("1. Brand")
+                            print("2. Non-Brand")
+
+                            new_frame_category = input(
+                                "Select Frame Category (1/2): "
+                            ).strip()
+
+                            if new_frame_category not in [
+                                "1", "2"
+                            ]:
+                                print(
+                                    "Please select 1 or 2."
+                                )
+                                continue
+
+                            selected_item[
+                                "frame_category"
+                            ] = new_frame_category
+
+                            if new_frame_category == "2":
+                                selected_item[
+                                    "frame_brand"
+                                ] = "Non-Brand"
+
+                            if selected_item_index == 0:
+                                frame_category = (
+                                    new_frame_category
+                                )
+
+                                if new_frame_category == "2":
+                                    frame_brand = "Non-Brand"
+
+                            print(
+                                "Frame Category updated "
+                                "successfully."
+                            )
+                            continue
+                        if frame_field_choice == "3":
+                            if (
+                                selected_item[
+                                    "frame_category"
+                                ] == "2"
+                            ):
+                                print(
+                                    "Frame Category is Non-Brand. "
+                                    "Frame Brand remains Non-Brand."
+                                )
+                                continue
+
+                            print(
+                                "Current Frame Brand: "
+                                f"{selected_item['frame_brand'] or 'Not Provided'}"
+                            )
+
+                            new_frame_brand = input(
+                                "Enter New Frame Brand: "
+                            ).strip()
+
+                            if not new_frame_brand:
+                                print(
+                                    "Frame Brand cannot be blank."
+                                )
+                                continue
+
+                            selected_item[
+                                "frame_brand"
+                            ] = new_frame_brand
+
+                            if selected_item_index == 0:
+                                frame_brand = new_frame_brand
+
+                            print(
+                                "Frame Brand updated "
+                                "successfully."
+                            )
+                            continue
+                        if frame_field_choice == "5":
+                            print(
+                                "Current Frame Offer: "
+                                f"{selected_item['frame_offer'] or 'None'}"
+                            )
+
+                            new_frame_offer = input(
+                                "Enter New Frame Offer "
+                                "(Optional - press Enter for none): "
+                            ).strip()
+
+                            new_frame_offer = normalize_offer(
+                                new_frame_offer
+                            )
+
+                            current_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            proposed_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    new_frame_offer,
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
                             new_order_total = (
-                                new_frame_price + lens_price
+                                order_total
+                                - current_item_total
+                                + proposed_item_total
                             )
 
                             if less_amount > new_order_total:
                                 print(
-                                    "Frame Price cannot be reduced "
-                                    "to this amount because the current "
-                                    "Less Amount would be greater than "
+                                    "Frame Offer cannot be changed "
+                                    "to this amount because the "
+                                    "current Less Amount would be "
+                                    "greater than Order Total."
+                                )
+                                continue
+
+                            new_total_amount = (
+                                new_order_total - less_amount
+                            )
+
+                            if advance_amount > new_total_amount:
+                                print(
+                                    "Frame Offer cannot be changed "
+                                    "to this amount because the "
+                                    "current Advance Amount would be "
+                                    "greater than Final Total Amount."
+                                )
+                                continue
+
+                            selected_item[
+                                "frame_offer"
+                            ] = new_frame_offer
+
+                            if selected_item_index == 0:
+                                frame_offer = new_frame_offer
+
+                            order_total = new_order_total
+                            total_amount = new_total_amount
+                            balance = (
+                                total_amount - advance_amount
+                            )
+
+                            print(
+                                "Frame Offer updated "
+                                "successfully."
+                            )
+                            print(
+                                f"New Order Total: "
+                                f"₹{order_total:.2f}"
+                            )
+                            print(
+                                f"New Final Amount: "
+                                f"₹{total_amount:.2f}"
+                            )
+                            print(
+                                f"New Balance: "
+                                f"₹{balance:.2f}"
+                            )
+                            continue
+                        if frame_field_choice == "4":
+                            print(
+                                "Current Frame Price: "
+                                f"₹{selected_item['frame_price']:.2f}"
+                            )
+
+                            while True:
+                                new_frame_price_input = input(
+                                    "Enter New Frame Price: "
+                                ).strip()
+
+                                try:
+                                    new_frame_price = float(
+                                        new_frame_price_input
+                                    )
+                                except ValueError:
+                                    print(
+                                        "Please enter a valid "
+                                        "Frame Price."
+                                    )
+                                    continue
+
+                                if new_frame_price < 0:
+                                    print(
+                                        "Frame Price cannot be "
+                                        "negative."
+                                    )
+                                    continue
+
+                                break
+
+                            current_frame_offer = selected_item.get(
+                                "frame_offer", ""
+                            )
+                            print(
+                                "Current Frame Offer: "
+                                f"{current_frame_offer or 'None'}"
+                            )
+
+                            new_frame_offer_input = input(
+                                "Enter New Frame Offer "
+                                "(Press Enter to keep current): "
+                            ).strip()
+
+                            if new_frame_offer_input == "":
+                                new_frame_offer = current_frame_offer
+                            else:
+                                new_frame_offer = normalize_offer(
+                                    new_frame_offer_input
+                                )
+
+                            current_frame_less = selected_item.get(
+                                "frame_less_amount", 0.0
+                            )
+                            print(
+                                "Current Frame Less Amount: "
+                                f"₹{current_frame_less:.2f}"
+                            )
+
+                            while True:
+                                new_frame_less_input = input(
+                                    "Enter New Frame Less Amount "
+                                    "(Press Enter to keep current): "
+                                ).strip()
+
+                                if new_frame_less_input == "":
+                                    new_frame_less_amount = (
+                                        current_frame_less
+                                    )
+                                    break
+
+                                try:
+                                    new_frame_less_amount = float(
+                                        new_frame_less_input
+                                    )
+                                except ValueError:
+                                    print(
+                                        "Please enter a valid "
+                                        "Frame Less Amount."
+                                    )
+                                    continue
+
+                                if new_frame_less_amount < 0:
+                                    print(
+                                        "Frame Less Amount cannot "
+                                        "be negative."
+                                    )
+                                    continue
+
+                                break
+
+                            current_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            proposed_item_total = (
+                                calculate_item_amount(
+                                    new_frame_price,
+                                    new_frame_offer,
+                                    new_frame_less_amount
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            new_order_total = (
+                                order_total
+                                - current_item_total
+                                + proposed_item_total
+                            )
+
+                            if less_amount > new_order_total:
+                                print(
+                                    "Frame Pricing cannot be changed "
+                                    "because the current Overall Bill "
+                                    "Discount would be greater than "
                                     "Order Total."
                                 )
                                 continue
@@ -10702,32 +14868,876 @@ if customer_type in ["1", "2"] and order_type == "3":
 
                             if advance_amount > new_total_amount:
                                 print(
-                                    "Frame Price cannot be reduced "
-                                    "to this amount because the current "
-                                    "Advance Amount would be greater than "
-                                    "Final Total Amount."
+                                    "Frame Pricing cannot be changed "
+                                    "because the current Advance Amount "
+                                    "would be greater than Final Total."
                                 )
                                 continue
 
-                            frame_price = new_frame_price
-                            break
+                            selected_item[
+                                "frame_price"
+                            ] = new_frame_price
+                            selected_item[
+                                "frame_offer"
+                            ] = new_frame_offer
+                            selected_item[
+                                "frame_less_amount"
+                            ] = new_frame_less_amount
 
-                        except ValueError:
-                            print(
-                                "Please enter Frame Price "
-                                "using numbers only."
+                            if selected_item_index == 0:
+                                frame_price = new_frame_price
+                                frame_offer = new_frame_offer
+                                frame_less_amount = (
+                                    new_frame_less_amount
+                                )
+
+                            order_total = new_order_total
+                            total_amount = new_total_amount
+                            balance = (
+                                total_amount - advance_amount
                             )
 
-                    print(
-                        "Frame Price updated successfully."
-                    )
+                            new_frame_amount = (
+                                calculate_item_amount(
+                                    new_frame_price,
+                                    new_frame_offer,
+                                    new_frame_less_amount
+                                )
+                            )
 
-                    continue
+                            print(
+                                "Frame Pricing updated successfully."
+                            )
+                            print(
+                                f"New Frame Amount: "
+                                f"₹{new_frame_amount:.2f}"
+                            )
+                            print(
+                                f"New Order Total: "
+                                f"₹{order_total:.2f}"
+                            )
+                            print(
+                                f"New Final Amount: "
+                                f"₹{total_amount:.2f}"
+                            )
+                            print(
+                                f"New Balance: "
+                                f"₹{balance:.2f}"
+                            )
+                            continue
+                        if frame_field_choice == "6":
+                            print(
+                                "Current Frame Less Amount: "
+                                f"₹{selected_item.get(
+                                    'frame_less_amount', 0.0
+                                ):.2f}"
+                            )
 
-                print(
-                    "Please select a valid Frame Details option."
-                )
+                            try:
+                                new_frame_less_amount = float(
+                                    input(
+                                        "Enter New Frame Less Amount "
+                                        "(Optional - enter 0 for none): "
+                                    ).strip() or "0"
+                                )
+                            except ValueError:
+                                print(
+                                    "Please enter a valid "
+                                    "Frame Less Amount."
+                                )
+                                continue
+
+                            if new_frame_less_amount < 0:
+                                print(
+                                    "Frame Less Amount cannot "
+                                    "be negative."
+                                )
+                                continue
+
+                            current_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            proposed_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    new_frame_less_amount
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            new_order_total = (
+                                order_total
+                                - current_item_total
+                                + proposed_item_total
+                            )
+
+                            if less_amount > new_order_total:
+                                print(
+                                    "Frame Less Amount cannot be "
+                                    "changed to this amount because "
+                                    "the current overall Less Amount "
+                                    "would be greater than Order Total."
+                                )
+                                continue
+
+                            new_total_amount = (
+                                new_order_total - less_amount
+                            )
+
+                            if advance_amount > new_total_amount:
+                                print(
+                                    "Frame Less Amount cannot be "
+                                    "changed to this amount because "
+                                    "the current Advance Amount would "
+                                    "be greater than Final Total Amount."
+                                )
+                                continue
+
+                            selected_item[
+                                "frame_less_amount"
+                            ] = new_frame_less_amount
+
+                            if selected_item_index == 0:
+                                frame_less_amount = (
+                                    new_frame_less_amount
+                                )
+
+                            order_total = new_order_total
+                            total_amount = new_total_amount
+                            balance = (
+                                total_amount - advance_amount
+                            )
+
+                            print(
+                                "Frame Less Amount updated "
+                                "successfully."
+                            )
+                            print(
+                                f"New Order Total: "
+                                f"₹{order_total:.2f}"
+                            )
+                            print(
+                                f"New Final Amount: "
+                                f"₹{total_amount:.2f}"
+                            )
+                            print(
+                                f"New Balance: "
+                                f"₹{balance:.2f}"
+                            )
+                            continue
+                if lens_edit_selected:
+                    while True:
+                        print(
+                            "\n--- Edit Prescription / Lenses ---"
+                        )
+                        print("1. Lens Type / Prescription")
+                        print("2. Lens Features / Coating")
+                        print("3. Lens Brand")
+                        print("4. Lens Price")
+                        print("5. Lens Offer")
+                        print("6. Lens Less Amount")
+                        print("7. Back")
+
+                        lens_field_choice = input(
+                            "Select Prescription / Lens Edit Option "
+                            "(1/2/3/4/5/6/7): "
+                        ).strip()
+
+                        if lens_field_choice == "7":
+                            break
+
+                        if lens_field_choice not in [
+                            "1", "2", "3", "4", "5", "6"
+                        ]:
+                            print(
+                                "Please select "
+                                "1, 2, 3, 4, 5, 6 or 7."
+                            )
+                            continue
+                        if lens_field_choice == "1":
+                            print(
+                                "Current Lens Type: "
+                                f"{selected_item['lens_type']}"
+                            )
+
+                            print("\n--- Lens Type ---")
+                            print("1. Single Vision")
+                            print("2. Bifocal")
+
+                            while True:
+                                new_lens_type_choice = input(
+                                    "Select Lens Type (1/2): "
+                                ).strip()
+
+                                if new_lens_type_choice in ["1", "2"]:
+                                    break
+
+                                print("Please select 1 or 2.")
+
+                            if new_lens_type_choice == "1":
+                                new_lens_type = "Single Vision"
+                                new_add_requirement = ""
+
+                            else:
+                                print("\n--- Bifocal Type ---")
+                                print("1. Kryptok")
+                                print("2. D Bifocal")
+                                print("3. Progressive Bifocal")
+                                print("4. Other")
+
+                                while True:
+                                    new_bifocal_choice = input(
+                                        "Select Bifocal Type "
+                                        "(1/2/3/4): "
+                                    ).strip()
+
+                                    if new_bifocal_choice == "1":
+                                        new_lens_type = "Kryptok"
+                                        break
+
+                                    if new_bifocal_choice == "2":
+                                        new_lens_type = "D Bifocal"
+                                        break
+
+                                    if new_bifocal_choice == "3":
+                                        new_lens_type = (
+                                            "Progressive Bifocal"
+                                        )
+                                        break
+
+                                    if new_bifocal_choice == "4":
+                                        new_lens_type = input(
+                                            "Enter Bifocal Type: "
+                                        ).strip()
+
+                                        if new_lens_type:
+                                            break
+
+                                        print(
+                                            "Bifocal Type cannot "
+                                            "be blank."
+                                        )
+                                        continue
+
+                                    print(
+                                        "Please select "
+                                        "1, 2, 3 or 4."
+                                    )
+
+                                print("\n--- ADD Requirement ---")
+                                print("1. Both Eyes")
+                                print("2. Right Eye Only")
+                                print("3. Left Eye Only")
+
+                                while True:
+                                    new_add_requirement = input(
+                                        "Select ADD Requirement "
+                                        "(1/2/3): "
+                                    ).strip()
+
+                                    if new_add_requirement in [
+                                        "1", "2", "3"
+                                    ]:
+                                        break
+
+                                    print(
+                                        "Please select 1, 2 or 3."
+                                    )
+
+                            edited_prescription = (
+                                edit_item_prescription_keep_current(
+                                    selected_item,
+                                    new_lens_type_choice,
+                                    new_add_requirement,
+                                )
+                            )
+
+                            selected_item.update(
+                                edited_prescription
+                            )
+
+                            selected_item[
+                                "lens_type"
+                            ] = new_lens_type
+
+                            selected_item[
+                                "add_requirement"
+                            ] = new_add_requirement
+
+                            if selected_item_index == 0:
+                                lens_type = new_lens_type
+                                add_requirement = (
+                                    new_add_requirement
+                                )
+
+                                right_sph = selected_item[
+                                    "right_sph"
+                                ]
+                                right_cyl = selected_item[
+                                    "right_cyl"
+                                ]
+                                right_axis = selected_item[
+                                    "right_axis"
+                                ]
+                                right_add = selected_item[
+                                    "right_add"
+                                ]
+
+                                left_sph = selected_item[
+                                    "left_sph"
+                                ]
+                                left_cyl = selected_item[
+                                    "left_cyl"
+                                ]
+                                left_axis = selected_item[
+                                    "left_axis"
+                                ]
+                                left_add = selected_item[
+                                    "left_add"
+                                ]
+
+                                distance_pd = selected_item[
+                                    "distance_pd"
+                                ]
+                                near_pd = selected_item[
+                                    "near_pd"
+                                ]
+
+                            if selected_item_index != 0:
+                                selected_item[
+                                    "prescription_mode"
+                                ] = "different"
+
+                            print(
+                                "Lens Type / Prescription updated "
+                                "successfully."
+                            )
+                            continue
+                        if lens_field_choice == "2":
+                            print(
+                                "Current Lens Features / Coating: "
+                                f"{selected_item['lens_features'] or 'Not Provided'}"
+                            )
+
+                            new_lens_features = input(
+                                "Enter New Lens Features / Coating "
+                                "(Optional - press Enter for none): "
+                            ).strip()
+
+                            selected_item[
+                                "lens_features"
+                            ] = new_lens_features
+
+                            if selected_item_index == 0:
+                                lens_features = new_lens_features
+
+                            print(
+                                "Lens Features / Coating updated "
+                                "successfully."
+                            )
+                            continue
+                        if lens_field_choice == "3":
+                            print(
+                                "Current Lens Brand: "
+                                f"{selected_item['lens_brand'] or 'Not Provided'}"
+                            )
+
+                            new_lens_brand = input(
+                                "Enter New Lens Brand "
+                                "(Optional - press Enter for none): "
+                            ).strip()
+
+                            selected_item[
+                                "lens_brand"
+                            ] = new_lens_brand
+
+                            if selected_item_index == 0:
+                                lens_brand = new_lens_brand
+
+                            print(
+                                "Lens Brand updated "
+                                "successfully."
+                            )
+                            continue
+                        if lens_field_choice == "5":
+                            print(
+                                "Current Lens Offer: "
+                                f"{selected_item['lens_offer'] or 'No Offer'}"
+                            )
+
+                            new_lens_offer_input = input(
+                                "Enter New Lens Offer "
+                                "(Optional - press Enter for none): "
+                            ).strip()
+
+                            new_lens_offer = normalize_offer(
+                                new_lens_offer_input
+                            )
+
+                            current_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            proposed_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    new_lens_offer,
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            new_order_total = (
+                                order_total
+                                - current_item_total
+                                + proposed_item_total
+                            )
+
+                            if less_amount > new_order_total:
+                                print(
+                                    "Lens Offer cannot be changed "
+                                    "to this amount because the "
+                                    "current Less Amount would be "
+                                    "greater than Order Total."
+                                )
+                                continue
+
+                            new_total_amount = (
+                                new_order_total - less_amount
+                            )
+
+                            if advance_amount > new_total_amount:
+                                print(
+                                    "Lens Offer cannot be changed "
+                                    "to this amount because the "
+                                    "current Advance Amount would be "
+                                    "greater than Final Total Amount."
+                                )
+                                continue
+
+                            selected_item[
+                                "lens_offer"
+                            ] = new_lens_offer
+
+                            if selected_item_index == 0:
+                                lens_offer = new_lens_offer
+
+                            order_total = new_order_total
+                            total_amount = new_total_amount
+                            balance = (
+                                total_amount - advance_amount
+                            )
+
+                            print(
+                                "Lens Offer updated "
+                                "successfully."
+                            )
+                            print(
+                                f"New Order Total: "
+                                f"₹{order_total:.2f}"
+                            )
+                            print(
+                                f"New Final Amount: "
+                                f"₹{total_amount:.2f}"
+                            )
+                            print(
+                                f"New Balance: "
+                                f"₹{balance:.2f}"
+                            )
+                            continue
+                        if lens_field_choice == "4":
+                            print(
+                                "Current Lens Price: "
+                                f"₹{selected_item['lens_price']:.2f}"
+                            )
+
+                            while True:
+                                new_lens_price_input = input(
+                                    "Enter New Lens Price: "
+                                ).strip()
+
+                                try:
+                                    new_lens_price = float(
+                                        new_lens_price_input
+                                    )
+                                except ValueError:
+                                    print(
+                                        "Please enter a valid "
+                                        "Lens Price."
+                                    )
+                                    continue
+
+                                if new_lens_price < 0:
+                                    print(
+                                        "Lens Price cannot be "
+                                        "negative."
+                                    )
+                                    continue
+
+                                break
+
+                            current_lens_offer = selected_item.get(
+                                "lens_offer", ""
+                            )
+                            print(
+                                "Current Lens Offer: "
+                                f"{current_lens_offer or 'None'}"
+                            )
+                            new_lens_offer_input = input(
+                                "Enter New Lens Offer "
+                                "(Press Enter to keep current): "
+                            ).strip()
+
+                            if new_lens_offer_input == "":
+                                new_lens_offer = current_lens_offer
+                            else:
+                                new_lens_offer = normalize_offer(
+                                    new_lens_offer_input
+                                )
+
+                            current_lens_less = selected_item.get(
+                                "lens_less_amount", 0.0
+                            )
+                            print(
+                                "Current Lens Less Amount: "
+                                f"₹{current_lens_less:.2f}"
+                            )
+
+                            while True:
+                                new_lens_less_input = input(
+                                    "Enter New Lens Less Amount "
+                                    "(Press Enter to keep current): "
+                                ).strip()
+
+                                if new_lens_less_input == "":
+                                    new_lens_less_amount = (
+                                        current_lens_less
+                                    )
+                                    break
+
+                                try:
+                                    new_lens_less_amount = float(
+                                        new_lens_less_input
+                                    )
+                                except ValueError:
+                                    print(
+                                        "Please enter a valid "
+                                        "Lens Less Amount."
+                                    )
+                                    continue
+
+                                if new_lens_less_amount < 0:
+                                    print(
+                                        "Lens Less Amount cannot "
+                                        "be negative."
+                                    )
+                                    continue
+
+                                break
+
+                            current_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            proposed_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    new_lens_price,
+                                    new_lens_offer,
+                                    new_lens_less_amount
+                                )
+                            )
+
+                            new_order_total = (
+                                order_total
+                                - current_item_total
+                                + proposed_item_total
+                            )
+
+                            if less_amount > new_order_total:
+                                print(
+                                    "Lens Pricing cannot be changed "
+                                    "because the current Overall Bill "
+                                    "Discount would be greater than "
+                                    "Order Total."
+                                )
+                                continue
+
+                            new_total_amount = (
+                                new_order_total - less_amount
+                            )
+
+                            if advance_amount > new_total_amount:
+                                print(
+                                    "Lens Pricing cannot be changed "
+                                    "because the current Advance Amount "
+                                    "would be greater than Final Total."
+                                )
+                                continue
+
+                            selected_item[
+                                "lens_price"
+                            ] = new_lens_price
+                            selected_item[
+                                "lens_offer"
+                            ] = new_lens_offer
+                            selected_item[
+                                "lens_less_amount"
+                            ] = new_lens_less_amount
+
+                            if selected_item_index == 0:
+                                lens_price = new_lens_price
+                                lens_offer = new_lens_offer
+                                lens_less_amount = (
+                                    new_lens_less_amount
+                                )
+
+                            order_total = new_order_total
+                            total_amount = new_total_amount
+                            balance = (
+                                total_amount - advance_amount
+                            )
+
+                            new_lens_amount = (
+                                calculate_item_amount(
+                                    new_lens_price,
+                                    new_lens_offer,
+                                    new_lens_less_amount
+                                )
+                            )
+
+                            print(
+                                "Lens Pricing updated successfully."
+                            )
+                            print(
+                                f"New Lens Amount: "
+                                f"₹{new_lens_amount:.2f}"
+                            )
+                            print(
+                                f"New Order Total: "
+                                f"₹{order_total:.2f}"
+                            )
+                            print(
+                                f"New Final Amount: "
+                                f"₹{total_amount:.2f}"
+                            )
+                            print(
+                                f"New Balance: "
+                                f"₹{balance:.2f}"
+                            )
+                            continue
+                        if lens_field_choice == "6":
+                            print(
+                                "Current Lens Less Amount: "
+                                f"₹{selected_item.get(
+                                    'lens_less_amount', 0.0
+                                ):.2f}"
+                            )
+
+                            try:
+                                new_lens_less_amount = float(
+                                    input(
+                                        "Enter New Lens Less Amount "
+                                        "(Optional - enter 0 for none): "
+                                    ).strip() or "0"
+                                )
+                            except ValueError:
+                                print(
+                                    "Please enter a valid "
+                                    "Lens Less Amount."
+                                )
+                                continue
+
+                            if new_lens_less_amount < 0:
+                                print(
+                                    "Lens Less Amount cannot "
+                                    "be negative."
+                                )
+                                continue
+
+                            current_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "lens_less_amount", 0.0
+                                    )
+                                )
+                            )
+
+                            proposed_item_total = (
+                                calculate_item_amount(
+                                    selected_item["frame_price"],
+                                    selected_item.get(
+                                        "frame_offer", ""
+                                    ),
+                                    selected_item.get(
+                                        "frame_less_amount", 0.0
+                                    )
+                                )
+                                + calculate_item_amount(
+                                    selected_item["lens_price"],
+                                    selected_item.get(
+                                        "lens_offer", ""
+                                    ),
+                                    new_lens_less_amount
+                                )
+                            )
+
+                            new_order_total = (
+                                order_total
+                                - current_item_total
+                                + proposed_item_total
+                            )
+
+                            if less_amount > new_order_total:
+                                print(
+                                    "Lens Less Amount cannot be "
+                                    "changed to this amount because "
+                                    "the current overall Less Amount "
+                                    "would be greater than Order Total."
+                                )
+                                continue
+
+                            new_total_amount = (
+                                new_order_total - less_amount
+                            )
+
+                            if advance_amount > new_total_amount:
+                                print(
+                                    "Lens Less Amount cannot be "
+                                    "changed to this amount because "
+                                    "the current Advance Amount would "
+                                    "be greater than Final Total Amount."
+                                )
+                                continue
+
+                            selected_item[
+                                "lens_less_amount"
+                            ] = new_lens_less_amount
+
+                            if selected_item_index == 0:
+                                lens_less_amount = (
+                                    new_lens_less_amount
+                                )
+
+                            order_total = new_order_total
+                            total_amount = new_total_amount
+                            balance = (
+                                total_amount - advance_amount
+                            )
+
+                            print(
+                                "Lens Less Amount updated "
+                                "successfully."
+                            )
+                            print(
+                                f"New Order Total: "
+                                f"₹{order_total:.2f}"
+                            )
+                            print(
+                                f"New Final Amount: "
+                                f"₹{total_amount:.2f}"
+                            )
+                            print(
+                                f"New Balance: "
+                                f"₹{balance:.2f}"
+                            )
+                            continue
             continue
+        
         if review_choice == "3":
 
             while True:
@@ -11036,12 +16046,16 @@ if customer_type in ["1", "2"] and order_type == "3":
                                         and parts[1] in [
                                             "00", "25", "50", "75"
                                         ]
-                                        and float(number_part) <= 5
+                                        and 0.75 <= float(number_part) <= 5
                                     ):
-                                        previous_right_add = (
+                                        if confirm_high_add(
                                             new_right_add
-                                        )
-                                        break
+                                        ):
+                                            previous_right_add = (
+                                                new_right_add
+                                            )
+                                            break
+                                        continue
 
                                 print(
                                     "Invalid ADD. Enter like "
@@ -11107,12 +16121,16 @@ if customer_type in ["1", "2"] and order_type == "3":
                                         and parts[1] in [
                                             "00", "25", "50", "75"
                                         ]
-                                        and float(number_part) <= 5
+                                        and 0.75 <= float(number_part) <= 5
                                     ):
-                                        previous_left_add = (
+                                        if confirm_high_add(
                                             new_left_add
-                                        )
-                                        break
+                                        ):
+                                            previous_left_add = (
+                                                new_left_add
+                                            )
+                                            break
+                                        continue
 
                                 print(
                                     "Invalid ADD. Enter like "
@@ -11516,10 +16534,14 @@ if customer_type in ["1", "2"] and order_type == "3":
                                         and len(parts[1]) == 2
                                         and parts[1]
                                         in ["00", "25", "50", "75"]
-                                        and float(number_part) <= 5
+                                        and 0.75 <= float(number_part) <= 5
                                     ):
-                                        right_add = new_right_add
-                                        break
+                                        if confirm_high_add(
+                                            new_right_add
+                                        ):
+                                            right_add = new_right_add
+                                            break
+                                        continue
 
                                 print(
                                     "Invalid ADD. Enter like "
@@ -11689,10 +16711,14 @@ if customer_type in ["1", "2"] and order_type == "3":
                                         and len(parts[1]) == 2
                                         and parts[1]
                                         in ["00", "25", "50", "75"]
-                                        and float(number_part) <= 5
+                                        and 0.75 <= float(number_part) <= 5
                                     ):
-                                        left_add = new_left_add
-                                        break
+                                        if confirm_high_add(
+                                            new_left_add
+                                        ):
+                                            left_add = new_left_add
+                                            break
+                                        continue
 
                                 print(
                                     "Invalid ADD. Enter like "
@@ -11743,11 +16769,7 @@ if customer_type in ["1", "2"] and order_type == "3":
                         ).strip()
 
                         if pd_vision_edit_choice == "1":
-                            distance_pd = input(
-                                "Enter Distance PD in mm "
-                                "(Example: 62, press Enter "
-                                "if not measured): "
-                            ).strip()
+                            distance_pd = get_valid_pd("Distance PD")
 
                             print(
                                 "Distance PD updated successfully."
@@ -11755,11 +16777,7 @@ if customer_type in ["1", "2"] and order_type == "3":
                             continue
 
                         if pd_vision_edit_choice == "2":
-                            near_pd = input(
-                                "Enter Near PD in mm "
-                                "(Example: 59, press Enter "
-                                "if not measured): "
-                            ).strip()
+                            near_pd = get_valid_pd("Near PD")
 
                             print(
                                 "Near PD updated successfully."
@@ -11767,11 +16785,9 @@ if customer_type in ["1", "2"] and order_type == "3":
                             continue
 
                         if pd_vision_edit_choice == "3":
-                            right_va = input(
-                                "Right Eye Visual Acuity "
-                                "(Example: 6/6, press Enter "
-                                "if not measured): "
-                            ).strip()
+                            right_va = get_valid_visual_acuity(
+                                "Right Eye Visual Acuity"
+                            )
 
                             print(
                                 "Right Eye Visual Acuity "
@@ -11780,11 +16796,9 @@ if customer_type in ["1", "2"] and order_type == "3":
                             continue
 
                         if pd_vision_edit_choice == "4":
-                            left_va = input(
-                                "Left Eye Visual Acuity "
-                                "(Example: 6/6, press Enter "
-                                "if not measured): "
-                            ).strip()
+                            left_va = get_valid_visual_acuity(
+                                "Left Eye Visual Acuity"
+                            )
 
                             print(
                                 "Left Eye Visual Acuity "
@@ -11793,11 +16807,9 @@ if customer_type in ["1", "2"] and order_type == "3":
                             continue
 
                         if pd_vision_edit_choice == "5":
-                            right_pinhole = input(
-                                "Right Eye Pinhole "
-                                "(Example: 6/6, press Enter "
-                                "if not measured): "
-                            ).strip()
+                            right_pinhole = get_valid_visual_acuity(
+                                "Right Eye Pinhole"
+                            )
 
                             print(
                                 "Right Eye Pinhole "
@@ -11806,11 +16818,9 @@ if customer_type in ["1", "2"] and order_type == "3":
                             continue
 
                         if pd_vision_edit_choice == "6":
-                            left_pinhole = input(
-                                "Left Eye Pinhole "
-                                "(Example: 6/6, press Enter "
-                                "if not measured): "
-                            ).strip()
+                            left_pinhole = get_valid_visual_acuity(
+                                "Left Eye Pinhole"
+                            )
 
                             print(
                                 "Left Eye Pinhole "
@@ -11836,401 +16846,9 @@ if customer_type in ["1", "2"] and order_type == "3":
 
             while True:
 
-                print("\n--- Edit Lens Details ---")
-                print("1. Lens Type")
-
-                if lens_type != "Single Vision":
-                    print("2. ADD Requirement")
-                else:
-                    print("2. ADD Requirement - Not Required")
-
-                print("3. Lens Features / Coating")
-                print("4. Lens Brand")
-                print("5. Lens Offer")
-                print("6. Lens Price")
-                print("7. Back")
-
-                lens_edit_choice = input(
-                    "Select Field (1-7): "
-                ).strip()
-
-                # ------------------------------------------
-                # 1. LENS TYPE
-                # ------------------------------------------
-                if lens_edit_choice == "1":
-
-                    print("\n--- Edit Lens Type ---")
-                    print("1. Single Vision")
-                    print("2. Bifocal")
-
-                    while True:
-
-                        new_lens_type_choice = input(
-                            "Select Lens Type (1/2): "
-                        ).strip()
-
-                        if new_lens_type_choice == "1":
-
-                            lens_type_choice = "1"
-                            lens_type = "Single Vision"
-                            add_requirement = ""
-
-                            right_add = ""
-                            left_add = ""
-
-                            break
-
-                        if new_lens_type_choice == "2":
-
-                            lens_type_choice = "2"
-
-                            print("\n--- Bifocal Type ---")
-                            print("1. Kryptok Bifocal")
-                            print("2. D Bifocal")
-                            print("3. Progressive Bifocal")
-                            print("4. Other")
-
-                            while True:
-
-                                new_bifocal_choice = input(
-                                    "Select Bifocal Type "
-                                    "(1/2/3/4): "
-                                ).strip()
-
-                                if new_bifocal_choice == "1":
-                                    lens_type = "Kryptok Bifocal"
-                                    break
-
-                                if new_bifocal_choice == "2":
-                                    lens_type = "D Bifocal"
-                                    break
-
-                                if new_bifocal_choice == "3":
-                                    lens_type = (
-                                        "Progressive Bifocal"
-                                    )
-                                    break
-
-                                if new_bifocal_choice == "4":
-                                    lens_type = "Other"
-                                    break
-
-                                print(
-                                    "Invalid option. Please select "
-                                    "1, 2, 3 or 4."
-                                )
-
-                            print("\n--- ADD Requirement ---")
-                            print("1. Both Eyes")
-                            print("2. Right Eye (OD) Only")
-                            print("3. Left Eye (OS) Only")
-
-                            while True:
-
-                                add_requirement = input(
-                                    "Select ADD Requirement "
-                                    "(1/2/3): "
-                                ).strip()
-
-                                if add_requirement in [
-                                    "1", "2", "3"
-                                ]:
-                                    break
-
-                                print(
-                                    "Invalid option. Please select "
-                                    "1, 2 or 3."
-                                )
-
-                            if add_requirement == "2":
-                                left_add = ""
-
-                            elif add_requirement == "3":
-                                right_add = ""
-
-                            break
-
-                        print(
-                            "Invalid option. Please select 1 or 2."
-                        )
-
-                    print(
-                        "Lens Type updated successfully."
-                    )
-                    continue
-
-                # ------------------------------------------
-                # 2. ADD REQUIREMENT
-                # ------------------------------------------
-                if lens_edit_choice == "2":
-
-                    if lens_type == "Single Vision":
-                        add_requirement = ""
-                        right_add = ""
-                        left_add = ""
-
-                        print(
-                            "ADD Requirement is Not Required "
-                            "for Single Vision."
-                        )
-                        continue
-
-                    print("\n--- Edit ADD Requirement ---")
-                    print("1. Both Eyes")
-                    print("2. Right Eye (OD) Only")
-                    print("3. Left Eye (OS) Only")
-
-                    while True:
-
-                        new_add_requirement = input(
-                            "Select ADD Requirement "
-                            "(1/2/3): "
-                        ).strip()
-
-                        if new_add_requirement in [
-                            "1", "2", "3"
-                        ]:
-                            add_requirement = (
-                                new_add_requirement
-                            )
-                            break
-
-                        print(
-                            "Invalid option. Please select "
-                            "1, 2 or 3."
-                        )
-
-                    if add_requirement == "2":
-                        left_add = ""
-
-                    elif add_requirement == "3":
-                        right_add = ""
-
-                    print(
-                        "ADD Requirement updated successfully."
-                    )
-                    continue
-
-                # ------------------------------------------
-                # 3. LENS FEATURES / COATING
-                # ------------------------------------------
-                if lens_edit_choice == "3":
-
-                    while True:
-
-                        new_lens_features = input(
-                            "Enter Lens Features / Coating "
-                            "(Optional): "
-                        ).strip().title()
-
-                        normalized_features = (
-                            new_lens_features.lower()
-                            .replace(".", " ")
-                            .replace("-", " ")
-                            .replace("/", " ")
-                            .replace(",", " ")
-                            .replace("_", " ")
-                        )
-
-                        feature_words = (
-                            normalized_features.split()
-                        )
-
-                        has_kt = (
-                            "kt" in feature_words
-                            or "kryptok" in feature_words
-                        )
-
-                        has_progressive = (
-                            "progressive" in feature_words
-                        )
-
-                        has_d_bifocal = (
-                            "d bifocal"
-                            in normalized_features
-                            or "dbifocal"
-                            in normalized_features
-                        )
-
-                        if lens_type == "Single Vision":
-
-                            if has_kt:
-                                print(
-                                    "KT / Kryptok is a Bifocal "
-                                    "type and cannot be used "
-                                    "with Single Vision."
-                                )
-                                continue
-
-                            if has_progressive:
-                                print(
-                                    "Progressive cannot be used "
-                                    "with Single Vision."
-                                )
-                                continue
-
-                            if has_d_bifocal:
-                                print(
-                                    "D Bifocal cannot be used "
-                                    "with Single Vision."
-                                )
-                                continue
-
-                        elif lens_type == "Kryptok Bifocal":
-
-                            if has_progressive:
-                                print(
-                                    "Progressive cannot be used "
-                                    "with Kryptok Bifocal."
-                                )
-                                continue
-
-                            if has_d_bifocal:
-                                print(
-                                    "D Bifocal cannot be used "
-                                    "with Kryptok Bifocal."
-                                )
-                                continue
-
-                        elif lens_type == "D Bifocal":
-
-                            if has_kt:
-                                print(
-                                    "KT / Kryptok cannot be used "
-                                    "with D Bifocal."
-                                )
-                                continue
-
-                            if has_progressive:
-                                print(
-                                    "Progressive cannot be used "
-                                    "with D Bifocal."
-                                )
-                                continue
-
-                        elif lens_type == "Progressive Bifocal":
-
-                            if has_kt:
-                                print(
-                                    "KT / Kryptok cannot be used "
-                                    "with Progressive Bifocal."
-                                )
-                                continue
-
-                            if has_d_bifocal:
-                                print(
-                                    "D Bifocal cannot be used "
-                                    "with Progressive Bifocal."
-                                )
-                                continue
-
-                        lens_features = new_lens_features
-                        break
-
-                    print(
-                        "Lens Features / Coating "
-                        "updated successfully."
-                    )
-                    continue
-
-                # ------------------------------------------
-                # 4. LENS BRAND
-                # ------------------------------------------
-                if lens_edit_choice == "4":
-
-                    lens_brand = input(
-                        "Enter Lens Brand (Optional): "
-                    ).strip().title()
-
-                    print(
-                        "Lens Brand updated successfully."
-                    )
-                    continue
-
-                # ------------------------------------------
-                # 5. LENS OFFER
-                # ------------------------------------------
-                if lens_edit_choice == "5":
-
-                    lens_offer = normalize_offer(
-                        input("Enter Lens Offer (Example: 10 or 10%): ")
-                    )
-                    print(
-                        "Lens Offer updated successfully."
-                    )
-                    continue
-
-                # ------------------------------------------
-                # 6. LENS PRICE
-                # ------------------------------------------
-                if lens_edit_choice == "6":
-
-                    while True:
-
-                        new_lens_price_input = input(
-                            "Enter Lens Price: "
-                        ).strip()
-
-                        try:
-                            new_lens_price = float(
-                                new_lens_price_input
-                            )
-
-                            if new_lens_price < 0:
-                                print(
-                                    "Lens Price cannot be negative."
-                                )
-                                continue
-
-                            lens_price = new_lens_price
-                            break
-
-                        except ValueError:
-                            print(
-                                "Please enter Lens Price "
-                                "using numbers only."
-                            )
-
-                    # Recalculate all dependent payment values
-                    order_total = frame_price + lens_price
-
-                    if less_amount > order_total:
-                        less_amount = order_total
-
-                    total_amount = (
-                        order_total - less_amount
-                    )
-
-                    if advance_amount > total_amount:
-                        advance_amount = total_amount
-
-                    balance = (
-                        total_amount - advance_amount
-                    )
-
-                    print(
-                        "Lens Price updated successfully."
-                    )
-                    continue
-
-                # ------------------------------------------
-                # 7. BACK
-                # ------------------------------------------
-                if lens_edit_choice == "7":
-                    break
-
-                print(
-                    "Please select a number from 1 to 7."
-                )
-
-            continue
-        if review_choice == "5":
-
-            while True:
-
                 print("\n--- Edit Payment Details ---")
                 print(f"Order Total    : ₹{order_total:.2f}")
-                print(f"Less Amount    : ₹{less_amount:.2f}")
+                print(f"Overall Bill Discount : ₹{less_amount:.2f}")
                 print(f"Final Total    : ₹{total_amount:.2f}")
                 print(f"Advance Amount : ₹{advance_amount:.2f}")
                 print(f"Balance        : ₹{balance:.2f}")
@@ -12251,7 +16869,7 @@ if customer_type in ["1", "2"] and order_type == "3":
                     while True:
 
                         new_less_input = input(
-                            "Enter Less Amount "
+                            "Enter Overall Bill Discount "
                             "(Optional - press Enter for 0): "
                         ).strip()
 
@@ -12264,7 +16882,8 @@ if customer_type in ["1", "2"] and order_type == "3":
                                 )
                             except ValueError:
                                 print(
-                                    "Please enter Less Amount "
+                                    "Please enter Overall Bill Discount "
+
                                     "using numbers only."
                                 )
                                 continue
@@ -12355,7 +16974,7 @@ if customer_type in ["1", "2"] and order_type == "3":
                 )
 
             continue
-        if review_choice == "6":
+        if review_choice == "5":
 
             while True:
 
@@ -12718,34 +17337,204 @@ else:
     )
 
 
-# ---------------- FRAME / LENS ----------------
+# ---------------- ORDER ITEMS ----------------
 
-print("\n--- Frame / Lens Details ---")
+print("\n--- Order Items Summary ---")
 
-if order_type in ["1", "3"]:
-    print("Frame Details:", frame_details)
+for item_number, item in enumerate(
+    order_items,
+    start=1
+):
+    item_order_type = item.get(
+        "order_type",
+        ""
+    )
 
-    if frame_brand:
-        print("Frame Brand:", frame_brand)
+    if item_order_type == "1":
+        item_type_text = "Frame Only"
+    elif item_order_type == "2":
+        item_type_text = "Lenses Only"
+    elif item_order_type == "3":
+        item_type_text = "Frame + Lenses"
+    else:
+        item_type_text = "Order Item"
 
-    if frame_offer:
-        print("Frame Offer:", frame_offer)
+    print(
+        f"\n--- Item {item_number} - "
+        f"{item_type_text} ---"
+    )
 
-    print("Frame Price:", frame_price)
+    person_name = str(
+        item.get("person_name", "")
+    ).strip()
 
-if order_type in ["2", "3"]:
-    print("Lens Type:", lens_type)
+    person_relationship = str(
+        item.get("person_relationship", "")
+    ).strip()
 
-    if lens_features:
-        print("Lens Features / Coating:", lens_features)
+    if person_name:
+        print("Person Name:", person_name)
 
-    if lens_brand:
-        print("Lens Brand:", lens_brand)
+    if person_relationship:
+        print(
+            "Relationship:",
+            person_relationship
+        )
 
-    if lens_offer:
-        print("Lens Offer:", lens_offer)
+    if item_order_type in ["1", "3"]:
+        item_frame_details = str(
+            item.get("frame_details", "")
+        ).strip()
 
-    print("Lens Price:", lens_price)
+        item_frame_brand = str(
+            item.get("frame_brand", "")
+        ).strip()
+
+        item_frame_offer = str(
+            item.get("frame_offer", "")
+        ).strip()
+
+        item_frame_price = float(
+            item.get("frame_price", 0) or 0
+        )
+
+        item_frame_less = float(
+            item.get("frame_less_amount", 0) or 0
+        )
+
+        print(
+            "Frame Details:",
+            item_frame_details
+            if item_frame_details
+            else "Not Recorded"
+        )
+
+        if (
+            item_frame_brand
+            and item_frame_brand.lower()
+            != "non-brand"
+        ):
+            print(
+                "Frame Brand:",
+                item_frame_brand
+            )
+
+        print(
+            f"Frame Price: ₹{item_frame_price:.2f}"
+        )
+
+        if item_frame_offer:
+            print(
+                "Frame Offer:",
+                item_frame_offer
+            )
+
+        if item_frame_less > 0:
+            print(
+                f"Frame Less: ₹{item_frame_less:.2f}"
+            )
+
+        item_frame_amount = calculate_item_amount(
+            item_frame_price,
+            item_frame_offer,
+            item_frame_less
+        )
+
+        print(
+            f"Frame Amount: ₹{item_frame_amount:.2f}"
+        )
+
+    if item_order_type in ["2", "3"]:
+        item_lens_type = str(
+            item.get("lens_type", "")
+        ).strip()
+
+        item_lens_features = str(
+            item.get("lens_features", "")
+        ).strip()
+
+        item_lens_brand = str(
+            item.get("lens_brand", "")
+        ).strip()
+
+        item_lens_offer = str(
+            item.get("lens_offer", "")
+        ).strip()
+
+        item_lens_price = float(
+            item.get("lens_price", 0) or 0
+        )
+
+        item_lens_less = float(
+            item.get("lens_less_amount", 0) or 0
+        )
+
+        print(
+            "Lens Type:",
+            item_lens_type
+            if item_lens_type
+            else "Not Recorded"
+        )
+
+        if item_lens_features:
+            print(
+                "Lens Features / Coating:",
+                item_lens_features
+            )
+
+        if (
+            item_lens_brand
+            and item_lens_brand.lower()
+            != "non-brand"
+        ):
+            print(
+                "Lens Brand:",
+                item_lens_brand
+            )
+
+        print(
+            f"Lens Price: ₹{item_lens_price:.2f}"
+        )
+
+        if item_lens_offer:
+            print(
+                "Lens Offer:",
+                item_lens_offer
+            )
+
+        if item_lens_less > 0:
+            print(
+                f"Lens Less: ₹{item_lens_less:.2f}"
+            )
+
+        item_lens_amount = calculate_item_amount(
+            item_lens_price,
+            item_lens_offer,
+            item_lens_less
+        )
+
+        print(
+            f"Lens Amount: ₹{item_lens_amount:.2f}"
+        )
+
+    item_amount = (
+        calculate_item_amount(
+            item["frame_price"],
+            item.get("frame_offer", ""),
+            item.get("frame_less_amount", 0.0)
+        )
+        + calculate_item_amount(
+            item["lens_price"],
+            item.get("lens_offer", ""),
+            item.get("lens_less_amount", 0.0)
+        )
+    )
+
+    print(
+        f"Item Total: ₹{item_amount:.2f}"
+    )
+
+
 # ---------------- CURRENT PRESCRIPTION ----------------
 
 if order_type in ["2", "3"]:
@@ -12825,7 +17614,11 @@ print(
     "Balance Amount:",
     balance
 )
+order_id = datetime.now().strftime(
+    "ORD-%Y%m%d-%H%M%S-%f"
+)
 csv_file_exists = os.path.exists(CUSTOMER_DATA_FILE)
+customer_record_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 # Save customer record to CSV
 with open(CUSTOMER_DATA_FILE, "a", newline="", encoding="utf-8") as file:
     writer = csv.writer(file)
@@ -12895,7 +17688,7 @@ with open(CUSTOMER_DATA_FILE, "a", newline="", encoding="utf-8") as file:
     ])
     writer.writerow([
 
-    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    customer_record_datetime,
     store_name,
     store_city,
     store_phone,
@@ -12957,6 +17750,121 @@ with open(CUSTOMER_DATA_FILE, "a", newline="", encoding="utf-8") as file:
     delivered_to,
     receiver_name
     ])
+    # Save flexible multi-order items to separate CSV
+order_items_file_exists = os.path.exists(
+    ORDER_ITEMS_DATA_FILE
+)
+
+with open(
+    ORDER_ITEMS_DATA_FILE,
+    "a",
+    newline="",
+    encoding="utf-8",
+) as order_items_file:
+    order_items_writer = csv.writer(
+        order_items_file
+    )
+
+    if not order_items_file_exists:
+        order_items_writer.writerow([
+            "Order ID",
+            "Date/Time",
+            "Store ID",
+            "Store Name",
+            "Store City",
+            "Main Customer Name",
+            "Main Customer Phone",
+            "Item Number",
+            "Person Type",
+            "Person Name",
+            "Person Relationship",
+            "Person Gender",
+            "Person Age",
+            "Order Type",
+            "Prescription Mode",
+            "ADD Requirement",
+            "Right SPH",
+            "Right CYL",
+            "Right AXIS",
+            "Right ADD",
+            "Left SPH",
+            "Left CYL",
+            "Left AXIS",
+            "Left ADD",
+            "Distance PD",
+            "Near PD",
+            "Frame Details",
+            "Frame Category",
+            "Frame Brand",
+            "Frame Price",
+            "Frame Offer",
+            "Frame Less Amount",
+            "Lens Type",
+            "Lens Features / Coating",
+            "Lens Brand",
+            "Lens Price",
+            "Lens Offer",
+            "Lens Less Amount",
+            "Item Amount",
+        ])
+
+    for item_number, item in enumerate(
+        order_items,
+        start=1,
+    ):
+        item_amount = (
+            calculate_item_amount(
+                item["frame_price"],
+                item.get("frame_offer", ""),
+                item.get("frame_less_amount", 0.0)
+            )
+            + calculate_item_amount(
+                item["lens_price"],
+                item.get("lens_offer", ""),
+                item.get("lens_less_amount", 0.0)
+            )
+        )
+        order_items_writer.writerow([
+            order_id,
+            customer_record_datetime,
+            CURRENT_STORE_ID,
+            store_name,
+            store_city,
+            customer_name,
+            phone,
+            item_number,
+            item["person_type"],
+            item["person_name"],
+            item["person_relation"],
+            item["person_gender"],
+            item["person_age"],
+            item["order_type"],
+            item["prescription_mode"],
+            item["add_requirement"],
+            item["right_sph"],
+            item["right_cyl"],
+            item["right_axis"],
+            item["right_add"],
+            item["left_sph"],
+            item["left_cyl"],
+            item["left_axis"],
+            item["left_add"],
+            item["distance_pd"],
+            item["near_pd"],
+            item["frame_details"],
+            item["frame_category"],
+            item["frame_brand"],
+            item["frame_price"],
+            item["frame_offer"],
+            item.get("frame_less_amount", 0.0),
+            item["lens_type"],
+            item["lens_features"],
+            item["lens_brand"],
+            item["lens_price"],
+            item["lens_offer"],
+            item.get("lens_less_amount", 0.0),
+            item_amount,
+        ])
 print("\n==================================================")
 print("        CUSTOMER RECORD COMPLETED SUCCESSFULLY")
 print("==================================================")
@@ -12965,6 +17873,12 @@ if order_type == "1":
 else:
     print("\n--- PRESCRIPTION MESSAGE ---")
 if order_type == "1":
+    frame_final_amount = calculate_item_amount(
+        frame_price,
+        frame_offer,
+        frame_less_amount
+    )
+
     prescription_message = f"""
 {store_name}
 {store_city}
@@ -12980,13 +17894,14 @@ Time: {record_time}
 Frame Order
 
 Frame Details: {frame_details}
-Frame Brand: {frame_brand}
+{f"Frame Brand: {frame_brand}" if frame_brand and frame_brand != "Non-Brand" else ""}
+Frame Price: ₹{frame_price:.2f}
 {f"Frame Offer: {frame_offer}" if frame_offer else ""}
-Frame Price: ₹{frame_price}
+{f"Frame Less: ₹{frame_less_amount:.2f}" if frame_less_amount > 0 else ""}
+Frame Amount: ₹{frame_final_amount:.2f}
 
 Thank you for choosing {store_name}.
 """
-
 else:
     prescription_message = f"""
 {store_name}
@@ -13020,6 +17935,104 @@ ADD: {left_add if left_add else "Not Required"}
 {f"Visual Acuity / Pinhole Test:\nRight Eye Visual Acuity: {right_va}\nLeft Eye Visual Acuity: {left_va}\nRight Eye Pinhole: {right_pinhole}\nLeft Eye Pinhole: {left_pinhole}\n" if right_va or left_va or right_pinhole or left_pinhole else ""}
 Please keep this prescription for your reference.
 """
+
+additional_prescription_lines = []
+
+for item_number, item in enumerate(
+    order_items,
+    start=1,
+):
+    if (
+        item_number == 1
+        or item["order_type"] not in ["2", "3"]
+        or item["prescription_mode"] != "different"
+    ):
+        continue
+
+    additional_prescription_lines.append(
+        f"Additional Prescription - Item {item_number}"
+    )
+
+    if item["person_type"] == "different":
+        person_text = item["person_name"]
+
+        if item["person_relation"]:
+            person_text += (
+                f" ({item['person_relation']})"
+            )
+
+        additional_prescription_lines.append(
+            f"For: {person_text}"
+        )
+    else:
+        additional_prescription_lines.append(
+            f"For: {customer_name}"
+        )
+
+    additional_prescription_lines.append(
+        "Right Eye (OD):"
+    )
+    additional_prescription_lines.append(
+        f"SPH: {item['right_sph']}"
+    )
+    additional_prescription_lines.append(
+        f"CYL: {item['right_cyl']}"
+    )
+    additional_prescription_lines.append(
+        "AXIS: "
+        f"{item['right_axis'] or 'Not Required'}"
+    )
+    additional_prescription_lines.append(
+        "ADD: "
+        f"{item['right_add'] or 'Not Required'}"
+    )
+
+    additional_prescription_lines.append(
+        ""
+    )
+    additional_prescription_lines.append(
+        "Left Eye (OS):"
+    )
+    additional_prescription_lines.append(
+        f"SPH: {item['left_sph']}"
+    )
+    additional_prescription_lines.append(
+        f"CYL: {item['left_cyl']}"
+    )
+    additional_prescription_lines.append(
+        "AXIS: "
+        f"{item['left_axis'] or 'Not Required'}"
+    )
+    additional_prescription_lines.append(
+        "ADD: "
+        f"{item['left_add'] or 'Not Required'}"
+    )
+
+    if item["distance_pd"]:
+        additional_prescription_lines.append(
+            "Distance PD: "
+            f"{item['distance_pd']}"
+        )
+
+    if item["near_pd"]:
+        additional_prescription_lines.append(
+            "Near PD: "
+            f"{item['near_pd']}"
+        )
+
+    additional_prescription_lines.append("")
+
+if additional_prescription_lines:
+    prescription_message = (
+        prescription_message.rstrip()
+        + "\n\n"
+        + "\n".join(
+            additional_prescription_lines
+        ).rstrip()
+        + "\n\nPlease keep all prescriptions "
+        "for your reference.\n"
+    )
+
 print(prescription_message)
 print("\n--- Send Message ---")
 print("1. SMS Text / Copy")
@@ -13071,40 +18084,239 @@ if message_choice == "2" and phone:
         print("Opening WhatsApp Order...")
     else:
         print("Opening WhatsApp Prescription...")
-if message_choice == "3":
+if message_choice in ["3", "5"]:
     if not phone:
-        print("WhatsApp Payment Receipt cannot be sent - Customer phone number is not available.")
+        if message_choice == "3":
+            print(
+                "WhatsApp Payment Receipt cannot be sent - "
+                "Customer phone number is not available."
+            )
+        else:
+            print(
+                "WhatsApp Prescription + Payment cannot be sent - "
+                "Customer phone number is not available."
+            )
     else:
         import urllib.parse
         import webbrowser
 
-        if order_type == "1":
-            payment_order_details = (
-                "Order Type: Frame Only\n"
-                f"Frame Details: {frame_details}\n"
-                f"Frame Brand: {frame_brand}\n"
-                f"Frame Price: ₹{frame_price}"
+        payment_order_lines = []
+
+        for item_number, item in enumerate(
+            order_items,
+            start=1,
+        ):
+            payment_order_lines.append(
+                f"Item {item_number}"
             )
 
-        elif order_type == "2":
-            payment_order_details = (
-                "Order Type: Lenses Only\n"
-                f"Lens Type: {lens_type}\n"
-                f"{f'Lens Features / Coating: {lens_features}' if lens_features else ''}\n"
-                f"{f'Lens Brand: {lens_brand}' if lens_brand else ''}\n"
-                f"Lens Price: ₹{lens_price}"
+            if item["person_type"] == "different":
+                person_text = item["person_name"]
+
+                if item["person_relation"]:
+                    person_text += (
+                        f" ({item['person_relation']})"
+                    )
+
+                payment_order_lines.append(
+                    f"For: {person_text}"
+                )
+            else:
+                payment_order_lines.append(
+                    f"For: {customer_name}"
+                )
+
+            if item["order_type"] == "1":
+                payment_order_lines.append(
+                    "Order Type: Frame Only"
+                )
+
+            elif item["order_type"] == "2":
+                payment_order_lines.append(
+                    "Order Type: Lenses Only"
+                )
+
+            else:
+                payment_order_lines.append(
+                    "Order Type: Frame + Lenses"
+                )
+
+            if item["order_type"] in ["1", "3"]:
+                if item["frame_details"]:
+                    payment_order_lines.append(
+                        "Frame: "
+                        f"{item['frame_details']}"
+                    )
+
+                if (
+                    item["frame_brand"]
+                    and item["frame_brand"] != "Non-Brand"
+                ):
+                    payment_order_lines.append(
+                        "Frame Brand: "
+                        f"{item['frame_brand']}"
+                    )
+
+            if item["order_type"] in ["2", "3"]:
+                if item["lens_type"]:
+                    payment_order_lines.append(
+                        "Lens: "
+                        f"{item['lens_type']}"
+                    )
+
+                if item["lens_features"]:
+                    payment_order_lines.append(
+                        "Lens Features / Coating: "
+                        f"{item['lens_features']}"
+                    )
+
+                if (
+                    item["lens_brand"]
+                    and item["lens_brand"] != "Non-Brand"
+                ):
+                    payment_order_lines.append(
+                        "Lens Brand: "
+                        f"{item['lens_brand']}"
+                    )
+
+                if (
+                    item["person_type"] == "different"
+                    or item["prescription_mode"] == "different"
+                ):
+                    payment_order_lines.append(
+                        "Prescription:"
+                    )
+
+                    payment_order_lines.append(
+                        "OD: "
+                        f"SPH {item['right_sph'] or '-'}, "
+                        f"CYL {item['right_cyl'] or '-'}, "
+                        f"AXIS {item['right_axis'] or '-'}, "
+                        f"ADD {item['right_add'] or 'Not Required'}"
+                    )
+
+                    payment_order_lines.append(
+                        "OS: "
+                        f"SPH {item['left_sph'] or '-'}, "
+                        f"CYL {item['left_cyl'] or '-'}, "
+                        f"AXIS {item['left_axis'] or '-'}, "
+                        f"ADD {item['left_add'] or 'Not Required'}"
+                    )
+
+                    if item["distance_pd"]:
+                        payment_order_lines.append(
+                            "Distance PD: "
+                            f"{item['distance_pd']}"
+                        )
+
+                    if item["near_pd"]:
+                        payment_order_lines.append(
+                            "Near PD: "
+                            f"{item['near_pd']}"
+                        )
+
+                elif item["prescription_mode"] == "same":
+                    payment_order_lines.append(
+                        "Prescription: Same Prescription"
+                    )
+
+            if item["order_type"] in ["1", "3"]:
+                frame_amount = calculate_item_amount(
+                    item["frame_price"],
+                    item.get("frame_offer", ""),
+                    item.get("frame_less_amount", 0.0)
+                )
+
+                payment_order_lines.append(
+                    f"Frame Price: ₹{item['frame_price']:.2f}"
+                )
+
+                if item.get("frame_offer"):
+                    payment_order_lines.append(
+                        f"Frame Offer: {item['frame_offer']}"
+                    )
+
+                if item.get("frame_less_amount", 0.0) > 0:
+                    payment_order_lines.append(
+                        "Frame Less: "
+                        f"₹{item['frame_less_amount']:.2f}"
+                    )
+
+                payment_order_lines.append(
+                    f"Frame Amount: ₹{frame_amount:.2f}"
+                )
+
+            if item["order_type"] in ["2", "3"]:
+                lens_amount = calculate_item_amount(
+                    item["lens_price"],
+                    item.get("lens_offer", ""),
+                    item.get("lens_less_amount", 0.0)
+                )
+
+                payment_order_lines.append(
+                    f"Lens Price: ₹{item['lens_price']:.2f}"
+                )
+
+                if item.get("lens_offer"):
+                    payment_order_lines.append(
+                        f"Lens Offer: {item['lens_offer']}"
+                    )
+
+                if item.get("lens_less_amount", 0.0) > 0:
+                    payment_order_lines.append(
+                        "Lens Less: "
+                        f"₹{item['lens_less_amount']:.2f}"
+                    )
+
+                payment_order_lines.append(
+                    f"Lens Amount: ₹{lens_amount:.2f}"
+                )
+
+            item_total = (
+                calculate_item_amount(
+                    item["frame_price"],
+                    item.get("frame_offer", ""),
+                    item.get("frame_less_amount", 0.0)
+                )
+                + calculate_item_amount(
+                    item["lens_price"],
+                    item.get("lens_offer", ""),
+                    item.get("lens_less_amount", 0.0)
+                )
+            )
+            payment_order_lines.append(
+                f"Item Total: ₹{item_total:.2f}"
+            )
+            payment_order_lines.append("")
+
+        payment_order_details = "\n".join(
+            payment_order_lines
+        ).strip()
+        payment_summary_lines = [
+            f"Total Amount: ₹{order_total:.2f}"
+        ]
+
+        if less_amount > 0:
+            payment_summary_lines.append(
+                f"Discount Amount: ₹{less_amount:.2f}"
+            )
+            payment_summary_lines.append(
+                f"Final Amount: ₹{total_amount:.2f}"
             )
 
-        else:
-            payment_order_details = (
-                "Order Type: Frame + Lenses\n"
-                f"Frame Details: {frame_details}\n"
-                f"Frame Brand: {frame_brand}\n"
-                f"Lens Type: {lens_type}\n"
-                f"{f'Lens Features / Coating: {lens_features}' if lens_features else ''}\n"
-                f"{f'Lens Brand: {lens_brand}' if lens_brand else ''}\n"
-                f"Frame & Lenses Price: ₹{order_total}"
+        if advance_amount > 0:
+            payment_summary_lines.append(
+                f"Advance Amount: ₹{advance_amount:.2f}"
             )
+
+            if balance > 0:
+                payment_summary_lines.append(
+                    f"Balance Amount: ₹{balance:.2f}"
+                )
+
+        payment_summary = "\n".join(
+            payment_summary_lines
+        )
         payment_message = f"""{store_name}
 {store_city}
 {f"Address: {store_address}" if store_address else ""}
@@ -13120,20 +18332,24 @@ Order Details
 {payment_order_details}
 
 Payment Details
-Original Amount: ₹{order_total}
-Discount Amount: ₹{less_amount}
-Final Amount: ₹{total_amount}
-Paid Amount: ₹{advance_amount}
-Balance Amount: ₹{balance}
+{payment_summary}
 
 Thank you for choosing {store_name}.
 """
 
-        whatsapp_message = urllib.parse.quote(payment_message)
-        whatsapp_url = f"https://wa.me/91{phone}?text={whatsapp_message}"
+        if message_choice == "3":
+            whatsapp_message = urllib.parse.quote(
+                payment_message
+            )
+            whatsapp_url = (
+                f"https://wa.me/91{phone}"
+                f"?text={whatsapp_message}"
+            )
 
-        webbrowser.open(whatsapp_url)
-        print("Opening WhatsApp Payment Receipt...")
+            webbrowser.open(whatsapp_url)
+            print(
+                "Opening WhatsApp Payment Receipt..."
+            )
 if message_choice == "4":
     if not phone:
         print("WhatsApp Balance Reminder cannot be sent - Customer phone number is not available.")
@@ -13174,17 +18390,16 @@ if message_choice == "5":
 
         combined_message = f"""{prescription_message}
 
+Order Details
+
+{payment_order_details}
+
 Payment Details
 
-Original Amount: ₹{order_total}
-Discount Amount: ₹{less_amount}
-Final Amount: ₹{total_amount}
-Paid Amount: ₹{advance_amount}
-Balance Amount: ₹{balance}
+{payment_summary}
 
 Thank you for choosing {store_name}.
 """
-
         whatsapp_message = urllib.parse.quote(combined_message)
         whatsapp_url = f"https://wa.me/91{phone}?text={whatsapp_message}"
 
@@ -13215,7 +18430,10 @@ while True:
 
     print("Please select a valid Print Option (1-5).")
 if print_choice == "1":
-    if order_type in ["2", "3"]:
+    if any(
+        item["order_type"] in ["2", "3"]
+        for item in order_items
+    ):
         print_text_document(
             prescription_message
         )
@@ -13235,15 +18453,20 @@ PAYMENT RECEIPT
 ========================================
 
 Customer Name : {customer_name}
-Phone         : {phone}
+Phone         : {phone if phone else "Not Provided"}
 Address       : {address}
 
+ORDER DETAILS
 ----------------------------------------
-Original Amount : Rs. {order_total}
-Discount Amount : Rs. {less_amount}
-Final Amount    : Rs. {total_amount}
-Paid Amount     : Rs. {advance_amount}
-Balance Amount  : Rs. {balance}
+{payment_order_details}
+----------------------------------------
+
+PAYMENT DETAILS
+Original Amount : Rs. {order_total:.2f}
+Discount Amount : Rs. {less_amount:.2f}
+Final Amount    : Rs. {total_amount:.2f}
+Paid Amount     : Rs. {advance_amount:.2f}
+Balance Amount  : Rs. {balance:.2f}
 ----------------------------------------
 
 Thank you for choosing {store_name}.
@@ -13270,6 +18493,7 @@ if print_choice == "3":
         f"Phone         : {phone if phone else 'Not Provided'}",
         f"Town/Village  : {address}",
     ]
+
     if full_address:
         full_record_lines.append(
             f"Full Address  : {full_address}"
@@ -13280,6 +18504,7 @@ if print_choice == "3":
         "SPECTACLE HISTORY",
         f"History       : {spectacle_history}",
     ])
+
     if spectacle_history == "Existing":
         full_record_lines.append(
             f"Using Glasses : {years_using_glasses}"
@@ -13287,7 +18512,8 @@ if print_choice == "3":
 
         if previous_prescription_date:
             full_record_lines.append(
-                f"Previous Rx Date: {previous_prescription_date}"
+                "Previous Rx Date: "
+                f"{previous_prescription_date}"
             )
 
         if any([
@@ -13298,116 +18524,319 @@ if print_choice == "3":
             previous_left_sph,
             previous_left_cyl,
             previous_left_axis,
-            previous_left_add
+            previous_left_add,
         ]):
             full_record_lines.extend([
                 "",
                 "PREVIOUS PRESCRIPTION",
                 (
                     "OD: "
-                    f"SPH {previous_right_sph} | "
-                    f"CYL {previous_right_cyl} | "
-                    f"AXIS {previous_right_axis} | "
-                    f"ADD {previous_right_add if previous_right_add else 'Not Required'}"
+                    f"SPH {previous_right_sph or '-'} | "
+                    f"CYL {previous_right_cyl or '-'} | "
+                    f"AXIS {previous_right_axis or '-'} | "
+                    "ADD "
+                    f"{previous_right_add or 'Not Required'}"
                 ),
                 (
                     "OS: "
-                    f"SPH {previous_left_sph} | "
-                    f"CYL {previous_left_cyl} | "
-                    f"AXIS {previous_left_axis} | "
-                    f"ADD {previous_left_add if previous_left_add else 'Not Required'}"
+                    f"SPH {previous_left_sph or '-'} | "
+                    f"CYL {previous_left_cyl or '-'} | "
+                    f"AXIS {previous_left_axis or '-'} | "
+                    "ADD "
+                    f"{previous_left_add or 'Not Required'}"
                 ),
             ])
 
-        if order_type in ["1", "3"]:
-            full_record_lines.extend([
-            "",
-            "FRAME DETAILS",
-            f"Frame Details : {frame_details}",
-            f"Frame Brand   : {frame_brand if frame_brand else 'Not Provided'}",
-            f"Frame Offer   : {frame_offer if frame_offer else 'None'}",
-            f"Frame Price   : Rs. {frame_price}",
-        ])
+    full_record_lines.extend([
+        "",
+        "CURRENT PRESCRIPTION",
+        (
+            "OD: "
+            f"SPH {right_sph or '-'} | "
+            f"CYL {right_cyl or '-'} | "
+            f"AXIS {right_axis or '-'} | "
+            f"ADD {right_add or 'Not Required'}"
+        ),
+        (
+            "OS: "
+            f"SPH {left_sph or '-'} | "
+            f"CYL {left_cyl or '-'} | "
+            f"AXIS {left_axis or '-'} | "
+            f"ADD {left_add or 'Not Required'}"
+        ),
+    ])
 
-        if order_type in ["2", "3"]:
-            full_record_lines.extend([
+    if distance_pd or near_pd:
+        full_record_lines.extend([
             "",
-            "LENS DETAILS",
-            f"Lens Type     : {lens_type}",
-            f"Lens Features : {lens_features if lens_features else 'Not Provided'}",
-            f"Lens Brand    : {lens_brand if lens_brand else 'Not Provided'}",
-            f"Lens Offer    : {lens_offer if lens_offer else 'None'}",
-            f"Lens Price    : Rs. {lens_price}",
-        ])
-            full_record_lines.extend([
-            "",
-            "CURRENT PRESCRIPTION",
+            "PUPILLARY DISTANCE (PD)",
             (
-                "OD: "
-                f"SPH {right_sph} | "
-                f"CYL {right_cyl} | "
-                f"AXIS {right_axis} | "
-                f"ADD {right_add if right_add else 'Not Required'}"
+                "Distance PD   : "
+                f"{distance_pd or 'Not Measured'}"
             ),
             (
-                "OS: "
-                f"SPH {left_sph} | "
-                f"CYL {left_cyl} | "
-                f"AXIS {left_axis} | "
-                f"ADD {left_add if left_add else 'Not Required'}"
+                "Near PD       : "
+                f"{near_pd or 'Not Measured'}"
             ),
         ])
-        if distance_pd or near_pd:
-            full_record_lines.extend([
-                "",
-                "PUPILLARY DISTANCE (PD)",
-                f"Distance PD   : {distance_pd if distance_pd else 'Not Measured'}",
-                f"Near PD       : {near_pd if near_pd else 'Not Measured'}",
-            ])
-            if any([
-            right_va,
-            left_va,
-            right_pinhole,
-            left_pinhole
-        ]):
-                full_record_lines.extend([
-                "",
-                "VISUAL ACUITY / PINHOLE",
-                f"Right VA      : {right_va if right_va else 'Not Measured'}",
-                f"Left VA       : {left_va if left_va else 'Not Measured'}",
-                f"Right Pinhole : {right_pinhole if right_pinhole else 'Not Measured'}",
-                f"Left Pinhole  : {left_pinhole if left_pinhole else 'Not Measured'}",
-            ])
-                full_record_lines.extend([
+
+    if any([
+        right_va,
+        left_va,
+        right_pinhole,
+        left_pinhole,
+    ]):
+        full_record_lines.extend([
             "",
-            "EYE SURGERY / IOL",
-            f"Eye Surgery   : {eye_surgery}",
+            "VISUAL ACUITY / PINHOLE",
+            f"Right VA      : {right_va or 'Not Measured'}",
+            f"Left VA       : {left_va or 'Not Measured'}",
+            (
+                "Right Pinhole : "
+                f"{right_pinhole or 'Not Measured'}"
+            ),
+            (
+                "Left Pinhole  : "
+                f"{left_pinhole or 'Not Measured'}"
+            ),
         ])
 
-        if eye_surgery != "No":
+    full_record_lines.extend([
+        "",
+        "EYE SURGERY / IOL",
+        f"Eye Surgery   : {eye_surgery}",
+    ])
+
+    if eye_surgery != "No":
+        full_record_lines.append(
+            f"Surgery Eye   : {surgery_eye}"
+        )
+
+        if surgery_eye in [
+            "Right Eye (OD)",
+            "Both Eyes",
+        ]:
             full_record_lines.append(
-                f"Surgery Eye   : {surgery_eye}"
+                f"Right Eye IOL : {right_iol}"
             )
 
-            if surgery_eye in ["Right Eye (OD)", "Both Eyes"]:
-                full_record_lines.append(
-                    f"Right Eye IOL : {right_iol}"
-                )
+        if surgery_eye in [
+            "Left Eye (OS)",
+            "Both Eyes",
+        ]:
+            full_record_lines.append(
+                f"Left Eye IOL  : {left_iol}"
+            )
 
-            if surgery_eye in ["Left Eye (OS)", "Both Eyes"]:
-                full_record_lines.append(
-                    f"Left Eye IOL  : {left_iol}"
-                )
+    full_record_lines.extend([
+        "",
+        "ORDER ITEMS",
+        "=" * 45,
+    ])
 
-
+    for item_number, item in enumerate(
+        order_items,
+        start=1,
+    ):
         full_record_lines.extend([
+            "",
+            f"Item {item_number}",
+        ])
+
+        if item["person_type"] == "different":
+            person_text = item["person_name"]
+
+            if item["person_relation"]:
+                person_text += (
+                    f" ({item['person_relation']})"
+                )
+
+            full_record_lines.append(
+                f"For           : {person_text}"
+            )
+        else:
+            full_record_lines.append(
+                f"For           : {customer_name}"
+            )
+
+        if item["order_type"] == "1":
+            full_record_lines.append(
+                "Order Type    : Frame Only"
+            )
+        elif item["order_type"] == "2":
+            full_record_lines.append(
+                "Order Type    : Lenses Only"
+            )
+        else:
+            full_record_lines.append(
+                "Order Type    : Frame + Lenses"
+            )
+
+        if item["order_type"] in ["1", "3"]:
+            if item["frame_details"]:
+                full_record_lines.append(
+                    "Frame Details : "
+                    f"{item['frame_details']}"
+                )
+
+            if (
+                item["frame_brand"]
+                and item["frame_brand"] != "Non-Brand"
+            ):
+                full_record_lines.append(
+                    "Frame Brand   : "
+                    f"{item['frame_brand']}"
+                )
+
+            frame_amount = calculate_item_amount(
+                item["frame_price"],
+                item.get("frame_offer", ""),
+                item.get("frame_less_amount", 0.0),
+            )
+
+            full_record_lines.append(
+                "Frame Price   : Rs. "
+                f"{item['frame_price']:.2f}"
+            )
+
+            if item.get("frame_offer"):
+                full_record_lines.append(
+                    "Frame Offer   : "
+                    f"{item['frame_offer']}"
+                )
+
+            if item.get(
+                "frame_less_amount",
+                0.0,
+            ) > 0:
+                full_record_lines.append(
+                    "Frame Less    : Rs. "
+                    f"{item['frame_less_amount']:.2f}"
+                )
+
+            full_record_lines.append(
+                "Frame Amount  : Rs. "
+                f"{frame_amount:.2f}"
+            )
+
+        if item["order_type"] in ["2", "3"]:
+            if item["lens_type"]:
+                full_record_lines.append(
+                    f"Lens Type     : {item['lens_type']}"
+                )
+
+            if item["lens_features"]:
+                full_record_lines.append(
+                    "Lens Features : "
+                    f"{item['lens_features']}"
+                )
+
+            if (
+                item["lens_brand"]
+                and item["lens_brand"] != "Non-Brand"
+            ):
+                full_record_lines.append(
+                    "Lens Brand    : "
+                    f"{item['lens_brand']}"
+                )
+
+            if (
+                item["person_type"] == "different"
+                or item["prescription_mode"] == "different"
+            ):
+                full_record_lines.extend([
+                    "Prescription:",
+                    (
+                        "OD: "
+                        f"SPH {item['right_sph'] or '-'} | "
+                        f"CYL {item['right_cyl'] or '-'} | "
+                        f"AXIS {item['right_axis'] or '-'} | "
+                        "ADD "
+                        f"{item['right_add'] or 'Not Required'}"
+                    ),
+                    (
+                        "OS: "
+                        f"SPH {item['left_sph'] or '-'} | "
+                        f"CYL {item['left_cyl'] or '-'} | "
+                        f"AXIS {item['left_axis'] or '-'} | "
+                        "ADD "
+                        f"{item['left_add'] or 'Not Required'}"
+                    ),
+                ])
+
+                if item["distance_pd"]:
+                    full_record_lines.append(
+                        "Distance PD   : "
+                        f"{item['distance_pd']}"
+                    )
+
+                if item["near_pd"]:
+                    full_record_lines.append(
+                        "Near PD       : "
+                        f"{item['near_pd']}"
+                    )
+
+            elif item["prescription_mode"] == "same":
+                full_record_lines.append(
+                    "Prescription  : Same Prescription"
+                )
+
+            lens_amount = calculate_item_amount(
+                item["lens_price"],
+                item.get("lens_offer", ""),
+                item.get("lens_less_amount", 0.0),
+            )
+
+            full_record_lines.append(
+                "Lens Price    : Rs. "
+                f"{item['lens_price']:.2f}"
+            )
+
+            if item.get("lens_offer"):
+                full_record_lines.append(
+                    "Lens Offer    : "
+                    f"{item['lens_offer']}"
+                )
+
+            if item.get(
+                "lens_less_amount",
+                0.0,
+            ) > 0:
+                full_record_lines.append(
+                    "Lens Less     : Rs. "
+                    f"{item['lens_less_amount']:.2f}"
+                )
+
+            full_record_lines.append(
+                "Lens Amount   : Rs. "
+                f"{lens_amount:.2f}"
+            )
+
+        item_total = (
+            calculate_item_amount(
+                item["frame_price"],
+                item.get("frame_offer", ""),
+                item.get("frame_less_amount", 0.0),
+            )
+            + calculate_item_amount(
+                item["lens_price"],
+                item.get("lens_offer", ""),
+                item.get("lens_less_amount", 0.0),
+            )
+        )
+
+        full_record_lines.append(
+            f"Item Total    : Rs. {item_total:.2f}"
+        )
+
+    full_record_lines.extend([
         "",
         "PAYMENT DETAILS",
-        f"Original Amount : Rs. {order_total}",
-        f"Discount Amount : Rs. {less_amount}",
-        f"Final Amount    : Rs. {total_amount}",
-        f"Paid Amount     : Rs. {advance_amount}",
-        f"Balance Amount  : Rs. {balance}",
+        f"Original Amount : Rs. {order_total:.2f}",
+        f"Discount Amount : Rs. {less_amount:.2f}",
+        f"Final Amount    : Rs. {total_amount:.2f}",
+        f"Paid Amount     : Rs. {advance_amount:.2f}",
+        f"Balance Amount  : Rs. {balance:.2f}",
         "",
         "=" * 45,
         f"Thank you for choosing {store_name}.",
@@ -13422,7 +18851,10 @@ if print_choice == "3":
     )
 
 if print_choice == "4":
-    if order_type in ["2", "3"]:
+    if any(
+        item["order_type"] in ["2", "3"]
+        for item in order_items
+    ):
         prescription_bill_text = f"""{prescription_message}
 
 ========================================
@@ -13430,13 +18862,19 @@ PAYMENT RECEIPT
 ========================================
 
 Customer Name : {customer_name}
-Phone         : {phone}
+Phone         : {phone if phone else "Not Provided"}
 
-Original Amount : Rs. {order_total}
-Discount Amount : Rs. {less_amount}
-Final Amount    : Rs. {total_amount}
-Paid Amount     : Rs. {advance_amount}
-Balance Amount  : Rs. {balance}
+ORDER DETAILS
+----------------------------------------
+{payment_order_details}
+----------------------------------------
+
+PAYMENT DETAILS
+Original Amount : Rs. {order_total:.2f}
+Discount Amount : Rs. {less_amount:.2f}
+Final Amount    : Rs. {total_amount:.2f}
+Paid Amount     : Rs. {advance_amount:.2f}
+Balance Amount  : Rs. {balance:.2f}
 
 Thank you for choosing {store_name}.
 """
