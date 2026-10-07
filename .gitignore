@@ -20,3 +20,18 @@ license_audit.csv
 admin_security.csv
 developer_provision.key
 license*.json
+# Local customer/order data
+order_items.csv
+order_items_*.csv
+demo_order_items.csv
+demo_order_items_*.csv
+
+# Local development safety backups
+app_backup_before_replace.py
+app_before_*.py
+
+# Local runtime test output
+summary_runtime_test.txt
+
+# Local .gitignore safety backups
+.gitignore_before_*
