@@ -1,9 +1,9 @@
 # Store Configuration
 
-store_name = "Ravi Opticals"
-store_city = "Eluru"
+store_name = ""
+store_city = ""
 store_address = ""
-store_phone = "9912255145"
+store_phone = ""
 store_email = ""
 store_website = ""
 store_logo = ""

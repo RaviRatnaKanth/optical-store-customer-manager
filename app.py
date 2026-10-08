@@ -1,4 +1,4 @@
-﻿import base64
+import base64
 import calendar
 import csv
 import json
@@ -13,6 +13,20 @@ import hmac
 import secrets
 import getpass
 from datetime import datetime
+
+APP_DATA_DIR = os.path.join(
+    os.environ.get(
+        "LOCALAPPDATA",
+        os.path.expanduser("~")
+    ),
+    "OpticalStoreCustomerManager"
+)
+
+os.makedirs(
+    APP_DATA_DIR,
+    exist_ok=True
+)
+
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from store_config import store_name, store_city, store_address, store_phone, store_email, store_website, store_logo
@@ -104,10 +118,78 @@ def normalize_indian_phone(value):
 
     return clean_phone
 
-STORE_PROFILE_FILE = "store_profile.csv"
-SIGNED_LICENSE_FILE = "license.json"
-STORE_REGISTRY_FILE = "stores.csv"
-ADMIN_SECURITY_FILE = "admin_security.csv"
+def migrate_existing_data_to_app_dir():
+    marker_path = os.path.join(
+        APP_DATA_DIR,
+        ".migration_complete"
+    )
+    if os.path.isfile(marker_path):
+        return
+    active_files = [
+        "stores.csv",
+        "store_profile.csv",
+        "license.json",
+        "admin_security.csv",
+        "customers.csv",
+        "payments.csv",
+        "order_items.csv",
+        "demo_customers.csv",
+        "demo_payments.csv",
+        "demo_order_items.csv",
+    ]
+
+    registry_path = "stores.csv"
+    if os.path.exists(registry_path):
+        try:
+            with open(
+                registry_path,
+                "r",
+                newline="",
+                encoding="utf-8-sig"
+            ) as registry_file:
+                for row in csv.DictReader(registry_file):
+                    store_id = row.get(
+                        "Store ID",
+                        ""
+                    ).strip().lower()
+
+                    if store_id and store_id != "store001":
+                        active_files.extend([
+                            f"store_profile_{store_id}.csv",
+                            f"customers_{store_id}.csv",
+                            f"payments_{store_id}.csv",
+                            f"order_items_{store_id}.csv",
+                            f"demo_customers_{store_id}.csv",
+                            f"demo_payments_{store_id}.csv",
+                            f"demo_order_items_{store_id}.csv",
+                        ])
+        except (OSError, csv.Error):
+            pass
+
+    for filename in active_files:
+        source_path = os.path.abspath(filename)
+        destination_path = os.path.join(
+            APP_DATA_DIR,
+            filename
+        )
+
+        if (
+            os.path.isfile(source_path)
+            and not os.path.exists(destination_path)
+        ):
+            shutil.copy2(
+                source_path,
+                destination_path
+            )
+
+    with open(marker_path, "w", encoding="utf-8") as marker_file:
+        marker_file.write("Migration completed")
+
+
+STORE_PROFILE_FILE = os.path.join(APP_DATA_DIR, "store_profile.csv")
+SIGNED_LICENSE_FILE = os.path.join(APP_DATA_DIR, "license.json")
+STORE_REGISTRY_FILE = os.path.join(APP_DATA_DIR, "stores.csv")
+ADMIN_SECURITY_FILE = os.path.join(APP_DATA_DIR, "admin_security.csv")
 LICENSE_PUBLIC_KEY_B64 = "Ol35h0I8OiVjbw/PxEFM+HF1tVzGyxUqSr8LgOS1NRw="
 
 
@@ -798,6 +880,7 @@ record_time = datetime.now().strftime("%I:%M %p")
 CUSTOMER_DATA_FILE = "customers.csv"
 PAYMENT_DATA_FILE = "payments.csv"
 ORDER_ITEMS_DATA_FILE = "order_items.csv"
+# Legacy data migration requires explicit approval
 initialize_store_registry()
 active_stores = load_store_registry()
 
@@ -833,15 +916,26 @@ CURRENT_STORE_ID = selected_store["Store ID"]
 CURRENT_STORE_NAME = selected_store["Store Name"]
 CURRENT_STORE_CITY = selected_store["Store City"]
 if CURRENT_STORE_ID == "STORE001":
-    STORE_PROFILE_FILE = "store_profile.csv"
+    STORE_PROFILE_FILE = os.path.join(
+        APP_DATA_DIR,
+        "store_profile.csv"
+    )
 else:
-    STORE_PROFILE_FILE = (
+    STORE_PROFILE_FILE = os.path.join(
+        APP_DATA_DIR,
         f"store_profile_{CURRENT_STORE_ID.lower()}.csv"
     )
 
 if os.path.exists(STORE_PROFILE_FILE):
     load_store_profile()
 else:
+    store_name = CURRENT_STORE_NAME
+    store_city = CURRENT_STORE_CITY
+    store_address = ""
+    store_phone = store_phone if CURRENT_STORE_ID == "STORE001" else ""
+    store_email = ""
+    store_website = ""
+    store_logo = ""
     save_store_profile()
 
 
@@ -866,33 +960,57 @@ while True:
 
     if data_mode == "1":
         if CURRENT_STORE_ID == "STORE001":
-            CUSTOMER_DATA_FILE = "customers.csv"
-            PAYMENT_DATA_FILE = "payments.csv"
-            ORDER_ITEMS_DATA_FILE = "order_items.csv"
+            CUSTOMER_DATA_FILE = os.path.join(
+                APP_DATA_DIR,
+                "customers.csv"
+            )
+            PAYMENT_DATA_FILE = os.path.join(
+                APP_DATA_DIR,
+                "payments.csv"
+            )
+            ORDER_ITEMS_DATA_FILE = os.path.join(
+                APP_DATA_DIR,
+                "order_items.csv"
+            )
         else:
-            CUSTOMER_DATA_FILE = (
+            CUSTOMER_DATA_FILE = os.path.join(
+                APP_DATA_DIR,
                 f"customers_{CURRENT_STORE_ID.lower()}.csv"
             )
-            PAYMENT_DATA_FILE = (
+            PAYMENT_DATA_FILE = os.path.join(
+                APP_DATA_DIR,
                 f"payments_{CURRENT_STORE_ID.lower()}.csv"
             )
-            ORDER_ITEMS_DATA_FILE = (
+            ORDER_ITEMS_DATA_FILE = os.path.join(
+                APP_DATA_DIR,
                 f"order_items_{CURRENT_STORE_ID.lower()}.csv"
             )
         break
     elif data_mode == "2":
         if CURRENT_STORE_ID == "STORE001":
-            CUSTOMER_DATA_FILE = "demo_customers.csv"
-            PAYMENT_DATA_FILE = "demo_payments.csv"
-            ORDER_ITEMS_DATA_FILE = "demo_order_items.csv"
+            CUSTOMER_DATA_FILE = os.path.join(
+                APP_DATA_DIR,
+                "demo_customers.csv"
+            )
+            PAYMENT_DATA_FILE = os.path.join(
+                APP_DATA_DIR,
+                "demo_payments.csv"
+            )
+            ORDER_ITEMS_DATA_FILE = os.path.join(
+                APP_DATA_DIR,
+                "demo_order_items.csv"
+            )
         else:
-            CUSTOMER_DATA_FILE = (
+            CUSTOMER_DATA_FILE = os.path.join(
+                APP_DATA_DIR,
                 f"demo_customers_{CURRENT_STORE_ID.lower()}.csv"
             )
-            PAYMENT_DATA_FILE = (
+            PAYMENT_DATA_FILE = os.path.join(
+                APP_DATA_DIR,
                 f"demo_payments_{CURRENT_STORE_ID.lower()}.csv"
             )
-            ORDER_ITEMS_DATA_FILE = (
+            ORDER_ITEMS_DATA_FILE = os.path.join(
+                APP_DATA_DIR,
                 f"demo_order_items_{CURRENT_STORE_ID.lower()}.csv"
             )
         break
@@ -900,7 +1018,7 @@ while True:
         print("Please select 1 for Real Data or 2 for Demo Data.")
 
 def create_startup_backup():
-    backup_folder = "backups"
+    backup_folder = os.path.join(APP_DATA_DIR, "backups")
 
     try:
         os.makedirs(backup_folder, exist_ok=True)

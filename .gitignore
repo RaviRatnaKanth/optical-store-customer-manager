@@ -35,3 +35,4 @@ summary_runtime_test.txt
 
 # Local .gitignore safety backups
 .gitignore_before_*
+store_config_before_*.py
