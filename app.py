@@ -12,6 +12,8 @@ import hashlib
 import hmac
 import secrets
 import getpass
+import tempfile
+import binascii
 from datetime import datetime
 
 APP_DATA_DIR = os.path.join(
@@ -484,7 +486,7 @@ def verify_license_signature(license_record, signature_text):
 
         return True
 
-    except (InvalidSignature, ValueError, TypeError):
+    except (InvalidSignature, ValueError, TypeError, binascii.Error):
         return False
 
 
@@ -591,6 +593,176 @@ def display_current_license_details():
 
     return True
 
+
+def activate_signed_license():
+    print("\n--- Activate Signed License ---")
+
+    license_path = input(
+        "Enter Signed License JSON File Path: "
+    ).strip().strip('"')
+
+    if not license_path:
+        print("License activation cancelled.")
+        return False
+
+    if not os.path.isfile(license_path):
+        print("Selected license file was not found.")
+        return False
+
+    try:
+        with open(
+            license_path,
+            "r",
+            encoding="utf-8-sig"
+        ) as license_file:
+            package = json.load(license_file)
+
+        if not isinstance(package, dict):
+            print("Invalid license package.")
+            return False
+
+        license_record = package.get("license")
+        signature = package.get("signature", "")
+
+        if not isinstance(license_record, dict):
+            print("Invalid license details.")
+            return False
+
+        if not isinstance(signature, str):
+            print("Invalid license signature.")
+            return False
+
+        if not verify_license_signature(
+            license_record,
+            signature
+        ):
+            print("License signature verification failed.")
+            return False
+
+        print("License digital signature verified successfully.")
+        license_status = str(
+            license_record.get("License Status", "")
+        ).strip().lower()
+
+        if license_status != "active":
+            print("License is not active.")
+            return False
+
+        start_text = str(
+            license_record.get("Start Date", "")
+        ).strip()
+
+        try:
+            start_date = datetime.strptime(
+                start_text,
+                "%Y-%m-%d"
+            ).date()
+        except ValueError:
+            print("Invalid license start date.")
+            return False
+
+        if datetime.now().date() < start_date:
+            print("License start date has not arrived yet.")
+            return False
+
+        expiry_text = str(
+            license_record.get("Expiry Date", "")
+        ).strip()
+
+        if expiry_text:
+            try:
+                expiry_date = datetime.strptime(
+                    expiry_text,
+                    "%Y-%m-%d"
+                ).date()
+            except ValueError:
+                print("Invalid license expiry date.")
+                return False
+
+            if datetime.now().date() > expiry_date:
+                print("License has expired.")
+                return False
+
+        allowed_stores_text = str(
+            license_record.get("Allowed Stores", "")
+        ).strip()
+
+        allowed_store_ids = [
+            store_id.strip()
+            for store_id in allowed_stores_text.split("|")
+            if store_id.strip()
+        ]
+
+        if CURRENT_STORE_ID not in allowed_store_ids:
+            print("This store is not allowed under the license.")
+            return False
+
+        print("License status, expiry and store verified.")
+
+        if os.path.exists(SIGNED_LICENSE_FILE):
+            print("An existing license is already installed.")
+            confirmation = input(
+                "Replace existing license? (yes/no): "
+            ).strip().lower()
+
+            if confirmation != "yes":
+                print("License activation cancelled.")
+                return False
+
+        backup_folder = os.path.join(
+            APP_DATA_DIR,
+            "license_backups"
+        )
+        os.makedirs(backup_folder, exist_ok=True)
+
+        temporary_path = None
+
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                suffix=".json",
+                prefix="license_pending_",
+                dir=APP_DATA_DIR,
+                delete=False,
+                encoding="utf-8"
+            ) as temporary_file:
+                temporary_path = temporary_file.name
+                json.dump(
+                    package,
+                    temporary_file,
+                    indent=4,
+                    ensure_ascii=False
+                )
+
+            if os.path.exists(SIGNED_LICENSE_FILE):
+                backup_time = datetime.now().strftime(
+                    "%Y%m%d_%H%M%S_%f"
+                )
+                backup_path = os.path.join(
+                    backup_folder,
+                    f"license_before_activation_{backup_time}.json"
+                )
+                shutil.copy2(
+                    SIGNED_LICENSE_FILE,
+                    backup_path
+                )
+
+            os.replace(
+                temporary_path,
+                SIGNED_LICENSE_FILE
+            )
+            temporary_path = None
+
+            print("Signed license activated successfully.")
+            return True
+
+        finally:
+            if temporary_path and os.path.exists(temporary_path):
+                os.remove(temporary_path)
+
+    except (OSError, ValueError, TypeError) as error:
+        print("Unable to verify license file:", error)
+        return False
 
 def hash_admin_password(password, salt):
     password_bytes = password.encode("utf-8")
@@ -781,6 +953,21 @@ def get_license_access_status():
     if license_status != "active":
         return "SUSPENDED"
 
+    start_text = str(
+        license_record.get("Start Date", "")
+    ).strip()
+
+    try:
+        start_date = datetime.strptime(
+            start_text,
+            "%Y-%m-%d"
+        ).date()
+    except ValueError:
+        return "INVALID_LICENSE"
+
+    if datetime.now().date() < start_date:
+        return "NOT_STARTED"
+
     expiry_text = license_record.get(
         "Expiry Date",
         ""
@@ -816,9 +1003,11 @@ def get_license_access_status():
 
 def get_license_access_message(status):
     messages = {
+        "ACTIVE": "License is active. Store access is enabled.",
         "NO_LICENSE": "No valid license was found.",
         "SUSPENDED": "This license is currently suspended.",
         "EXPIRED": "This license has expired.",
+        "NOT_STARTED": "This license is not valid until its start date.",
         "INVALID_LICENSE": "The license information is invalid.",
         "STORE_NOT_ALLOWED": (
             "This store / branch is not allowed "
@@ -1180,6 +1369,38 @@ def migrate_customer_csv(file_name):
         writer = csv.writer(file)
         writer.writerows(rows)
 
+PAYMENT_CSV_HEADER = [
+    "Payment Date/Time",
+    "Customer Name",
+    "Phone",
+    "Address",
+    "Order Date/Time",
+    "Order Type",
+    "Total Amount",
+    "Previous Paid",
+    "Amount Paid Now",
+    "Remaining Balance",
+    "Payment Type",
+    "Payment Status",
+    "Delivery Status",
+    "Delivery Date/Time",
+    "Delivered To",
+    "Receiver Name"
+]
+
+
+def initialize_payment_csv(file_name):
+    if os.path.exists(file_name):
+        return
+
+    with open(
+        file_name,
+        "x",
+        newline="",
+        encoding="utf-8"
+    ) as file:
+        csv.writer(file).writerow(PAYMENT_CSV_HEADER)
+
 def migrate_payment_csv(file_name):
     if not os.path.exists(file_name):
         return
@@ -1197,15 +1418,21 @@ def migrate_payment_csv(file_name):
 
     changed = False
 
-    if len(rows[0]) == 14:
-        rows[0].append("Delivered To")
-        changed = True
+    has_header = (
+        rows[0]
+        and rows[0][0].strip() == "Payment Date/Time"
+    )
 
-    if len(rows[0]) == 15:
-        rows[0].append("Receiver Name")
-        changed = True
+    if has_header:
+        while len(rows[0]) < len(PAYMENT_CSV_HEADER):
+            rows[0].append(
+                PAYMENT_CSV_HEADER[len(rows[0])]
+            )
+            changed = True
 
-    for row in rows[1:]:
+    data_rows = rows[1:] if has_header else rows
+
+    for row in data_rows:
         while len(row) < 16:
             row.append("")
             changed = True
@@ -1222,6 +1449,7 @@ def migrate_payment_csv(file_name):
         writer = csv.writer(file)
         writer.writerows(rows)
 migrate_customer_csv(CUSTOMER_DATA_FILE)
+initialize_payment_csv(PAYMENT_DATA_FILE)
 migrate_payment_csv(PAYMENT_DATA_FILE)
 # ==================================================
 # 2. CUSTOMER / PATIENT DETAILS
@@ -1235,13 +1463,24 @@ print("4. Pending Delivery Customers")
 print("5. Old Customer / Historical Entry")
 print("6. Store Profile / Settings")
 print("7. Customer Reports")
+print("8. Activate / Update License")
 
 while True:
     customer_type = input(
-        "Select Customer Type (1/2/3/4/5/6/7): "
+        "Select Customer Type (1/2/3/4/5/6/7/8): "
     ).strip()
     if customer_type.lower() == "admin":
         open_protected_admin_control()
+        continue
+
+    if customer_type == "8":
+        if activate_signed_license():
+            license_access_status = get_license_access_status()
+            print(
+                get_license_access_message(
+                    license_access_status
+                )
+            )
         continue
     if (
         customer_type == "1"
@@ -2575,7 +2814,9 @@ if customer_type == "3":
             payment_file
         )
 
-        next(payment_reader, None)
+        first_payment_row = next(payment_reader, None)
+        if first_payment_row and first_payment_row[0].strip() != "Payment Date/Time":
+            payment_reader = iter([first_payment_row] + list(payment_reader))
 
         for payment_row in payment_reader:
 
@@ -3233,7 +3474,9 @@ if customer_type == "4":
     ) as payment_file:
 
         payment_reader = csv.reader(payment_file)
-        next(payment_reader, None)
+        first_payment_row = next(payment_reader, None)
+        if first_payment_row and first_payment_row[0].strip() != "Payment Date/Time":
+            payment_reader = iter([first_payment_row] + list(payment_reader))
 
         for payment_row in payment_reader:
 
@@ -6148,7 +6391,9 @@ if customer_type == "2" and order_type == "5":
         ) as payment_file:
 
             payment_reader = csv.reader(payment_file)
-            next(payment_reader, None)
+            first_payment_row = next(payment_reader, None)
+            if first_payment_row and first_payment_row[0].strip() != "Payment Date/Time":
+                payment_reader = iter([first_payment_row] + list(payment_reader))
 
             for payment_row in payment_reader:
                 if len(payment_row) < 14:
@@ -6603,7 +6848,9 @@ if customer_type == "2" and order_type == "6":
             payment_file
         )
 
-        next(payment_reader, None)
+        first_payment_row = next(payment_reader, None)
+        if first_payment_row and first_payment_row[0].strip() != "Payment Date/Time":
+            payment_reader = iter([first_payment_row] + list(payment_reader))
 
         for payment_row in payment_reader:
 
