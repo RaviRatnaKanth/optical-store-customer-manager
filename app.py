@@ -1469,6 +1469,7 @@ while True:
     customer_type = input(
         "Select Customer Type (1/2/3/4/5/6/7/8): "
     ).strip()
+    license_access_status = get_license_access_status()
     if customer_type.lower() == "admin":
         open_protected_admin_control()
         continue
