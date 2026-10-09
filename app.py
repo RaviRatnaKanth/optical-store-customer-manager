@@ -32,6 +32,286 @@ os.makedirs(
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from store_config import store_name, store_city, store_address, store_phone, store_email, store_website, store_logo
+def format_multi_order_payment_details(order_items, customer_name):
+    payment_order_lines = []
+
+    for item_number, item in enumerate(
+        order_items,
+        start=1,
+    ):
+        payment_order_lines.append(
+            f"Item {item_number}"
+        )
+
+        if item["person_type"] == "different":
+            person_text = item["person_name"]
+
+            if item["person_relation"]:
+                person_text += (
+                    f" ({item['person_relation']})"
+                )
+
+            payment_order_lines.append(
+                f"For: {person_text}"
+            )
+        else:
+            payment_order_lines.append(
+                f"For: {customer_name}"
+            )
+
+        if item["order_type"] == "1":
+            payment_order_lines.append(
+                "Order Type: Frame Only"
+            )
+
+        elif item["order_type"] == "2":
+            payment_order_lines.append(
+                "Order Type: Lenses Only"
+            )
+
+        else:
+            payment_order_lines.append(
+                "Order Type: Frame + Lenses"
+            )
+
+        if item["order_type"] in ["1", "3"]:
+            if item["frame_details"]:
+                payment_order_lines.append(
+                    "Frame: "
+                    f"{item['frame_details']}"
+                )
+
+            if (
+                item["frame_brand"]
+                and item["frame_brand"] != "Non-Brand"
+            ):
+                payment_order_lines.append(
+                    "Frame Brand: "
+                    f"{item['frame_brand']}"
+                )
+
+        if item["order_type"] in ["2", "3"]:
+            if item["lens_type"]:
+                payment_order_lines.append(
+                    "Lens: "
+                    f"{item['lens_type']}"
+                )
+
+            if item["lens_features"]:
+                payment_order_lines.append(
+                    "Lens Features / Coating: "
+                    f"{item['lens_features']}"
+                )
+
+            if (
+                item["lens_brand"]
+                and item["lens_brand"] != "Non-Brand"
+            ):
+                payment_order_lines.append(
+                    "Lens Brand: "
+                    f"{item['lens_brand']}"
+                )
+
+            if (
+                item["person_type"] == "different"
+                or item["prescription_mode"] == "different"
+            ):
+                payment_order_lines.append(
+                    "Prescription:"
+                )
+
+                payment_order_lines.append(
+                    "OD: "
+                    f"SPH {item['right_sph'] or '-'}, "
+                    f"CYL {item['right_cyl'] or 'Not Recorded'}, "
+                    f"AXIS {item['right_axis'] or '-'}, "
+                    f"ADD {item['right_add'] or 'Not Required'}"
+                )
+
+                payment_order_lines.append(
+                    "OS: "
+                    f"SPH {item['left_sph'] or '-'}, "
+                    f"CYL {item['left_cyl'] or 'Not Recorded'}, "
+                    f"AXIS {item['left_axis'] or '-'}, "
+                    f"ADD {item['left_add'] or 'Not Required'}"
+                )
+
+                if item["distance_pd"]:
+                    payment_order_lines.append(
+                        "Distance PD: "
+                        f"{item['distance_pd']}"
+                    )
+
+                if item["near_pd"]:
+                    payment_order_lines.append(
+                        "Near PD: "
+                        f"{item['near_pd']}"
+                    )
+
+            elif item["prescription_mode"] == "same":
+                payment_order_lines.append(
+                    "Prescription: Same Prescription"
+                )
+
+        if item["order_type"] in ["1", "3"]:
+            frame_amount = calculate_item_amount(
+                item["frame_price"],
+                item.get("frame_offer", ""),
+                item.get("frame_less_amount", 0.0)
+            )
+
+            payment_order_lines.append(
+                f"Frame Price: ₹{item['frame_price']:.2f}"
+            )
+
+            if item.get("frame_offer"):
+                payment_order_lines.append(
+                    f"Frame Offer: {item['frame_offer']}"
+                )
+
+            if item.get("frame_less_amount", 0.0) > 0:
+                payment_order_lines.append(
+                    "Frame Less: "
+                    f"₹{item['frame_less_amount']:.2f}"
+                )
+
+            payment_order_lines.append(
+                f"Frame Amount: ₹{frame_amount:.2f}"
+            )
+
+        if item["order_type"] in ["2", "3"]:
+            lens_amount = calculate_item_amount(
+                item["lens_price"],
+                item.get("lens_offer", ""),
+                item.get("lens_less_amount", 0.0)
+            )
+
+            payment_order_lines.append(
+                f"Lens Price: ₹{item['lens_price']:.2f}"
+            )
+
+            if item.get("lens_offer"):
+                payment_order_lines.append(
+                    f"Lens Offer: {item['lens_offer']}"
+                )
+
+            if item.get("lens_less_amount", 0.0) > 0:
+                payment_order_lines.append(
+                    "Lens Less: "
+                    f"₹{item['lens_less_amount']:.2f}"
+                )
+
+            payment_order_lines.append(
+                f"Lens Amount: ₹{lens_amount:.2f}"
+            )
+
+        item_total = (
+            calculate_item_amount(
+                item["frame_price"],
+                item.get("frame_offer", ""),
+                item.get("frame_less_amount", 0.0)
+            )
+            + calculate_item_amount(
+                item["lens_price"],
+                item.get("lens_offer", ""),
+                item.get("lens_less_amount", 0.0)
+            )
+        )
+        payment_order_lines.append(
+            f"Item Total: ₹{item_total:.2f}"
+        )
+        payment_order_lines.append("")
+
+    payment_order_details = "\n".join(
+        payment_order_lines
+    ).strip()
+    return payment_order_details
+
+
+def get_payment_order_item_rows(payment_row):
+    """Conservatively find item rows for a selected payment record.
+
+    Exact timestamp wins. If timestamps differ, use only a single
+    matching order group on the same day; ambiguous cases return [].
+    """
+    if len(payment_row) < 7 or not os.path.exists(ORDER_ITEMS_DATA_FILE):
+        return []
+    customer_name = payment_row[1].strip().casefold()
+    customer_phone = normalize_indian_phone(payment_row[2])
+    payment_time = payment_row[4].strip()
+    groups = {}
+    with open(ORDER_ITEMS_DATA_FILE, 'r', encoding='utf-8-sig', newline='') as f:
+        reader = csv.reader(f)
+        next(reader, None)
+        for row in reader:
+            if len(row) < 39 or row[5].strip().casefold() != customer_name:
+                continue
+            if customer_phone:
+                if normalize_indian_phone(row[6]) != customer_phone:
+                    continue
+            elif normalize_indian_phone(row[6]):
+                continue
+            key = (row[0].strip(), row[1].strip())
+            groups.setdefault(key, []).append(row)
+    exact = [rows for (oid, dt), rows in groups.items() if dt == payment_time]
+    if len(exact) == 1:
+        return exact[0]
+    if exact:
+        return []
+    same_day = [rows for (oid, dt), rows in groups.items()
+                if dt[:10] == payment_time[:10] and len(payment_time) >= 10]
+    return []
+
+
+def payment_item_rows_as_dicts(rows):
+    """Convert persisted order item CSV rows to the existing formatter shape."""
+    def amount(value):
+        try:
+            return float(value or 0)
+        except (TypeError, ValueError):
+            return 0.0
+    result = []
+    for row in sorted(rows, key=lambda r: int(r[7]) if r[7].isdigit() else 999999):
+        result.append({
+            'person_type': row[8], 'person_name': row[9],
+            'person_relation': row[10], 'order_type': row[13],
+            'prescription_mode': row[14],
+            'right_sph': row[16], 'right_cyl': row[17],
+            'right_axis': row[18], 'right_add': row[19],
+            'left_sph': row[20], 'left_cyl': row[21],
+            'left_axis': row[22], 'left_add': row[23],
+            'distance_pd': row[24], 'near_pd': row[25],
+            'frame_details': row[26], 'frame_brand': row[28],
+            'frame_price': amount(row[29]), 'frame_offer': row[30],
+            'frame_less_amount': amount(row[31]),
+            'lens_type': row[32], 'lens_features': row[33],
+            'lens_brand': row[34], 'lens_price': amount(row[35]),
+            'lens_offer': row[36], 'lens_less_amount': amount(row[37]),
+        })
+    return result
+
+
+def get_payment_update_order_details(payment_row):
+    rows = get_payment_order_item_rows(payment_row)
+    if not rows:
+        return 'Order Type: ' + payment_row[5]
+    items = payment_item_rows_as_dicts(rows)
+    details = format_multi_order_payment_details(items, payment_row[1])
+    gross = sum(calculate_item_amount(item['frame_price'], item['frame_offer'],
+                                      item['frame_less_amount'])
+                + calculate_item_amount(item['lens_price'], item['lens_offer'],
+                                        item['lens_less_amount']) for item in items)
+    try:
+        final = float(payment_row[6])
+    except (TypeError, ValueError):
+        return details
+    discount = gross - final
+    if discount > 0.005:
+        details += f'\n\nItem Subtotal: ₹{gross:.2f}\nOverall Discount: ₹{discount:.2f}'
+    details += f'\nFinal Amount: ₹{final:.2f}'
+    return 'Order Details\n' + details
+
+
 def print_text_document(document_text):
     import tempfile
 
@@ -1760,7 +2040,6 @@ def get_valid_visual_acuity(field_name):
             "Examples: 6/5, 6/6, 6/7.5, 6/9, 6/12, "
             "6/18, 6/24, 6/36, 6/60"
         )
-        print("Other accepted values: CF, HM, PL+, PL-")
 
         value = input(
             f"Enter {field_name} "
@@ -1770,8 +2049,6 @@ def get_valid_visual_acuity(field_name):
         if value == "":
             return ""
 
-        if value in ("CF", "HM", "PL+", "PL-"):
-            return value
 
         if value.startswith("6/"):
             denominator = value[2:]
@@ -1786,7 +2063,7 @@ def get_valid_visual_acuity(field_name):
 
         print(
             "Invalid vision value. Enter like 6/6, 6/9, "
-            "6/12, 6/60, CF, HM, PL+ or PL-."
+            "6/12, 6/18, 6/24, 6/36 or 6/60."
         )
 
 
@@ -3411,6 +3688,9 @@ Thank you,
                 )
             )
 
+            payment_update_order_details = get_payment_update_order_details(
+                selected_pending_order
+            )
             payment_update_message = f"""
 {store_name}
 {store_city}
@@ -3420,7 +3700,7 @@ Thank you,
 Customer Name: {selected_pending_order[1]}
 {update_title}
 
-Order Type: {selected_pending_order[5]}
+{payment_update_order_details}
 Order Date / Time: {selected_pending_order[4]}
 
 Total Amount: ₹{total_amount_value:.2f}
@@ -5039,13 +5319,13 @@ Prescription Source: {f"{store_name} Eye Testing" if prescription_source == "In-
 
 Right Eye (OD):
 SPH: {previous_right_sph}
-CYL: {previous_right_cyl if previous_right_cyl else "0"}
+CYL: {previous_right_cyl if previous_right_cyl else "Not Recorded"}
 AXIS: {previous_right_axis if previous_right_axis else "Not Required"}
 ADD: {previous_right_add if previous_right_add else "Not Required"}
 
 Left Eye (OS):
 SPH: {previous_left_sph}
-CYL: {previous_left_cyl if previous_left_cyl else "0"}
+CYL: {previous_left_cyl if previous_left_cyl else "Not Recorded"}
 AXIS: {previous_left_axis if previous_left_axis else "Not Required"}
 ADD: {previous_left_add if previous_left_add else "Not Required"}
 
@@ -5278,13 +5558,13 @@ Prescription Source: {f"{store_name} Eye Testing" if prescription_source == "In-
 
 Right Eye (OD):
 SPH: {previous_right_sph}
-CYL: {previous_right_cyl if previous_right_cyl else "0"}
+CYL: {previous_right_cyl if previous_right_cyl else "Not Recorded"}
 AXIS: {previous_right_axis if previous_right_axis else "Not Required"}
 ADD: {previous_right_add if previous_right_add else "Not Required"}
 
 Left Eye (OS):
 SPH: {previous_left_sph}
-CYL: {previous_left_cyl if previous_left_cyl else "0"}
+CYL: {previous_left_cyl if previous_left_cyl else "Not Recorded"}
 AXIS: {previous_left_axis if previous_left_axis else "Not Required"}
 ADD: {previous_left_add if previous_left_add else "Not Required"}
 
@@ -5965,7 +6245,7 @@ if customer_type == "2" and order_type == "4":
         print("OD:")
         print(
             f"SPH: {right_sph} | "
-            f"CYL: {right_cyl if right_cyl else '0'} | "
+            f"CYL: {right_cyl if right_cyl else 'Not Recorded'} | "
             f"AXIS: {right_axis if right_axis else 'Not Required'} | "
             f"ADD: {right_add}"
         )
@@ -5973,7 +6253,7 @@ if customer_type == "2" and order_type == "4":
         print("OS:")
         print(
             f"SPH: {left_sph} | "
-            f"CYL: {left_cyl if left_cyl else '0'} | "
+            f"CYL: {left_cyl if left_cyl else 'Not Recorded'} | "
             f"AXIS: {left_axis if left_axis else 'Not Required'} | "
             f"ADD: {left_add}"        )
     else:
@@ -5992,13 +6272,13 @@ Spectacle Prescription
 
 Right Eye (OD):
 SPH: {right_sph}
-CYL: {right_cyl}
+CYL: {right_cyl if right_cyl else "Not Recorded"}
 AXIS: {right_axis if right_axis else "Not Required"}
 ADD: {right_add if right_add else "Not Required"}
 
 Left Eye (OS):
 SPH: {left_sph}
-CYL: {left_cyl}
+CYL: {left_cyl if left_cyl else "Not Recorded"}
 AXIS: {left_axis if left_axis else "Not Required"}
 ADD: {left_add if left_add else "Not Required"}
 
@@ -7266,6 +7546,9 @@ if customer_type == "2" and order_type == "6":
                 )
             )
 
+            payment_update_order_details = get_payment_update_order_details(
+                selected_payment
+            )
             payment_update_message = f"""
 {store_name}
 {store_city}
@@ -7275,7 +7558,7 @@ if customer_type == "2" and order_type == "6":
 Customer Name: {selected_customer[5]}
 {update_title}
 
-Order Type: {order_type_name}
+{payment_update_order_details}
 Order Date / Time: {order_datetime}
 
 Total Amount: ₹{total_amount_value:.2f}
@@ -9521,16 +9804,18 @@ while True:
 
         if additional_order_type in ["2", "3"]:
             print("\n--- Additional Lens Details ---")
+            additional_prescription_choice = "3"
             if additional_person_choice == "1" and order_type != "1":
                 print(
                     "\n--- Prescription for This Item ---"
                 )
-                print("1. Use Same Prescription")
-                print("2. Enter Different Prescription")
+                print("1. Use Same Prescription & Same Lens Type")
+                print("2. Use Same Prescription & Change Lens Type")
+                print("3. Enter Different Prescription")
 
                 while True:
                     additional_prescription_choice = input(
-                        "Select Prescription Option (1/2): "
+                        "Select Prescription Option (1/2/3): "
                     ).strip()
 
                     if additional_prescription_choice == "1":
@@ -9538,12 +9823,14 @@ while True:
                         break
 
                     if additional_prescription_choice == "2":
-                        additional_prescription_mode = (
-                            "different"
-                        )
+                        additional_prescription_mode = "same"
                         break
 
-                    print("Please select 1 or 2.")
+                    if additional_prescription_choice == "3":
+                        additional_prescription_mode = "different"
+                        break
+
+                    print("Please select 1, 2 or 3.")
 
             else:
                 additional_prescription_mode = "different"
@@ -9559,9 +9846,8 @@ while True:
                         "Enter Separate Prescription."
                     )
             if additional_prescription_mode == "same":
-                additional_lens_type = lens_type
-                additional_lens_type_choice = lens_type_choice
-                additional_add_requirement = add_requirement
+                print("\nPrescription will be reused.")
+                print("Original prescription values will be reused.")
 
                 additional_right_sph = right_sph
                 additional_right_cyl = right_cyl
@@ -9576,11 +9862,63 @@ while True:
                 additional_distance_pd = distance_pd
                 additional_near_pd = near_pd
 
-                print(
-                    "Using same Lens Type and Prescription."
-                )
+                if additional_prescription_choice == "1":
+                    additional_lens_type = lens_type
+                    additional_lens_type_choice = lens_type_choice
+                    additional_add_requirement = add_requirement
+                    print(
+                        "Using same Lens Type and Prescription."
+                    )
+                else:
+                    print("Select Lens Type for this item.")
 
-            else:
+            if additional_prescription_choice == "2":
+                print("\n--- Change Bifocal Lens Type ---")
+                print("1. Kryptok Bifocal")
+                print("2. D Bifocal")
+                print("3. Progressive Bifocal")
+                print("4. Other")
+
+                bifocal_options = {
+                    "1": "Kryptok Bifocal",
+                    "2": "D Bifocal",
+                    "3": "Progressive Bifocal",
+                    "4": "Other",
+                }
+
+                while True:
+                    additional_bifocal_choice = input(
+                        "Select Bifocal Type (1/2/3/4): "
+                    ).strip()
+
+                    if additional_bifocal_choice in bifocal_options:
+                        additional_lens_type = bifocal_options[
+                            additional_bifocal_choice
+                        ]
+                        additional_lens_type_choice = "2"
+                        additional_add_requirement = add_requirement
+
+                        if not additional_add_requirement:
+                            print("\n--- ADD Requirement ---")
+                            print("1. Both Eyes")
+                            print("2. Right Eye (OD) Only")
+                            print("3. Left Eye (OS) Only")
+
+                            while True:
+                                additional_add_requirement = input(
+                                    "Select ADD Requirement (1/2/3): "
+                                ).strip()
+
+                                if additional_add_requirement in ("1", "2", "3"):
+                                    break
+
+                                print("Please select 1, 2 or 3.")
+
+                        break
+
+                    print("Please select 1, 2, 3 or 4.")
+
+            if additional_prescription_mode == "different":
                 print("\n--- Lens Type ---")
                 print("1. Single Vision")
                 print("2. Bifocal")
@@ -9664,6 +10002,36 @@ while True:
                         "Invalid option. Please select 1 or 2."
                     )
 
+            if additional_prescription_mode == "same":
+                if additional_prescription_choice == "1":
+                    pass
+                elif additional_lens_type_choice == "1":
+                    additional_right_add = ""
+                    additional_left_add = ""
+                    additional_near_pd = ""
+                else:
+                    if additional_add_requirement in ("1", "2"):
+                        if not additional_right_add:
+                            additional_right_add = get_old_add(
+                                "Right Eye"
+                            )
+                    else:
+                        additional_right_add = ""
+
+                    if additional_add_requirement in ("1", "3"):
+                        if not additional_left_add:
+                            additional_left_add = get_old_add(
+                                "Left Eye"
+                            )
+                    else:
+                        additional_left_add = ""
+
+                    if not additional_near_pd:
+                        additional_near_pd = input(
+                            "Enter Near PD for Bifocal "
+                            "(Optional): "
+                        ).strip()
+            else:
                 additional_prescription = (
                     get_item_prescription_details(
                         additional_lens_type_choice,
@@ -12173,13 +12541,13 @@ if customer_type in ["1", "2"] and order_type == "2":
         print("\n   Current Prescription")
         print(
             f"   OD: SPH {right_sph} | "
-            f"CYL {right_cyl if right_cyl else '0'} | "
+            f"CYL {right_cyl if right_cyl else 'Not Recorded'} | "
             f"AXIS {right_axis if right_axis else 'Not Required'} | "
             f"ADD {right_add if right_add else 'Not Required'}"
         )
         print(
             f"   OS: SPH {left_sph} | "
-            f"CYL {left_cyl if left_cyl else '0'} | "
+            f"CYL {left_cyl if left_cyl else 'Not Recorded'} | "
             f"AXIS {left_axis if left_axis else 'Not Required'} | "
             f"ADD {left_add if left_add else 'Not Required'}"
         )
@@ -14341,13 +14709,13 @@ if customer_type in ["1", "2"] and order_type == "3":
         print("\n   Current Prescription")
         print(
             f"   OD: SPH {right_sph} | "
-            f"CYL {right_cyl if right_cyl else '0'} | "
+            f"CYL {right_cyl if right_cyl else 'Not Recorded'} | "
             f"AXIS {right_axis if right_axis else 'Not Required'} | "
             f"ADD {right_add if right_add else 'Not Required'}"
         )
         print(
             f"   OS: SPH {left_sph} | "
-            f"CYL {left_cyl if left_cyl else '0'} | "
+            f"CYL {left_cyl if left_cyl else 'Not Recorded'} | "
             f"AXIS {left_axis if left_axis else 'Not Required'} | "
             f"ADD {left_add if left_add else 'Not Required'}"
         )
@@ -17840,7 +18208,7 @@ for item_number, item in enumerate(
     ).strip()
 
     person_relationship = str(
-        item.get("person_relationship", "")
+        item.get("person_relation", "")
     ).strip()
 
     if person_name:
@@ -17851,6 +18219,21 @@ for item_number, item in enumerate(
             "Relationship:",
             person_relationship
         )
+
+    if item.get("person_type") == "different":
+        person_gender = str(
+            item.get("person_gender", "")
+        ).strip()
+
+        person_age = str(
+            item.get("person_age", "")
+        ).strip()
+
+        if person_gender:
+            print("Person Gender:", person_gender)
+
+        if person_age:
+            print("Person Age:", person_age)
 
     if item_order_type in ["1", "3"]:
         item_frame_details = str(
@@ -18006,6 +18389,47 @@ for item_number, item in enumerate(
     )
 
 
+    if item_number > 1 and item_order_type in ["2", "3"]:
+        item_prescription_mode = item.get(
+            "prescription_mode", ""
+        )
+
+        if item_prescription_mode == "same":
+            print("Prescription: Same as Main Prescription")
+            print(
+                "ADD (OD/OS):",
+                item.get("right_add") or "Not Required",
+                "/",
+                item.get("left_add") or "Not Required"
+            )
+
+        elif item_prescription_mode == "different":
+            print("--- Additional Item Prescription ---")
+
+            for eye_label, prefix in [
+                ("Right Eye (OD)", "right"),
+                ("Left Eye (OS)", "left")
+            ]:
+                print(
+                    eye_label + ":",
+                    "SPH =", item.get(prefix + "_sph", ""),
+                    "CYL =", item.get(prefix + "_cyl") or "Not Recorded",
+                    "AXIS =", item.get(prefix + "_axis", ""),
+                    "ADD =",
+                    item.get(prefix + "_add") or "Not Required"
+                )
+
+            if item.get("distance_pd") or item.get("near_pd"):
+                print(
+                    "Distance PD:",
+                    item.get("distance_pd") or "Not Measured"
+                )
+                print(
+                    "Near PD:",
+                    item.get("near_pd") or "Not Measured"
+                )
+
+
 # ---------------- CURRENT PRESCRIPTION ----------------
 
 if order_type in ["2", "3"]:
@@ -18015,7 +18439,7 @@ if order_type in ["2", "3"]:
     print(
         "Right Eye (OD):",
         "SPH =", right_sph,
-        "CYL =", right_cyl,
+        "CYL =", right_cyl or "Not Recorded",
         "AXIS =", right_axis,
         "ADD =",
         right_add if right_add else "Not Required"
@@ -18024,7 +18448,7 @@ if order_type in ["2", "3"]:
     print(
         "Left Eye (OS):",
         "SPH =", left_sph,
-        "CYL =", left_cyl,
+        "CYL =", left_cyl or "Not Recorded",
         "AXIS =", left_axis,
         "ADD =",
         left_add if left_add else "Not Required"
@@ -18392,13 +18816,13 @@ Prescription Source: {prescription_source}
 Spectacle Prescription
 Right Eye (OD):
 SPH: {right_sph}
-CYL: {right_cyl}
+CYL: {right_cyl if right_cyl else "Not Recorded"}
 AXIS: {right_axis if right_axis else "Not Required"}
 ADD: {right_add if right_add else "Not Required"}
 
 Left Eye (OS):
 SPH: {left_sph}
-CYL: {left_cyl}
+CYL: {left_cyl if left_cyl else "Not Recorded"}
 AXIS: {left_axis if left_axis else "Not Required"}
 ADD: {left_add if left_add else "Not Required"}
 {f"Pupillary Distance (PD):\nDistance PD: {distance_pd}\nNear PD: {near_pd}\n" if distance_pd or near_pd else ""}
@@ -18447,7 +18871,7 @@ for item_number, item in enumerate(
         f"SPH: {item['right_sph']}"
     )
     additional_prescription_lines.append(
-        f"CYL: {item['right_cyl']}"
+        f"CYL: {item['right_cyl'] if item['right_cyl'] else 'Not Recorded'}"
     )
     additional_prescription_lines.append(
         "AXIS: "
@@ -18468,7 +18892,7 @@ for item_number, item in enumerate(
         f"SPH: {item['left_sph']}"
     )
     additional_prescription_lines.append(
-        f"CYL: {item['left_cyl']}"
+        f"CYL: {item['left_cyl'] if item['left_cyl'] else 'Not Recorded'}"
     )
     additional_prescription_lines.append(
         "AXIS: "
@@ -18535,10 +18959,24 @@ if message_choice == "1":
     if not phone:
         print("SMS Text cannot be prepared - Customer phone number is not available.")
     else:
-        sms_message = prescription_message
+        print("\n--- SMS Text / Copy ---")
+        print("1. Prescription Only")
+        print("2. Payment Only")
+        print("3. Prescription + Payment")
 
-        print("\n--- SMS TEXT / COPY ---")
-        print(sms_message)
+        while True:
+            sms_choice = input(
+                "Select SMS Option (1/2/3): "
+            ).strip()
+
+            if sms_choice in ("1", "2", "3"):
+                break
+
+            print("Please select 1, 2 or 3.")
+
+        if sms_choice == "1":
+            print("\n--- SMS TEXT / COPY ---")
+            print(prescription_message)
 if message_choice == "2":
     if not phone:
         print("WhatsApp Prescription cannot be sent - Customer phone number is not available.")
@@ -18555,7 +18993,11 @@ if message_choice == "2" and phone:
         print("Opening WhatsApp Order...")
     else:
         print("Opening WhatsApp Prescription...")
-if message_choice in ["3", "5"]:
+if message_choice in ["3", "5"] or (
+    message_choice == "1"
+    and phone
+    and sms_choice in ("2", "3")
+):
     if not phone:
         if message_choice == "3":
             print(
@@ -18571,198 +19013,9 @@ if message_choice in ["3", "5"]:
         import urllib.parse
         import webbrowser
 
-        payment_order_lines = []
-
-        for item_number, item in enumerate(
-            order_items,
-            start=1,
-        ):
-            payment_order_lines.append(
-                f"Item {item_number}"
-            )
-
-            if item["person_type"] == "different":
-                person_text = item["person_name"]
-
-                if item["person_relation"]:
-                    person_text += (
-                        f" ({item['person_relation']})"
-                    )
-
-                payment_order_lines.append(
-                    f"For: {person_text}"
-                )
-            else:
-                payment_order_lines.append(
-                    f"For: {customer_name}"
-                )
-
-            if item["order_type"] == "1":
-                payment_order_lines.append(
-                    "Order Type: Frame Only"
-                )
-
-            elif item["order_type"] == "2":
-                payment_order_lines.append(
-                    "Order Type: Lenses Only"
-                )
-
-            else:
-                payment_order_lines.append(
-                    "Order Type: Frame + Lenses"
-                )
-
-            if item["order_type"] in ["1", "3"]:
-                if item["frame_details"]:
-                    payment_order_lines.append(
-                        "Frame: "
-                        f"{item['frame_details']}"
-                    )
-
-                if (
-                    item["frame_brand"]
-                    and item["frame_brand"] != "Non-Brand"
-                ):
-                    payment_order_lines.append(
-                        "Frame Brand: "
-                        f"{item['frame_brand']}"
-                    )
-
-            if item["order_type"] in ["2", "3"]:
-                if item["lens_type"]:
-                    payment_order_lines.append(
-                        "Lens: "
-                        f"{item['lens_type']}"
-                    )
-
-                if item["lens_features"]:
-                    payment_order_lines.append(
-                        "Lens Features / Coating: "
-                        f"{item['lens_features']}"
-                    )
-
-                if (
-                    item["lens_brand"]
-                    and item["lens_brand"] != "Non-Brand"
-                ):
-                    payment_order_lines.append(
-                        "Lens Brand: "
-                        f"{item['lens_brand']}"
-                    )
-
-                if (
-                    item["person_type"] == "different"
-                    or item["prescription_mode"] == "different"
-                ):
-                    payment_order_lines.append(
-                        "Prescription:"
-                    )
-
-                    payment_order_lines.append(
-                        "OD: "
-                        f"SPH {item['right_sph'] or '-'}, "
-                        f"CYL {item['right_cyl'] or '-'}, "
-                        f"AXIS {item['right_axis'] or '-'}, "
-                        f"ADD {item['right_add'] or 'Not Required'}"
-                    )
-
-                    payment_order_lines.append(
-                        "OS: "
-                        f"SPH {item['left_sph'] or '-'}, "
-                        f"CYL {item['left_cyl'] or '-'}, "
-                        f"AXIS {item['left_axis'] or '-'}, "
-                        f"ADD {item['left_add'] or 'Not Required'}"
-                    )
-
-                    if item["distance_pd"]:
-                        payment_order_lines.append(
-                            "Distance PD: "
-                            f"{item['distance_pd']}"
-                        )
-
-                    if item["near_pd"]:
-                        payment_order_lines.append(
-                            "Near PD: "
-                            f"{item['near_pd']}"
-                        )
-
-                elif item["prescription_mode"] == "same":
-                    payment_order_lines.append(
-                        "Prescription: Same Prescription"
-                    )
-
-            if item["order_type"] in ["1", "3"]:
-                frame_amount = calculate_item_amount(
-                    item["frame_price"],
-                    item.get("frame_offer", ""),
-                    item.get("frame_less_amount", 0.0)
-                )
-
-                payment_order_lines.append(
-                    f"Frame Price: ₹{item['frame_price']:.2f}"
-                )
-
-                if item.get("frame_offer"):
-                    payment_order_lines.append(
-                        f"Frame Offer: {item['frame_offer']}"
-                    )
-
-                if item.get("frame_less_amount", 0.0) > 0:
-                    payment_order_lines.append(
-                        "Frame Less: "
-                        f"₹{item['frame_less_amount']:.2f}"
-                    )
-
-                payment_order_lines.append(
-                    f"Frame Amount: ₹{frame_amount:.2f}"
-                )
-
-            if item["order_type"] in ["2", "3"]:
-                lens_amount = calculate_item_amount(
-                    item["lens_price"],
-                    item.get("lens_offer", ""),
-                    item.get("lens_less_amount", 0.0)
-                )
-
-                payment_order_lines.append(
-                    f"Lens Price: ₹{item['lens_price']:.2f}"
-                )
-
-                if item.get("lens_offer"):
-                    payment_order_lines.append(
-                        f"Lens Offer: {item['lens_offer']}"
-                    )
-
-                if item.get("lens_less_amount", 0.0) > 0:
-                    payment_order_lines.append(
-                        "Lens Less: "
-                        f"₹{item['lens_less_amount']:.2f}"
-                    )
-
-                payment_order_lines.append(
-                    f"Lens Amount: ₹{lens_amount:.2f}"
-                )
-
-            item_total = (
-                calculate_item_amount(
-                    item["frame_price"],
-                    item.get("frame_offer", ""),
-                    item.get("frame_less_amount", 0.0)
-                )
-                + calculate_item_amount(
-                    item["lens_price"],
-                    item.get("lens_offer", ""),
-                    item.get("lens_less_amount", 0.0)
-                )
-            )
-            payment_order_lines.append(
-                f"Item Total: ₹{item_total:.2f}"
-            )
-            payment_order_lines.append("")
-
-        payment_order_details = "\n".join(
-            payment_order_lines
-        ).strip()
+        payment_order_details = format_multi_order_payment_details(
+            order_items, customer_name
+        )
         payment_summary_lines = [
             f"Total Amount: ₹{order_total:.2f}"
         ]
@@ -18771,19 +19024,12 @@ if message_choice in ["3", "5"]:
             payment_summary_lines.append(
                 f"Discount Amount: ₹{less_amount:.2f}"
             )
-            payment_summary_lines.append(
-                f"Final Amount: ₹{total_amount:.2f}"
-            )
 
-        if advance_amount > 0:
-            payment_summary_lines.append(
-                f"Advance Amount: ₹{advance_amount:.2f}"
-            )
-
-            if balance > 0:
-                payment_summary_lines.append(
-                    f"Balance Amount: ₹{balance:.2f}"
-                )
+        payment_summary_lines.extend([
+            f"Final Amount: ₹{total_amount:.2f}",
+            f"Advance Amount: ₹{advance_amount:.2f}",
+            f"Balance Amount: ₹{balance:.2f}",
+        ])
 
         payment_summary = "\n".join(
             payment_summary_lines
@@ -18805,8 +19051,40 @@ Order Details
 Payment Details
 {payment_summary}
 
+Delivery Status: {delivery_status}
+
 Thank you for choosing {store_name}.
 """
+
+        if message_choice == "1":
+            if sms_choice == "2":
+                sms_message = payment_message
+                print("\n--- SMS PAYMENT ONLY ---")
+                print(sms_message)
+
+            elif sms_choice == "3":
+                payment_section = (
+                    "Order Details\n"
+                    + payment_order_details
+                    + "\n\nPayment Details\n"
+                    + payment_summary
+                    + "\n\nDelivery Status: "
+                    + str(delivery_status)
+                )
+
+                sms_message = (
+                    prescription_message.rstrip()
+                    + "\n\n"
+                    + payment_section
+                )
+                if "Thank you for choosing" not in prescription_message:
+                    sms_message += (
+                        "\n\nThank you for choosing "
+                        + store_name
+                        + "."
+                    )
+                print("\n--- SMS PRESCRIPTION + PAYMENT ---")
+                print(sms_message)
 
         if message_choice == "3":
             whatsapp_message = urllib.parse.quote(
@@ -18859,18 +19137,21 @@ if message_choice == "5":
         import urllib.parse
         import webbrowser
 
-        combined_message = f"""{prescription_message}
-
-Order Details
-
-{payment_order_details}
-
-Payment Details
-
-{payment_summary}
-
-Thank you for choosing {store_name}.
-"""
+        combined_message = (
+            prescription_message.rstrip()
+            + "\n\nOrder Details\n"
+            + payment_order_details
+            + "\n\nPayment Details\n"
+            + payment_summary
+            + "\n\nDelivery Status: "
+            + str(delivery_status)
+        )
+        if "Thank you for choosing" not in prescription_message:
+            combined_message += (
+                "\n\nThank you for choosing "
+                + store_name
+                + "."
+            )
         whatsapp_message = urllib.parse.quote(combined_message)
         whatsapp_url = f"https://wa.me/91{phone}?text={whatsapp_message}"
 
