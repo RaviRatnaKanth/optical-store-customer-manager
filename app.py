@@ -8156,6 +8156,8 @@ surgery_eye = ""
 right_iol = "No"
 left_iol = "No"
 
+right_iol_add_required = False
+left_iol_add_required = False
 if (
     order_type in ["2", "3"]
     and not (
@@ -8202,6 +8204,22 @@ if (
                         "Please enter y for Yes or n for No."
                     )
 
+            if right_iol == "Yes":
+                while True:
+                    add_answer = input(
+                        "Right Eye IOL - ADD Required? (y/n): "
+                    ).strip().lower()
+
+                    if add_answer in ["y", "yes"]:
+                        right_iol_add_required = True
+                        break
+
+                    if add_answer in ["n", "no"]:
+                        right_iol_add_required = False
+                        break
+
+                    print("Please enter y or n.")
+
             break
 
         elif surgery_choice == "3":
@@ -8225,6 +8243,22 @@ if (
                     print(
                         "Please enter y for Yes or n for No."
                     )
+
+            if left_iol == "Yes":
+                while True:
+                    add_answer = input(
+                        "Left Eye IOL - ADD Required? (y/n): "
+                    ).strip().lower()
+
+                    if add_answer in ["y", "yes"]:
+                        left_iol_add_required = True
+                        break
+
+                    if add_answer in ["n", "no"]:
+                        left_iol_add_required = False
+                        break
+
+                    print("Please enter y or n.")
 
             break
 
@@ -8267,6 +8301,38 @@ if (
                     print(
                         "Please enter y for Yes or n for No."
                     )
+
+            if right_iol == "Yes":
+                while True:
+                    answer = input(
+                        "Right Eye IOL - ADD Required? (y/n): "
+                    ).strip().lower()
+
+                    if answer in ["y", "yes"]:
+                        right_iol_add_required = True
+                        break
+
+                    if answer in ["n", "no"]:
+                        right_iol_add_required = False
+                        break
+
+                    print("Please enter y or n.")
+
+            if left_iol == "Yes":
+                while True:
+                    answer = input(
+                        "Left Eye IOL - ADD Required? (y/n): "
+                    ).strip().lower()
+
+                    if answer in ["y", "yes"]:
+                        left_iol_add_required = True
+                        break
+
+                    if answer in ["n", "no"]:
+                        left_iol_add_required = False
+                        break
+
+                    print("Please enter y or n.")
 
             break
 
@@ -8378,7 +8444,13 @@ elif order_type in ["2", "3"]:
 
         print("Invalid AXIS. Enter a number from 0 to 180 or leave blank.")
 
-    if lens_type_choice == "1" or add_requirement == "3":
+    if (
+        not right_iol_add_required
+        and (
+            lens_type_choice == "1"
+            or add_requirement == "3"
+        )
+    ):
         right_add = ""
     else:
         while True:
@@ -8478,7 +8550,13 @@ elif order_type in ["2", "3"]:
         print("Invalid AXIS. Enter a number from 0 to 180 or leave blank.")
 
     # Left Eye ADD Logic
-    if lens_type_choice == "1" or add_requirement == "2":
+    if (
+        not left_iol_add_required
+        and (
+            lens_type_choice == "1"
+            or add_requirement == "2"
+        )
+    ):
         left_add = ""
     else:
         while True:
@@ -18812,6 +18890,7 @@ Time: {record_time}
 Prescription Source: {prescription_source}
 {f"Prescription From: {prescription_from}" if prescription_source == "External Prescription" and prescription_from else ""}
 {("Prescription details are as provided in the external prescription." if prescription_source == "External Prescription" else "Prescription details are based on the existing prescription on record." if prescription_source == "Existing Prescription on Record" else "")}
+{("Eye Surgery / IOL History" + chr(10) + "Eye Surgery: Yes" + chr(10) + "Surgery Eye: " + surgery_eye + chr(10) + ("Right Eye IOL: " + right_iol + chr(10) if surgery_eye in ["Right Eye (OD)", "Both Eyes"] else "") + ("Left Eye IOL: " + left_iol + chr(10) if surgery_eye in ["Left Eye (OS)", "Both Eyes"] else "")) if eye_surgery == "Yes" else ""}
 
 Spectacle Prescription
 Right Eye (OD):
