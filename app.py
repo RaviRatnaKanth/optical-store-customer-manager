@@ -17233,6 +17233,111 @@ if customer_type in ["1", "2"] and order_type == "3":
                             "Please select 1, 2, 3 or 4."
                         )
 
+                    right_iol_add_required = False
+                    left_iol_add_required = False
+
+                    if right_iol == "Yes":
+                        while True:
+                            answer = input(
+                                "Right Eye IOL - ADD Required? (y/n): "
+                            ).strip().lower()
+
+                            if answer in ("y", "yes"):
+                                right_iol_add_required = True
+                                break
+
+                            if answer in ("n", "no"):
+                                break
+
+                            print("Please enter y or n.")
+
+                    if left_iol == "Yes":
+                        while True:
+                            answer = input(
+                                "Left Eye IOL - ADD Required? (y/n): "
+                            ).strip().lower()
+
+                            if answer in ("y", "yes"):
+                                left_iol_add_required = True
+                                break
+
+                            if answer in ("n", "no"):
+                                break
+
+                            print("Please enter y or n.")
+
+                    if (
+                        not right_iol_add_required
+                        and (
+                            lens_type_choice == "1"
+                            or add_requirement == "3"
+                        )
+                    ):
+                        right_add = ""
+
+                    if (
+                        not left_iol_add_required
+                        and (
+                            lens_type_choice == "1"
+                            or add_requirement == "2"
+                        )
+                    ):
+                        left_add = ""
+
+                    if right_iol_add_required and not right_add:
+                        while True:
+                            new_right_add = input(
+                                "Enter Right Eye ADD / Near Power (+): "
+                            ).strip()
+
+                            if new_right_add.startswith("+"):
+                                number_part = new_right_add[1:]
+                                parts = number_part.split(".")
+
+                                if (
+                                    len(parts) == 2
+                                    and parts[0].isdigit()
+                                    and len(parts[1]) == 2
+                                    and parts[1] in ["00", "25", "50", "75"]
+                                    and 0.75 <= float(number_part) <= 5
+                                ):
+                                    if confirm_high_add(new_right_add):
+                                        right_add = new_right_add
+                                        break
+                                    continue
+
+                            print(
+                                "Invalid ADD. Enter like "
+                                "+1.00, +1.25, +1.50 or +2.00."
+                            )
+
+                    if left_iol_add_required and not left_add:
+                        while True:
+                            new_left_add = input(
+                                "Enter Left Eye ADD / Near Power (+): "
+                            ).strip()
+
+                            if new_left_add.startswith("+"):
+                                number_part = new_left_add[1:]
+                                parts = number_part.split(".")
+
+                                if (
+                                    len(parts) == 2
+                                    and parts[0].isdigit()
+                                    and len(parts[1]) == 2
+                                    and parts[1] in ["00", "25", "50", "75"]
+                                    and 0.75 <= float(number_part) <= 5
+                                ):
+                                    if confirm_high_add(new_left_add):
+                                        left_add = new_left_add
+                                        break
+                                    continue
+
+                            print(
+                                "Invalid ADD. Enter like "
+                                "+1.00, +1.25, +1.50 or +2.00."
+                            )
+
                     print(
                         "Eye Surgery / IOL History "
                         "updated successfully."
@@ -17265,8 +17370,11 @@ if customer_type in ["1", "2"] and order_type == "3":
                         print("3. Right Eye (OD) AXIS")
 
                         if (
-                            lens_type_choice != "1"
-                            and add_requirement != "3"
+                            right_iol_add_required
+                            or (
+                                lens_type_choice != "1"
+                                and add_requirement != "3"
+                            )
                         ):
                             print("4. Right Eye (OD) ADD")
                         else:
@@ -17277,8 +17385,11 @@ if customer_type in ["1", "2"] and order_type == "3":
                         print("7. Left Eye (OS) AXIS")
 
                         if (
-                            lens_type_choice != "1"
-                            and add_requirement != "2"
+                            left_iol_add_required
+                            or (
+                                lens_type_choice != "1"
+                                and add_requirement != "2"
+                            )
                         ):
                             print("8. Left Eye (OS) ADD")
                         else:
@@ -17419,8 +17530,11 @@ if customer_type in ["1", "2"] and order_type == "3":
                         if current_rx_edit_choice == "4":
 
                             if (
-                                lens_type_choice == "1"
-                                or add_requirement == "3"
+                                not right_iol_add_required
+                                and (
+                                    lens_type_choice == "1"
+                                    or add_requirement == "3"
+                                )
                             ):
                                 right_add = ""
                                 print(
@@ -17596,8 +17710,11 @@ if customer_type in ["1", "2"] and order_type == "3":
                         if current_rx_edit_choice == "8":
 
                             if (
-                                lens_type_choice == "1"
-                                or add_requirement == "2"
+                                not left_iol_add_required
+                                and (
+                                    lens_type_choice == "1"
+                                    or add_requirement == "2"
+                                )
                             ):
                                 left_add = ""
                                 print(
@@ -19209,33 +19326,30 @@ Thank you,
 
         webbrowser.open(whatsapp_url)
         print("Opening WhatsApp Balance Reminder...")
-if message_choice == "5":
-    if not phone:
-        print("WhatsApp Prescription + Payment cannot be sent - Customer phone number is not available.")
-    else:
-        import urllib.parse
-        import webbrowser
+if message_choice == "5" and phone:
+    import urllib.parse
+    import webbrowser
 
-        combined_message = (
-            prescription_message.rstrip()
-            + "\n\nOrder Details\n"
-            + payment_order_details
-            + "\n\nPayment Details\n"
-            + payment_summary
-            + "\n\nDelivery Status: "
-            + str(delivery_status)
+    combined_message = (
+        prescription_message.rstrip()
+        + "\n\nOrder Details\n"
+        + payment_order_details
+        + "\n\nPayment Details\n"
+        + payment_summary
+        + "\n\nDelivery Status: "
+        + str(delivery_status)
+    )
+    if "Thank you for choosing" not in prescription_message:
+        combined_message += (
+            "\n\nThank you for choosing "
+            + store_name
+            + "."
         )
-        if "Thank you for choosing" not in prescription_message:
-            combined_message += (
-                "\n\nThank you for choosing "
-                + store_name
-                + "."
-            )
-        whatsapp_message = urllib.parse.quote(combined_message)
-        whatsapp_url = f"https://wa.me/91{phone}?text={whatsapp_message}"
+    whatsapp_message = urllib.parse.quote(combined_message)
+    whatsapp_url = f"https://wa.me/91{phone}?text={whatsapp_message}"
 
-        webbrowser.open(whatsapp_url)
-        print("Opening WhatsApp Prescription + Payment...")
+    webbrowser.open(whatsapp_url)
+    print("Opening WhatsApp Prescription + Payment...")
 # ==================================================
 # PRINT HELPERS
 # ==================================================
@@ -19243,6 +19357,10 @@ if message_choice == "5":
 # ==================================================
 # PRINT MENU
 # ==================================================
+
+payment_order_details = format_multi_order_payment_details(
+    order_items, customer_name
+)
 
 print("\n--- Print ---")
 print("1. Print Prescription")
